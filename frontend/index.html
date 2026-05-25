@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA AI Tools</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="progressBar"></div>
+  <div class="container">
+    <header>
+      <h1>QA AI Tools</h1>
+      <p>Test case review &amp; improvement</p>
+    </header>
+
+    <!-- TestIT Import (primary flow) -->
+    <div class="testit-import">
+      <h2>Fetch test case from TestIT</h2>
+      <div class="import-row">
+        <input type="text" id="fetchInput" class="fetch-input"
+               placeholder="Test case ID — e.g. 6109" />
+        <button class="btn-primary" id="btnFetch">Fetch from TestIT</button>
+      </div>
+      <div id="fetchOutput" style="display:none;">
+        <div class="block-progress" id="fetchProgress"></div>
+        <div id="fetchResult" class="fetch-result"></div>
+        <div class="fetch-actions">
+          <button class="btn-primary" id="btnReviewFetched" disabled>Review</button>
+          <button class="btn-improve" id="btnImproveFetched" disabled>Improve</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Two-column: manual input + review -->
+    <div class="main-grid">
+
+      <div class="panel">
+        <h2>Manual Input <span class="panel-hint">JSON or plain text</span></h2>
+        <textarea id="manualInput" placeholder="Название теста&#10;&#10;Предусловие:&#10;Пользователь зарегистрирован&#10;&#10;Шаги:&#10;1. Открыть страницу входа&#10;2. Ввести email и пароль&#10;3. Нажать &quot;Войти&quot;&#10;&#10;Ожидаемый результат:&#10;Пользователь авторизован, открывается главная страница&#10;&#10;— или вставь JSON тест-кейс"></textarea>
+        <div class="actions">
+          <button class="btn-primary" id="btnManualReview" disabled>Review</button>
+          <button class="btn-improve" id="btnManualImprove" disabled>Improve</button>
+        </div>
+      </div>
+
+      <div class="output-block" id="reviewOutput">
+        <div class="block-progress" id="reviewProgress"></div>
+        <div id="reviewContent"><span class="placeholder-text">Fetch a test case or use manual input, then click Review.</span></div>
+      </div>
+
+    </div>
+
+    <!-- Status -->
+    <div class="status" id="status"></div>
+
+    <!-- Improved testcase -->
+    <div class="output-block" id="improveOutput" style="display:none;">
+      <div class="block-progress" id="improveProgress"></div>
+      <div class="improve-header">
+        <h2>Improved TestCase</h2>
+        <div class="improve-actions">
+          <button class="btn-icon" id="btnCopyImproved" disabled>Copy JSON</button>
+          <button class="btn-icon" id="btnDownloadImproved" disabled>Download JSON</button>
+          <button class="btn-icon btn-draft" id="btnCreateDraft" disabled>Create AI Draft in TestIT</button>
+        </div>
+      </div>
+      <div id="improveContent"></div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
