@@ -4,125 +4,117 @@ import json
 import logging
 from pathlib import Path
 
-import httpx
+import instructor
+from openai import OpenAI
 
 from app.core.config import settings
+from app.schemas.analysis import (
+    AnalysisIssue,
+    AnalyzedTestCase,
+    ImproveResult,
+    ReviewResult,
+)
 
 logger = logging.getLogger(__name__)
 
-_REVIEW_PROMPT_PATH = Path(__file__).parent / "prompts" / "testcase_review.md"
-_IMPROVE_PROMPT_PATH = Path(__file__).parent / "prompts" / "testcase_improvement.md"
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-_FALLBACK_REVIEW = {
-    "summary": "LLM недоступен. Это fallback review. Тест-кейс успешно распарсен, но AI review не выполнен.",
-    "issues": [
-        {
-            "severity": "medium",
-            "title": "AI review не выполнен",
-            "description": "Локальный LLM endpoint недоступен или вернул невалидные данные.",
-            "recommendation": "Проверь статус Ollama, настройки LLM_BASE_URL и LLM_MODEL.",
-        }
-    ],
-    "suggested_test_cases": [],
-    "warnings": ["LLM is unavailable, mock response returned"],
-    "raw_cleaned_testcase": {},
+PROMPT_REGISTRY: dict[str, dict[str, Path]] = {
+    "review": {
+        "testit": _PROMPTS_DIR / "review_testit.md",
+        "manual": _PROMPTS_DIR / "review_manual.md",
+    },
+    "improve": {
+        "testit": _PROMPTS_DIR / "improve.md",
+        "manual": _PROMPTS_DIR / "improve.md",
+    },
 }
 
+_FALLBACK_REVIEW = ReviewResult(
+    summary="LLM недоступен. Тест-кейс распарсен, но анализ не выполнен.",
+    issues=[
+        AnalysisIssue(
+            severity="medium",
+            title="AI анализ не выполнен",
+            description="LLM endpoint недоступен или вернул невалидные данные.",
+            recommendation="Проверь настройки LLM_BASE_URL и LLM_MODEL в .env.",
+        )
+    ],
+    warnings=["LLM is unavailable, fallback response returned"],
+)
 
-def _load_prompt(path: Path, fallback: str) -> str:
+_FALLBACK_IMPROVE = ImproveResult(
+    improved_testcase=AnalyzedTestCase(),
+    issue_resolutions=[],
+    warnings=["LLM is unavailable, fallback response returned"],
+)
+
+
+def _load_prompt(path: Path) -> str:
     try:
-        return path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8").strip()
     except Exception as exc:
         logger.warning("Failed to load prompt %s: %s", path, exc)
-        return fallback
+        return "You are a QA assistant."
 
 
-def _build_headers() -> dict[str, str]:
-    headers = {"Content-Type": "application/json"}
-    if settings.LLM_API_KEY:
-        headers["Authorization"] = f"Bearer {settings.LLM_API_KEY}"
-    return headers
-
-
-def _post_chat(system_prompt: str, user_content: str) -> dict:
-    payload = {
-        "model": settings.LLM_MODEL,
-        "temperature": settings.LLM_TEMPERATURE,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_content},
-        ],
-        "response_format": {"type": "json_object"},
-    }
-    url = f"{settings.LLM_BASE_URL.rstrip('/')}/chat/completions"
-    with httpx.Client(timeout=120.0) as client:
-        response = client.post(url, json=payload, headers=_build_headers())
-        response.raise_for_status()
-        data = response.json()
-    return data
-
-
-def review_testcase_with_llm(clean_testcase: dict) -> dict:
-    system_prompt = _load_prompt(
-        _REVIEW_PROMPT_PATH, "You are a QA assistant. Review the test case and return JSON."
+def _get_instructor_client() -> instructor.Instructor:
+    openai_client = OpenAI(
+        base_url=settings.LLM_BASE_URL,
+        api_key=settings.LLM_API_KEY or "no-key",
     )
-    user_content = f"Тест-кейс для review:\n\n{json.dumps(clean_testcase, ensure_ascii=False, indent=2)}"
+    return instructor.from_openai(openai_client, mode=instructor.Mode.JSON)
 
+
+def analyze_testcase_with_llm(
+    clean_testcase: dict,
+    source_type: str = "testit",
+) -> ReviewResult:
+    prompt_path = PROMPT_REGISTRY["review"].get(source_type, PROMPT_REGISTRY["review"]["testit"])
+    prompt = _load_prompt(prompt_path)
+    client = _get_instructor_client()
     try:
-        data = _post_chat(system_prompt, user_content)
-        raw_content = data["choices"][0]["message"]["content"]
-        try:
-            return json.loads(raw_content)
-        except json.JSONDecodeError:
-            logger.warning("LLM returned invalid JSON: %s", raw_content[:200])
-            fallback = dict(_FALLBACK_REVIEW)
-            fallback["warnings"] = ["LLM returned invalid JSON"]
-            fallback["summary"] = f"LLM вернул невалидный JSON. Raw: {raw_content[:300]}"
-            return fallback
-    except Exception as exc:
-        logger.warning("LLM review request failed: %s", exc)
-        return dict(_FALLBACK_REVIEW)
-
-
-def _build_fallback_improvement(clean_testcase: dict, warning: str) -> dict:
-    return {
-        "title": clean_testcase.get("title") or "",
-        "description": clean_testcase.get("description") or "",
-        "preconditions": clean_testcase.get("preconditions") or [],
-        "steps": clean_testcase.get("steps") or [],
-        "postconditions": clean_testcase.get("postconditions") or [],
-        "tags": clean_testcase.get("tags") or [],
-        "priority": clean_testcase.get("priority"),
-        "status": clean_testcase.get("status"),
-        "duration": clean_testcase.get("duration"),
-        "attributes": clean_testcase.get("attributes") or {},
-        "improvement_notes": ["AI improvement was not performed because LLM is unavailable"],
-        "warnings": [warning],
-    }
-
-
-def improve_testcase_with_llm(clean_testcase: dict, review: dict | None = None) -> dict:
-    system_prompt = _load_prompt(
-        _IMPROVE_PROMPT_PATH, "You are a QA assistant. Improve the test case and return JSON."
-    )
-
-    parts = [f"Нормализованный тест-кейс:\n\n{json.dumps(clean_testcase, ensure_ascii=False, indent=2)}"]
-    if review:
-        parts.append(f"\nРезультат review:\n\n{json.dumps(review, ensure_ascii=False, indent=2)}")
-    user_content = "\n".join(parts)
-
-    try:
-        data = _post_chat(system_prompt, user_content)
-        raw_content = data["choices"][0]["message"]["content"]
-        try:
-            return json.loads(raw_content)
-        except json.JSONDecodeError:
-            logger.warning("LLM returned invalid JSON during improvement: %s", raw_content[:200])
-            return _build_fallback_improvement(
-                clean_testcase, "LLM returned invalid JSON during testcase improvement"
-            )
-    except Exception as exc:
-        logger.warning("LLM improve request failed: %s", exc)
-        return _build_fallback_improvement(
-            clean_testcase, "LLM is unavailable, fallback improved testcase returned"
+        return client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            response_model=ReviewResult,
+            max_retries=2,
+            temperature=settings.LLM_TEMPERATURE,
+            messages=[
+                {"role": "system", "content": prompt},
+                {
+                    "role": "user",
+                    "content": f"Тест-кейс для анализа:\n\n{json.dumps(clean_testcase, ensure_ascii=False, indent=2)}",
+                },
+            ],
         )
+    except Exception as exc:
+        logger.warning("LLM analyze failed: %s", exc)
+        return _FALLBACK_REVIEW
+
+
+def improve_testcase_with_llm(
+    testcase: dict,
+    selected_issues: list[dict],
+    source_type: str = "testit",
+) -> ImproveResult:
+    prompt_path = PROMPT_REGISTRY["improve"].get(source_type, PROMPT_REGISTRY["improve"]["testit"])
+    prompt = _load_prompt(prompt_path)
+    client = _get_instructor_client()
+    user_content = (
+        f"Тест-кейс для улучшения:\n{json.dumps(testcase, ensure_ascii=False, indent=2)}\n\n"
+        f"Проблемы для исправления (выбраны пользователем):\n{json.dumps(selected_issues, ensure_ascii=False, indent=2)}"
+    )
+    try:
+        return client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            response_model=ImproveResult,
+            max_retries=2,
+            temperature=settings.LLM_TEMPERATURE,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_content},
+            ],
+        )
+    except Exception as exc:
+        logger.warning("LLM improve failed: %s", exc)
+        return _FALLBACK_IMPROVE
