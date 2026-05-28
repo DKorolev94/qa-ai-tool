@@ -3,6 +3,25 @@ from typing import Literal
 from pydantic import BaseModel
 
 
+class ParsedStep(BaseModel):
+    action: str
+    expected: str | None = None
+    test_data: str | None = None
+    comments: str | None = None
+
+
+class TextParseResult(BaseModel):
+    title: str = ""
+    description: str = ""
+    preconditions: list[ParsedStep] = []
+    steps: list[ParsedStep] = []
+    postconditions: list[ParsedStep] = []
+    tags: list[str] = []
+    priority: str | None = None
+    status: str | None = None
+    duration: int | None = None
+
+
 class AnalysisIssue(BaseModel):
     severity: Literal["low", "medium", "high"]
     title: str

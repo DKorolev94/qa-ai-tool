@@ -64,6 +64,35 @@ def parse_testit_content(raw: str) -> NormalizedTestCase:
         except (json.JSONDecodeError, Exception):
             pass  # not valid JSON, fall through to text parsing
 
+    # Use LLM to parse free-form text (handles all language/format variations)
+    try:
+        from app.core.llm_client import parse_testcase_with_llm
+        llm_result = parse_testcase_with_llm(raw)
+        if llm_result is not None and (llm_result.title or llm_result.steps):
+            return NormalizedTestCase(
+                title=llm_result.title or None,
+                description=llm_result.description,
+                preconditions=[
+                    TestCaseStep(action=s.action, expected=s.expected, test_data=s.test_data, comments=s.comments)
+                    for s in llm_result.preconditions
+                ],
+                steps=[
+                    TestCaseStep(action=s.action, expected=s.expected, test_data=s.test_data, comments=s.comments)
+                    for s in llm_result.steps
+                ],
+                postconditions=[
+                    TestCaseStep(action=s.action, expected=s.expected, test_data=s.test_data, comments=s.comments)
+                    for s in llm_result.postconditions
+                ],
+                tags=llm_result.tags,
+                priority=llm_result.priority,
+                status=llm_result.status,
+                duration=llm_result.duration,
+                attachments=extract_attachments(raw),
+            )
+    except Exception:
+        pass  # LLM unavailable — fall through to regex parser
+
     cleaned = clean_html(raw)
     attachments = extract_attachments(raw)
     warnings: list[str] = []

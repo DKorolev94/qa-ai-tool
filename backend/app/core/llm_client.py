@@ -13,6 +13,7 @@ from app.schemas.analysis import (
     AnalyzedTestCase,
     ImproveResult,
     ReviewResult,
+    TextParseResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,9 @@ PROMPT_REGISTRY: dict[str, dict[str, Path]] = {
     "improve": {
         "testit": _PROMPTS_DIR / "improve.md",
         "manual": _PROMPTS_DIR / "improve.md",
+    },
+    "parse": {
+        "manual": _PROMPTS_DIR / "parse_testcase.md",
     },
 }
 
@@ -48,6 +52,8 @@ _FALLBACK_IMPROVE = ImproveResult(
     issue_resolutions=[],
     warnings=["LLM is unavailable, fallback response returned"],
 )
+
+_FALLBACK_PARSE: TextParseResult | None = None  # None signals "use regex fallback"
 
 
 def _load_prompt(path: Path) -> str:
@@ -124,3 +130,24 @@ def improve_testcase_with_llm(
     except Exception as exc:
         logger.warning("LLM improve failed: %s", exc)
         return _FALLBACK_IMPROVE
+
+
+def parse_testcase_with_llm(raw_text: str) -> TextParseResult | None:
+    """Parse free-form test case text. Returns None on failure (caller falls back to regex)."""
+    prompt_path = PROMPT_REGISTRY["parse"]["manual"]
+    prompt = _load_prompt(prompt_path)
+    client = _get_instructor_client()
+    try:
+        return client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            response_model=TextParseResult,
+            max_retries=2,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Разбери этот тест-кейс:\n\n{raw_text}"},
+            ],
+        )
+    except Exception as exc:
+        logger.warning("LLM parse failed: %s", exc)
+        return None
