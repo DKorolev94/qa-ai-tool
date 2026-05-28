@@ -12,8 +12,12 @@ from app.integrations.testit_client import (
 )
 from app.parsing.testit_parser import parse_testit_content
 from app.parsing.testit_workitem_mapper import normalize_testit_workitem
-from app.schemas.improvement import ImproveTestCaseRequest, ImproveTestCaseResponse
-from app.schemas.review import ReviewResponse
+from app.schemas.analysis import (
+    AnalyzeTestCaseRequest,
+    AnalyzeTestCaseResponse,
+    ImproveTestCaseRequest,
+    ImproveTestCaseResponse,
+)
 from app.schemas.testcase import NormalizedTestCase
 from app.schemas.testit import (
     CreateDraftRequest,
@@ -21,8 +25,8 @@ from app.schemas.testit import (
     FetchTestItWorkItemRequest,
     FetchTestItWorkItemResponse,
 )
-from app.services.testcase_improver import improve_raw_testcase
-from app.services.testcase_reviewer import review_normalized_testcase, review_raw_testcase
+from app.services.testcase_analyzer import analyze_raw_testcase
+from app.services.testcase_improver import improve_testcase
 from app.services.testit_draft_service import create_draft_in_testit
 from app.services.testit_workitem_service import fetch_and_normalize_work_item
 from pydantic import BaseModel
@@ -38,11 +42,6 @@ class WorkItemRequest(BaseModel):
     work_item: dict
 
 
-class ReviewRequest(BaseModel):
-    raw_content: str | None = None
-    work_item: dict | None = None
-
-
 @router.post("/clean-testcase", response_model=NormalizedTestCase)
 async def clean_testcase(body: RawContentRequest) -> NormalizedTestCase:
     return parse_testit_content(body.raw_content)
@@ -53,25 +52,30 @@ async def normalize_workitem(body: WorkItemRequest) -> NormalizedTestCase:
     return normalize_testit_workitem(body.work_item)
 
 
-@router.post("/review-testcase", response_model=ReviewResponse)
-async def review_testcase(body: ReviewRequest) -> ReviewResponse:
-    if body.work_item is not None:
-        normalized = normalize_testit_workitem(body.work_item)
-        return review_normalized_testcase(normalized)
-    if body.raw_content is not None:
-        return review_raw_testcase(body.raw_content)
-    raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
+@router.post("/analyze-testcase", response_model=AnalyzeTestCaseResponse)
+async def analyze_testcase(body: AnalyzeTestCaseRequest) -> AnalyzeTestCaseResponse:
+    if body.work_item is None and body.raw_content is None:
+        raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
+    try:
+        return analyze_raw_testcase(
+            raw_content=body.raw_content,
+            work_item=body.work_item,
+            source_type=body.source_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.post("/improve-testcase", response_model=ImproveTestCaseResponse)
-async def improve_testcase(body: ImproveTestCaseRequest) -> ImproveTestCaseResponse:
+async def improve_testcase_endpoint(body: ImproveTestCaseRequest) -> ImproveTestCaseResponse:
     if body.work_item is None and body.raw_content is None:
-        raise HTTPException(status_code=400, detail="Provide raw_content or work_item")
+        raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
     try:
-        return improve_raw_testcase(
+        return improve_testcase(
             raw_content=body.raw_content,
             work_item=body.work_item,
-            review=body.review,
+            selected_issues=body.selected_issues,
+            source_type=body.source_type,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
