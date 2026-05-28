@@ -77,6 +77,9 @@ def postprocess_improved_testcase(
     result["improvement_notes"] = _deduplicate(
         [str(n) for n in (result.get("improvement_notes") or [])]
     )
+    result["manual_notes"] = _deduplicate(
+        [str(n) for n in (result.get("manual_notes") or [])]
+    )
 
     # Remove stale notes
     result["improvement_notes"] = _filter_stale_notes(result["improvement_notes"], result)
@@ -93,6 +96,12 @@ def postprocess_improved_testcase(
                 validation_warnings.append(f"Step {i + 1} is missing an action")
             if not step.get("expected"):
                 validation_warnings.append(f"Step {i + 1} is missing an expected result")
+
+    # Status: NeedsWork if manual actions remain, Ready if LLM fixed everything
+    if result.get("manual_notes"):
+        result["status"] = "NeedsWork"
+    else:
+        result["status"] = "Ready"
 
     # Duration
     display_duration, raw_duration = _process_duration(result)

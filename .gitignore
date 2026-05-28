@@ -30,3 +30,7 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Node
+node_modules/
+frontend/node_modules/

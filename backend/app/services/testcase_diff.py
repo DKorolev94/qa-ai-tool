@@ -8,12 +8,6 @@ def _short(val: object) -> str:
     return s[:_MAX_STR] + "…" if len(s) > _MAX_STR else s
 
 
-def _step_action(step: object) -> str:
-    if isinstance(step, dict):
-        return step.get("action") or ""
-    return ""
-
-
 def _compare_field(
     field: str,
     before: object,

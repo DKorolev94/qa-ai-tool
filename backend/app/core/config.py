@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    LLM_PROVIDER: str = "ollama"
     LLM_BASE_URL: str = "http://localhost:11434/v1"
     LLM_MODEL: str = "gemma3:4b"
     LLM_API_KEY: str = "ollama"
@@ -16,8 +15,8 @@ class Settings(BaseSettings):
     TESTIT_AUTH_SCHEME: str = "PrivateToken"
     TESTIT_TIMEOUT_SECONDS: int = 30
     TESTIT_VERIFY_SSL: bool = True
-    TESTIT_PROJECT_ID: str = ""
-    TESTIT_DRAFT_SECTION_ID: str = ""
+    TESTIT_PROJECT_UUID: str = ""
+    TESTIT_DRAFT_SECTION_UUID: str = ""
 
     @field_validator("TESTIT_BASE_URL", mode="after")
     @classmethod

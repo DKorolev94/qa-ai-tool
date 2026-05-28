@@ -73,6 +73,8 @@ function startBlockProgress(id) {
   if (_blockTimers[id]) { clearInterval(_blockTimers[id]); }
   bar.style.transition = "none";
   bar.style.width = "0%";
+  bar.style.height = "3px";
+  bar.style.marginBottom = "12px";
   bar.style.opacity = "1";
   let val = 0;
   _blockTimers[id] = setInterval(() => {
@@ -91,7 +93,11 @@ function finishBlockProgress(id) {
   setTimeout(() => {
     bar.style.transition = "opacity 0.4s ease";
     bar.style.opacity = "0";
-    setTimeout(() => { bar.style.width = "0%"; }, 400);
+    setTimeout(() => {
+      bar.style.width = "0%";
+      bar.style.height = "0";
+      bar.style.marginBottom = "0";
+    }, 400);
   }, 250);
 }
 
@@ -115,7 +121,7 @@ function setLoading(on) {
     finishProgress();
   }
   if (currentWorkItem) [btnReviewFetched, btnImproveFetched].forEach(b => b.disabled = on);
-  if (on) setStatus("Processing...", "loading");
+  if (on) setStatus("Обработка...", "loading");
 }
 
 function esc(str) {
@@ -186,9 +192,9 @@ function renderTags(tags) {
 function renderMeta(tc) {
   const parts = [];
   const dur = tc.display_duration || tc.duration;
-  if (dur) parts.push(`Duration: ${esc(String(dur))}`);
-  if (tc.priority) parts.push(`Priority: ${esc(tc.priority)}`);
-  if (tc.status) parts.push(`Status: ${esc(tc.status)}`);
+  if (dur) parts.push(`Длительность: ${esc(String(dur))}`);
+  if (tc.priority) parts.push(`Приоритет: ${esc(tc.priority)}`);
+  if (tc.status) parts.push(`Статус: ${esc(tc.status)}`);
   return parts.length
     ? `<div class="tc-meta-row muted">${parts.join(" · ")}</div>`
     : "";
@@ -197,16 +203,18 @@ function renderMeta(tc) {
 function renderAttributes(tc) {
   const attrs = tc.attributes;
   if (!attrs || !Object.keys(attrs).length) return "";
-  return `<div class="section-label">Attributes</div>
-    <div class="attr-hidden-note">TestIT attributes preserved (UUID keys/values require TestIT attribute dictionary to read).</div>`;
+  return `<div class="section-label">Атрибуты</div>
+    <div class="attr-hidden-note">Атрибуты TestIT сохранены (UUID-ключи и значения читаются через справочник атрибутов TestIT).</div>`;
 }
 
 function renderReview(data) {
-  let html = `<h2>Review Result${warningsBadge(data.warnings)}</h2>`;
+  const titleEl = document.getElementById("reviewTitle");
+  if (titleEl) titleEl.innerHTML = `Результат ревью${warningsBadge(data.warnings)}`;
+  let html = ``;
   if (data.summary) html += `<div class="review-summary">${esc(data.summary)}</div>`;
 
   if (data.issues?.length) {
-    html += `<div class="section-label">Issues (${data.issues.length}) <span class="issues-hint">— снимите галку чтобы не исправлять</span></div>`;
+    html += `<div class="section-label">Проблемы (${data.issues.length}) <span class="issues-hint">— снимите галку чтобы не исправлять</span></div>`;
     data.issues.forEach((issue, idx) => {
       html += `<div class="issue-card" data-issue-idx="${idx}">
         <div class="issue-header">
@@ -221,7 +229,7 @@ function renderReview(data) {
   }
 
   if (data.suggested_test_cases?.length) {
-    html += `<div class="section-label">Suggested Test Cases (${data.suggested_test_cases.length})</div>`;
+    html += `<div class="section-label">Предлагаемые тест-кейсы (${data.suggested_test_cases.length})</div>`;
     data.suggested_test_cases.forEach(tc => {
       const stepsHtml = (tc.steps || []).map((s, i) => `
         <li><span class="step-num">${i + 1}.</span>
@@ -241,7 +249,7 @@ function renderReview(data) {
     });
   }
 
-  reviewContent.innerHTML = html || `<span class="placeholder-text">No review data.</span>`;
+  reviewContent.innerHTML = html || `<span class="placeholder-text">Нет данных ревью.</span>`;
 }
 
 reviewOutput.addEventListener("change", e => {
@@ -270,7 +278,7 @@ function renderDiff(diff) {
     .join(", ");
 
   if (!changes.length) {
-    return `<div class="diff-block"><div class="diff-none">No structural changes detected.</div></div>`;
+    return `<div class="diff-block"><div class="diff-none">Изменений нет.</div></div>`;
   }
 
   const typeIcon = { added: "✚", changed: "⟳", removed: "✖" };
@@ -286,7 +294,32 @@ function renderDiff(diff) {
     </div>`).join("");
 
   return `<div class="diff-block">
-    ${changedFields ? `<div class="diff-summary-text">Changed: ${esc(changedFields)}</div>` : ""}
+    ${changedFields ? `<div class="diff-summary-text">Изменено: ${esc(changedFields)}</div>` : ""}
+    ${rows}
+  </div>`;
+}
+
+function renderIssueResolutions(resolutions) {
+  if (!resolutions?.length) return "";
+  const statusIcon = { resolved: "✅", manual_needed: "⚠️", skipped: "⏭️" };
+  const statusCls = { resolved: "issue-resolved", manual_needed: "issue-manual", skipped: "issue-skipped" };
+  const statusLabel = { resolved: "исправлено", manual_needed: "требует доработки", skipped: "пропущено" };
+
+  const rows = resolutions.map(r => {
+    const icon = statusIcon[r.status] || "·";
+    const cls = statusCls[r.status] || "";
+    const label = statusLabel[r.status] || r.status;
+    const detail = r.action_taken || r.reason || "";
+    return `<div class="issue-resolution-row ${cls}">
+      <span class="issue-resolution-icon">${icon}</span>
+      <span class="issue-resolution-title">${esc(r.issue_title)}</span>
+      <span class="issue-resolution-status">— ${label}</span>
+      ${detail ? `<div class="issue-resolution-detail">${esc(detail)}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  return `<div class="issue-resolutions-block">
+    <div class="section-label section-divider">Результат исправления</div>
     ${rows}
   </div>`;
 }
@@ -300,6 +333,7 @@ function renderImproved(data) {
   improveOutput.style.display = "";
 
   const improvement_notes = data.improvement_notes || [];
+  const manual_notes = data.manual_notes || [];
   const allWarnings = data.warnings || [];
   const validationWarnings = data.validation_warnings || [];
   const tcWithDuration = { ...tc, display_duration: data.display_duration };
@@ -311,30 +345,41 @@ function renderImproved(data) {
   if (tc.title) html += `<div class="tc-title ef" data-edit="title" contenteditable="true" spellcheck="false">${esc(tc.title)}</div>`;
   if (tc.tags?.length) html += `<div class="tc-meta-row">${renderTags(tc.tags)}</div>`;
   html += renderMeta(tcWithDuration);
-  if (tc.description) html += `<div class="section-label">Description</div><div class="tc-desc ef" data-edit="description" contenteditable="true" spellcheck="false">${esc(tc.description)}</div>`;
-  if (tc.preconditions?.length) html += `<div class="section-label">Preconditions</div>${renderEditableStepList(tc.preconditions, "preconditions")}`;
-  if (tc.steps?.length) html += `<div class="section-label">Steps</div>${renderEditableStepList(tc.steps, "steps")}`;
-  if (tc.postconditions?.length) html += `<div class="section-label">Postconditions</div>${renderEditableStepList(tc.postconditions, "postconditions")}`;
+  if (tc.description) html += `<div class="section-label">Описание</div><div class="tc-desc ef" data-edit="description" contenteditable="true" spellcheck="false">${esc(tc.description)}</div>`;
+  if (tc.preconditions?.length) html += `<div class="section-label">Предусловия</div>${renderEditableStepList(tc.preconditions, "preconditions")}`;
+  if (tc.steps?.length) html += `<div class="section-label">Шаги</div>${renderEditableStepList(tc.steps, "steps")}`;
+  if (tc.postconditions?.length) html += `<div class="section-label">Постусловия</div>${renderEditableStepList(tc.postconditions, "postconditions")}`;
   html += renderAttributes(tc);
   html += `</div>`;
 
-  if (data.diff) {
-    html += `<div class="section-label section-divider">Diff Summary</div>${renderDiff(data.diff)}`;
+  // Issue resolutions — primary block (covers what was fixed / what needs manual work)
+  if (data.issue_resolutions?.length) {
+    html += renderIssueResolutions(data.issue_resolutions);
+  }
+
+  // manual_notes — only if there's no issue_resolutions (no review was passed)
+  // When review was passed, manual_needed resolutions already carry the same info
+  if (manual_notes.length && !data.issue_resolutions?.length) {
+    html += `<div class="section-label section-divider">Требует доработки</div>`;
+    html += manual_notes.map(n => `<div class="warn-item warn-manual">🔴 ${esc(n)}</div>`).join("");
   }
 
   if (validationWarnings.length) {
-    html += `<div class="section-label section-divider">Validation Warnings</div>`;
+    html += `<div class="section-label section-divider">Предупреждения</div>`;
     html += validationWarnings.map(w => `<div class="warn-item">⚠ ${esc(w)}</div>`).join("");
   }
 
-  if (improvement_notes.length) {
-    html += `<div class="section-label section-divider">Improvement Notes</div>`;
-    html += improvement_notes.map(n => `<div class="note-item">💡 ${esc(n)}</div>`).join("");
+  if (allWarnings.length) {
+    html += `<div class="section-label section-divider">Предупреждения</div>`;
+    html += allWarnings.map(w => `<div class="warn-item">⚠ ${esc(w)}</div>`).join("");
   }
 
-  if (allWarnings.length) {
-    html += `<div class="section-label section-divider">Warnings</div>`;
-    html += allWarnings.map(w => `<div class="warn-item">⚠ ${esc(w)}</div>`).join("");
+  // Diff — collapsible technical detail
+  if (data.diff) {
+    html += `<details class="diff-details section-divider">
+      <summary class="diff-summary-toggle">Технические изменения</summary>
+      ${renderDiff(data.diff)}
+    </details>`;
   }
 
   html += `<div class="section-label section-divider">TestIT JSON</div>
@@ -401,19 +446,19 @@ function mapFetchError(msg) {
 
 function renderFetchResult(data) {
   const nc = data.normalized_testcase;
-  let html = `<div class="fetch-id-badge">Work Item <code>${esc(data.work_item_id)}</code> loaded</div>`;
+  let html = `<div class="fetch-id-badge">Тест-кейс <code>${esc(data.work_item_id)}</code> загружен</div>`;
   if (nc.title) html += `<div class="tc-title">${esc(nc.title)}</div>`;
   if (nc.tags?.length) html += `<div class="tc-meta-row">${renderTags(nc.tags)}</div>`;
   if (nc.priority || nc.status) {
     const parts = [];
-    if (nc.priority) parts.push(`Priority: ${esc(nc.priority)}`);
-    if (nc.status)   parts.push(`Status: ${esc(nc.status)}`);
+    if (nc.priority) parts.push(`Приоритет: ${esc(nc.priority)}`);
+    if (nc.status)   parts.push(`Статус: ${esc(nc.status)}`);
     html += `<div class="tc-meta-row muted">${parts.join(" · ")}</div>`;
   }
-  if (nc.description) html += `<div class="section-label">Description</div><div class="tc-desc">${esc(nc.description)}</div>`;
-  if (nc.steps?.length) html += `<div class="section-label">Steps (${nc.steps.length})</div>${renderStepList(nc.steps)}`;
+  if (nc.description) html += `<div class="section-label">Описание</div><div class="tc-desc">${esc(nc.description)}</div>`;
+  if (nc.steps?.length) html += `<div class="section-label">Шаги (${nc.steps.length})</div>${renderStepList(nc.steps)}`;
   if (data.warnings?.length) {
-    html += `<div class="section-label">Warnings</div>`;
+    html += `<div class="section-label">Предупреждения</div>`;
     html += data.warnings.map(w => `<div class="warn-item">⚠ ${esc(w)}</div>`).join("");
   }
   fetchResult.innerHTML = html;
@@ -421,11 +466,11 @@ function renderFetchResult(data) {
 
 btnFetch.addEventListener("click", async () => {
   const val = fetchInput.value.trim();
-  if (!val) { setStatus("Enter test case ID.", "error"); return; }
+  if (!val) { setStatus("Введите ID тест-кейса.", "error"); return; }
   _fetchInProgress = true;
   setLoading(true);
-  setStatus("Fetching from TestIT...", "loading");
-  fetchResult.innerHTML = `<span class="placeholder-text">Loading…</span>`;
+  setStatus("Загружаю из TestIT...", "loading");
+  fetchResult.innerHTML = `<span class="placeholder-text">Загрузка…</span>`;
   fetchOutput.style.display = "";
   startBlockProgress("fetchProgress");
   try {
@@ -435,7 +480,7 @@ btnFetch.addEventListener("click", async () => {
     renderFetchResult(data);
     btnReviewFetched.disabled = false;
     btnImproveFetched.disabled = false;
-    setStatus(`Work item ${data.work_item_id} loaded.`, "success");
+    setStatus(`Тест-кейс ${data.work_item_id} загружен.`, "success");
   } catch (err) {
     const friendly = mapFetchError(err.message);
     fetchResult.innerHTML = `<div class="fetch-error">${esc(friendly)}</div>`;
@@ -452,17 +497,17 @@ btnFetch.addEventListener("click", async () => {
 
 btnReviewFetched.addEventListener("click", async () => {
   if (!currentWorkItem) return;
-  reviewContent.innerHTML = `<span class="placeholder-text">Loading...</span>`;
+  reviewContent.innerHTML = `<span class="placeholder-text">Загрузка...</span>`;
   setLoading(true);
   startBlockProgress("reviewProgress");
   try {
     const data = await doPost("/api/review-testcase", { work_item: currentWorkItem });
     lastReviewResult = data;
     renderReview(data);
-    setStatus("Review complete.", "success");
+    setStatus("Ревью завершено.", "success");
   } catch (err) {
-    reviewContent.innerHTML = `<span class="placeholder-text">Error</span>`;
-    setStatus("Error: " + err.message, "error");
+    reviewContent.innerHTML = `<span class="placeholder-text">Ошибка</span>`;
+    setStatus("Ошибка: " + err.message, "error");
   } finally { setLoading(false); finishBlockProgress("reviewProgress"); }
 });
 
@@ -470,7 +515,7 @@ btnImproveFetched.addEventListener("click", async () => {
   if (!currentWorkItem) return;
   draftSourceId = fetchedWorkItemId;
   draftSourceAttributes = currentWorkItem.attributes || {};
-  improveContent.innerHTML = `<span class="placeholder-text">Improving...</span>`;
+  improveContent.innerHTML = `<span class="placeholder-text">Улучшение...</span>`;
   improveOutput.style.display = "";
   setLoading(true);
   startBlockProgress("improveProgress");
@@ -480,10 +525,10 @@ btnImproveFetched.addEventListener("click", async () => {
       review: getFilteredReview(),
     });
     renderImproved(data);
-    setStatus("Improvement complete.", "success");
+    setStatus("Улучшение завершено.", "success");
   } catch (err) {
-    improveContent.innerHTML = `<span class="placeholder-text">Error</span>`;
-    setStatus("Error: " + err.message, "error");
+    improveContent.innerHTML = `<span class="placeholder-text">Ошибка</span>`;
+    setStatus("Ошибка: " + err.message, "error");
   } finally { setLoading(false); finishBlockProgress("improveProgress"); }
 });
 
@@ -497,29 +542,29 @@ manualInput.addEventListener("input", () => {
 
 btnManualReview.addEventListener("click", async () => {
   const raw = manualInput.value.trim();
-  if (!raw) { setStatus("Paste test case content first.", "error"); return; }
+  if (!raw) { setStatus("Вставьте тест-кейс.", "error"); return; }
   const body = parseManualInput(raw);
-  reviewContent.innerHTML = `<span class="placeholder-text">Loading...</span>`;
+  reviewContent.innerHTML = `<span class="placeholder-text">Загрузка...</span>`;
   setLoading(true);
   startBlockProgress("reviewProgress");
   try {
     const data = await doPost("/api/review-testcase", body);
     lastReviewResult = data;
     renderReview(data);
-    setStatus("Review complete.", "success");
+    setStatus("Ревью завершено.", "success");
   } catch (err) {
-    reviewContent.innerHTML = `<span class="placeholder-text">Error</span>`;
-    setStatus("Error: " + err.message, "error");
+    reviewContent.innerHTML = `<span class="placeholder-text">Ошибка</span>`;
+    setStatus("Ошибка: " + err.message, "error");
   } finally { setLoading(false); finishBlockProgress("reviewProgress"); }
 });
 
 btnManualImprove.addEventListener("click", async () => {
   const raw = manualInput.value.trim();
-  if (!raw) { setStatus("Paste test case content first.", "error"); return; }
+  if (!raw) { setStatus("Вставьте тест-кейс.", "error"); return; }
   draftSourceId = null;
   draftSourceAttributes = null;
   const body = parseManualInput(raw);
-  improveContent.innerHTML = `<span class="placeholder-text">Improving...</span>`;
+  improveContent.innerHTML = `<span class="placeholder-text">Улучшение...</span>`;
   improveOutput.style.display = "";
   setLoading(true);
   startBlockProgress("improveProgress");
@@ -529,10 +574,10 @@ btnManualImprove.addEventListener("click", async () => {
       review: getFilteredReview(),
     });
     renderImproved(data);
-    setStatus("Improvement complete.", "success");
+    setStatus("Улучшение завершено.", "success");
   } catch (err) {
-    improveContent.innerHTML = `<span class="placeholder-text">Error</span>`;
-    setStatus("Error: " + err.message, "error");
+    improveContent.innerHTML = `<span class="placeholder-text">Ошибка</span>`;
+    setStatus("Ошибка: " + err.message, "error");
   } finally { setLoading(false); finishBlockProgress("improveProgress"); }
 });
 
@@ -582,7 +627,7 @@ btnCreateDraft.addEventListener("click", async () => {
       source_attributes: draftSourceAttributes || {},
     });
     renderDraftResult(data);
-    setStatus(`AI draft created: ${data.global_id || data.work_item_id}`, "success");
+    setStatus(`Черновик создан в TestIT: ${data.global_id || data.work_item_id}`, "success");
   } catch (err) {
     const friendly = mapDraftError(err.message);
     setStatus(friendly, "error");
@@ -599,10 +644,10 @@ async function copyText(text, btn) {
   try {
     await navigator.clipboard.writeText(text);
     const orig = btn.textContent;
-    btn.textContent = "Copied!";
+    btn.textContent = "Скопировано!";
     setTimeout(() => { btn.textContent = orig; }, 2000);
   } catch {
-    setStatus("Clipboard access denied.", "error");
+    setStatus("Нет доступа к буферу обмена.", "error");
   }
 }
 
