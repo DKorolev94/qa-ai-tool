@@ -53,45 +53,6 @@ def _coerce_testcase(raw: dict, original: dict) -> AnalyzedTestCase:
         )
 
 
-def _coerce_resolutions(raw: list | None, issues: list) -> list[IssueResolution]:
-    """Compatibility shim: parses raw dict list from LLM output into IssueResolution objects.
-    Used by testcase_improver.py until it is migrated to typed LLM results."""
-    if not issues:
-        return []
-    result: list[IssueResolution] = []
-    seen: set[int] = set()
-    for item in raw or []:
-        if not isinstance(item, dict):
-            continue
-        try:
-            idx = int(item.get("issue_index", -1))
-            if idx < 0 or idx >= len(issues):
-                continue
-            seen.add(idx)
-            status = item.get("status", "skipped")
-            if status not in ("resolved", "manual_needed", "skipped"):
-                status = "skipped"
-            result.append(IssueResolution(
-                issue_index=idx,
-                issue_title=str(issues[idx].get("title", "") if isinstance(issues[idx], dict) else ""),
-                status=status,
-                action_taken=str(item["action_taken"]) if item.get("action_taken") else None,
-                reason=str(item["reason"]) if item.get("reason") else None,
-            ))
-        except Exception as exc:
-            logger.warning("Failed to coerce resolution: %s — %s", item, exc)
-    for idx, issue in enumerate(issues):
-        if idx not in seen:
-            result.append(IssueResolution(
-                issue_index=idx,
-                issue_title=str(issue.get("title", "") if isinstance(issue, dict) else ""),
-                status="skipped",
-                reason="Не обработано LLM",
-            ))
-    result.sort(key=lambda r: r.issue_index)
-    return result
-
-
 def _complete_resolutions(
     resolutions: list[IssueResolution],
     issues: list[dict],
