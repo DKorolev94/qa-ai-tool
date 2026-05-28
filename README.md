@@ -1,79 +1,100 @@
 # QA AI Tools
 
-Internal platform of AI-powered tools for QA engineers.
+Внутренняя платформа AI-инструментов для QA-инженеров.
 
-## Available tools
+## Что умеет
 
-| Tool | Description | Status |
-|------|-------------|--------|
-| **Test Case Review & Improve** | LLM review of test cases, inline improvement, AI draft creation in TestIT | 🧪 Beta |
-
-## Flow
-
-1. **Fetch** test case from TestIT by ID — or paste JSON / plain text in Manual Input
-2. **Review** — LLM finds issues, select which to fix
-3. **Improve** — LLM produces fixed version with diff, edit inline in real-time
-4. **Create AI Draft** — pushes improved test case to TestIT as a draft in "AI Review / Drafts" section
+**Ревью и улучшение тест-кейсов** — загружаешь кейс из TestIT или вставляешь текст/JSON, LLM находит проблемы, ты выбираешь что исправить, LLM генерирует улучшенную версию. Готово — отправляешь черновик обратно в TestIT.
 
 ---
 
-## Setup
+## Быстрый старт
 
-### Backend
+### 1. Backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env
-# fill in .env — see comments inside
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+cp .env.example .env             # заполни .env (см. ниже)
+uvicorn app.main:app --reload --port 8000
 ```
 
-Backend: http://localhost:8000  
-Health check: http://localhost:8000/health
+Проверка: http://localhost:8000/health → `{"status":"ok"}`
 
-### Frontend
+### 2. Frontend
 
-Open `frontend/index.html` in browser. No build step, no server needed.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Открывай: http://localhost:5173
 
 ---
 
-## LLM setup
+## Настройка .env
 
-Any OpenAI-compatible API works — local Ollama, remote GPU host, DeepSeek, etc.
+### LLM (обязательно)
+
+Поддерживается любой OpenAI-совместимый API — Ollama, DeepSeek, удалённый GPU-хост.
 
 ```env
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=gemma3:4b
+LLM_MODEL=llama3.3:latest
 LLM_API_KEY=ollama
 LLM_TEMPERATURE=0.2
 ```
 
-Ollama quick start:
+Ollama:
 ```bash
-ollama pull gemma3:4b && ollama serve
+ollama pull llama3.3 && ollama serve
 ```
 
----
-
-## TestIT setup
+### TestIT (для загрузки кейсов и создания черновиков)
 
 ```env
-TESTIT_BASE_URL=https://testit.example.com
-TESTIT_PRIVATE_TOKEN=your_token
-TESTIT_PROJECT_ID=your_project_uuid
-TESTIT_DRAFT_SECTION_ID=   # optional — auto-created if empty
+TESTIT_BASE_URL=https://yourteam.testit.software
+TESTIT_PRIVATE_TOKEN=your_private_token
+TESTIT_PROJECT_UUID=your_project_uuid
+TESTIT_DRAFT_SECTION_UUID=          # опционально — раздел создаётся автоматически
 ```
 
-Token never leaves the backend. Frontend never sees `TESTIT_PRIVATE_TOKEN`.
-
-Supported input: numeric ID (`6109`) or UUID (`3fa85f64-...`).
+Токен хранится только на бэкенде, фронтенд его не видит.
 
 ---
 
-## Tests
+## Как использовать ревью тест-кейсов
+
+### Источник: TestIT
+
+1. Введи числовой ID тест-кейса (например `3995`) в поле «ID тест-кейса»
+2. Нажми **Загрузить** — кейс подтянется из TestIT
+3. Нажми **Анализировать** — LLM найдёт проблемы и покажет список замечаний
+
+### Источник: текст или JSON
+
+1. Вставь тест-кейс в поле ввода — любой формат:
+   - Свободный текст с заголовками (Заголовок:, Шаги:, ОР: и т.д.)
+   - JSON (структура TestIT work item или произвольный объект)
+2. Нажми **Анализировать**
+
+### Улучшение
+
+1. После анализа отметь галками замечания которые хочешь исправить
+2. Нажми **Улучшить** — LLM исправит выбранные проблемы
+3. Отредактируй поля прямо в интерфейсе — JSON обновляется в реальном времени
+4. Нажми **Создать черновик в TestIT** — кейс попадёт в раздел «AI Review / Drafts»
+
+### История изменений
+
+В нижней части улучшенного кейса — раскрываемый блок **«История изменений»** со списком что именно LLM поменял (поле, было → стало).
+
+---
+
+## Тесты
 
 ```bash
 cd backend && pytest
@@ -83,19 +104,21 @@ cd backend && pytest
 
 ## API
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| Метод | Endpoint | Описание |
+|-------|----------|----------|
 | GET | `/health` | Health check |
-| POST | `/api/review-testcase` | LLM review |
-| POST | `/api/improve-testcase` | LLM improvement + diff |
-| POST | `/api/testit/workitem/fetch` | Fetch work item from TestIT |
-| POST | `/api/testit/workitem/create-draft` | Create AI draft in TestIT |
+| POST | `/api/analyze-testcase` | LLM анализ + список замечаний |
+| POST | `/api/improve-testcase` | LLM улучшение + история изменений |
+| POST | `/api/testit/workitem/fetch` | Загрузить кейс из TestIT |
+| POST | `/api/testit/workitem/create-draft` | Создать черновик в TestIT |
+
+Поле `source_type` в запросах: `"testit"` (по умолчанию) или `"manual"` — выбирает промпт для ревью.
 
 ---
 
-## Not implemented
+## Не реализовано
 
-- Jira / other TMS integrations
-- Run history / database
-- Authentication
-- Batch processing
+- Jira и другие TMS
+- История запросов / база данных
+- Авторизация
+- Пакетная обработка
