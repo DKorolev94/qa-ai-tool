@@ -38,9 +38,14 @@ def improve_testcase(
     manual_notes = processed.pop("manual_notes", None) or llm_result.manual_notes
     processed.pop("warnings", None)
 
+    issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues)
+
+    has_manual_needed = any(r.status == "manual_needed" for r in issue_resolutions)
+    if has_manual_needed:
+        processed["status"] = "NeedsWork"
+
     improved_final = _coerce_testcase(processed, clean_dict)
     diff = build_testcase_diff(clean_dict, improved_final.model_dump())
-    issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues)
 
     parse_warnings = normalized.warnings or []
     all_warnings = list(dict.fromkeys(parse_warnings + llm_result.warnings))
