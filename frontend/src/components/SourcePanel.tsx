@@ -20,8 +20,6 @@ function splitCompactLines(text: string | null | undefined): string[] {
 interface Props {
   mode: SourceMode
   onModeChange: (m: SourceMode) => void
-  sourceType: 'testit' | 'manual'
-  onSourceTypeChange: (t: 'testit' | 'manual') => void
   testItId: string
   onTestItIdChange: (v: string) => void
   manualText: string
@@ -41,7 +39,6 @@ interface Props {
 
 export function SourcePanel({
   mode, onModeChange,
-  sourceType, onSourceTypeChange,
   testItId, onTestItIdChange,
   manualText, onManualTextChange,
   fetchResult, fetchError, fetchLoading,
@@ -118,26 +115,6 @@ export function SourcePanel({
       </div>
 
       <div className="panel-footer flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-tx-muted flex-shrink-0">Тип кейса:</span>
-          <div className="flex gap-0.5 p-0.5 bg-bg-hover rounded-md border border-line">
-            {(['testit', 'manual'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => onSourceTypeChange(t)}
-                className={[
-                  'px-3 py-1 text-xs font-medium rounded transition-all duration-150',
-                  sourceType === t
-                    ? 'bg-bg-panel text-tx-primary shadow-card'
-                    : 'text-tx-muted hover:text-tx-secondary',
-                ].join(' ')}
-              >
-                {t === 'testit' ? 'TestIT' : 'Manual'}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="flex items-center gap-2">
           <button
             className={`btn flex-1 ${canImprove ? 'btn-secondary' : 'btn-primary'}`}

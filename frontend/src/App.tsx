@@ -19,7 +19,7 @@ import type {
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sourceMode, setSourceMode] = useState<SourceMode>('testit')
-  const [sourceType, setSourceType] = useState<'testit' | 'manual'>('testit')
+  const sourceType = sourceMode
   const [testItId, setTestItId] = useState('')
   const [manualText, setManualText] = useState('')
 
@@ -220,7 +220,6 @@ export default function App() {
           <div className="pipeline-top">
             <SourcePanel
               mode={sourceMode} onModeChange={setSourceMode}
-              sourceType={sourceType} onSourceTypeChange={setSourceType}
               testItId={testItId} onTestItIdChange={setTestItId}
               manualText={manualText} onManualTextChange={setManualText}
               fetchResult={fetchResult} fetchError={fetchError} fetchLoading={fetchLoading}
