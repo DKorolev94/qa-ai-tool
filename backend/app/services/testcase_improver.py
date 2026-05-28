@@ -40,7 +40,10 @@ def improve_testcase(
 
     issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues)
 
-    has_manual_needed = any(r.status == "manual_needed" for r in issue_resolutions)
+    has_manual_needed = (
+        any(r.status == "manual_needed" for r in issue_resolutions)
+        or bool(manual_notes)
+    )
     if has_manual_needed:
         processed["status"] = "NeedsWork"
 
