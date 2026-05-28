@@ -64,93 +64,74 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               <path d="M3.5 7h5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <span className="text-sm font-semibold sidebar-brand block truncate">QA AI Tools</span>
-              <span className="text-[10px] sidebar-version">beta</span>
-            </div>
-          )}
+          <div className="sidebar-brand-wrap flex flex-col leading-none min-w-0">
+            <span className="text-sm font-semibold sidebar-brand truncate">QA AI Tools</span>
+            <span className="sidebar-version">beta</span>
+          </div>
         </div>
       </div>
 
-      {/* Nav section */}
-      {!collapsed && (
-        <div className="px-3 pt-4 pb-1.5">
-          <span className="sidebar-section-label">Инструменты</span>
-        </div>
-      )}
+      {/* Section label */}
+      <div className="px-3 pt-4 pb-1.5 sidebar-section-wrap">
+        <span className="sidebar-section-label">Инструменты</span>
+      </div>
 
-      <nav className="flex-1 px-2 pb-2 overflow-y-auto" style={{ paddingTop: collapsed ? '12px' : '0' }}>
+      {/* Nav */}
+      <nav className="flex-1 px-2 pb-2 overflow-y-auto">
         {NAV_ITEMS.map((item) => (
-          <NavRow key={item.label} item={item} collapsed={collapsed} />
+          <NavRow key={item.label} item={item} />
         ))}
       </nav>
 
       <div className="sidebar-divider mx-3 my-1" />
 
+      {/* Bottom actions */}
       <div className="px-2 py-2 flex-shrink-0 flex flex-col gap-0.5">
-        <NavRow item={{ icon: <IconSettings />, label: 'Настройки' }} collapsed={collapsed} />
+        <NavRow item={{ icon: <IconSettings />, label: 'Настройки' }} />
         <button
           type="button"
           className="sidebar-nav-row"
           onClick={onToggle}
-          title={collapsed ? 'Развернуть' : 'Свернуть'}
+          title={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
         >
-          <span className="flex-shrink-0 flex items-center justify-center w-[15px]">
-            <IconCollapse collapsed={collapsed} />
-          </span>
-          {!collapsed && <span className="text-xs sidebar-label">Свернуть</span>}
+          <span className="flex-shrink-0 sidebar-nav-icon"><IconCollapse collapsed={collapsed} /></span>
+          <span className="text-xs sidebar-label">Свернуть</span>
         </button>
       </div>
     </aside>
   )
 }
 
-function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
-  const baseClass = 'sidebar-nav-row'
-
+function NavRow({ item }: { item: NavItem }) {
   if (item.active) {
     return (
       <button
         type="button"
-        className={`${baseClass} sidebar-nav-row-active`}
+        className="sidebar-nav-row sidebar-nav-row-active"
         title={item.label}
         aria-current="page"
       >
         <span className="sidebar-nav-active-line" />
-        <span className="flex-shrink-0 flex items-center justify-center w-[15px]">{item.icon}</span>
-        {!collapsed && (
-          <span className="text-xs font-medium sidebar-label leading-tight">{item.label}</span>
-        )}
+        <span className="flex-shrink-0 sidebar-nav-icon">{item.icon}</span>
+        <span className="text-xs font-medium sidebar-label leading-tight">{item.label}</span>
       </button>
     )
   }
 
   if (item.soon) {
     return (
-      <div
-        className={`${baseClass} sidebar-nav-row-soon`}
-        title={`${item.label} — скоро`}
-      >
-        <span className="flex-shrink-0 flex items-center justify-center w-[15px]">{item.icon}</span>
-        {!collapsed && (
-          <>
-            <span className="text-xs flex-1 sidebar-label leading-tight min-w-0">{item.label}</span>
-            <span className="sidebar-soon flex-shrink-0">скоро</span>
-          </>
-        )}
+      <div className="sidebar-nav-row sidebar-nav-row-soon" title={`${item.label} — скоро`}>
+        <span className="flex-shrink-0 sidebar-nav-icon">{item.icon}</span>
+        <span className="text-xs sidebar-label leading-tight flex-1 min-w-0">{item.label}</span>
+        <span className="sidebar-soon">скоро</span>
       </div>
     )
   }
 
   return (
-    <button
-      type="button"
-      className={baseClass}
-      title={item.label}
-    >
-      <span className="flex-shrink-0 flex items-center justify-center w-[15px]">{item.icon}</span>
-      {!collapsed && <span className="text-xs sidebar-label leading-tight">{item.label}</span>}
+    <button type="button" className="sidebar-nav-row" title={item.label}>
+      <span className="flex-shrink-0 sidebar-nav-icon">{item.icon}</span>
+      <span className="text-xs sidebar-label leading-tight">{item.label}</span>
     </button>
   )
 }
