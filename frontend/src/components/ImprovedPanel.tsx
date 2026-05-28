@@ -300,25 +300,19 @@ function ImprovedContent({
       {result.diff && (
         <div className="border border-line rounded-xl overflow-hidden">
           <button
-              className={`flex items-center gap-2 px-3 py-2.5 text-xs bg-bg-surface w-full text-left ${diffOpen ? 'border-b border-line' : ''}`}
-              onClick={() => setDiffOpen((v) => !v)}
-            >
-              <span className="section-label mb-0 flex-1">Изменения</span>
-              {result.diff.changes?.length ? (
-                <span className="font-mono text-tx-dim text-2xs">{result.diff.changes.length}</span>
-              ) : null}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 14 14"
-                fill="none"
-                className={`text-tx-dim transition-transform duration-200 ${diffOpen ? 'rotate-180' : ''}`}
-                aria-hidden="true"
-              >
-                <path d="M3.5 5.5L7 9l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          {diffOpen && <DiffBlock diff={result.diff} />}
+            className={`flex items-center gap-2 px-3 py-2.5 text-xs bg-bg-surface w-full text-left ${diffOpen ? 'border-b border-line' : ''}`}
+            onClick={() => setDiffOpen((v) => !v)}
+          >
+            <span className="section-label mb-0 flex-1">История изменений</span>
+            {result.diff.changes?.length ? (
+              <span className="font-mono text-tx-dim text-2xs bg-bg-hover px-1.5 py-0.5 rounded">{result.diff.changes.length}</span>
+            ) : null}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+              className={`text-tx-dim transition-transform duration-200 ${diffOpen ? 'rotate-180' : ''}`}>
+              <path d="M3.5 5.5L7 9l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {diffOpen && <ChangeHistory diff={result.diff} />}
         </div>
       )}
 
@@ -623,27 +617,65 @@ function ResolutionRow({ resolution }: { resolution: IssueResolution }) {
   )
 }
 
-function DiffBlock({ diff }: { diff: Diff }) {
+const FIELD_NAMES: Record<string, string> = {
+  title: 'Заголовок',
+  description: 'Описание',
+  preconditions: 'Предусловия',
+  steps: 'Шаги',
+  postconditions: 'Постусловия',
+  tags: 'Теги',
+  priority: 'Приоритет',
+  status: 'Статус',
+  duration: 'Длительность',
+  attributes: 'Атрибуты',
+}
+
+function ChangeHistory({ diff }: { diff: Diff }) {
   if (!diff.changes?.length) {
-    return <div className="px-4 py-3 text-xs text-tx-muted font-mono">Изменений нет</div>
+    return (
+      <div className="px-4 py-4 text-xs text-tx-muted flex items-center gap-2">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3"/><path d="M6 4v3M6 8.5v.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+        Поля не изменились
+      </div>
+    )
   }
 
-  const typeIcon = { added: '+', changed: '~', removed: '−' }
-  const typeColor = { added: 'text-ok font-bold', changed: 'text-accent font-bold', removed: 'text-bad font-bold' }
+  const typeConfig = {
+    added:   { dot: 'bg-ok',     label: 'добавлено',  textClass: 'text-ok' },
+    changed: { dot: 'bg-accent', label: 'изменено',   textClass: 'text-accent' },
+    removed: { dot: 'bg-bad',    label: 'удалено',    textClass: 'text-bad' },
+  }
 
   return (
-    <div className="p-4 flex flex-col gap-0 overflow-x-auto bg-bg-surface">
-      {diff.changes.map((change, index) => (
-        <div key={index} className="flex items-start gap-2 py-1.5 border-b border-line/40 last:border-b-0 text-xs">
-          <span className={`font-mono flex-shrink-0 w-3 text-center ${typeColor[change.type] ?? 'text-tx-muted'}`}>
-            {typeIcon[change.type] ?? '·'}
-          </span>
-          <span className="text-tx-muted font-mono flex-shrink-0 w-28 truncate">{change.field}</span>
-          {change.before && <span className="text-bad/70 flex-1 min-w-0 line-through whitespace-pre-line">{normalizeMultiline(change.before)}</span>}
-          {change.before && change.after && <span className="text-tx-dim flex-shrink-0">→</span>}
-          {change.after && <span className="text-ok/80 flex-1 min-w-0 whitespace-pre-line">{normalizeMultiline(change.after)}</span>}
-        </div>
-      ))}
+    <div className="px-3 py-3 bg-bg-surface flex flex-col gap-0">
+      {diff.changes.map((change, index) => {
+        const cfg = typeConfig[change.type as keyof typeof typeConfig] ?? typeConfig.changed
+        const fieldLabel = FIELD_NAMES[change.field] ?? change.field
+        return (
+          <div key={index} className="flex items-start gap-3 py-2.5 border-b border-line/30 last:border-b-0">
+            {/* Timeline dot + line */}
+            <div className="flex flex-col items-center flex-shrink-0 mt-1">
+              <div className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+            </div>
+            <div className="flex flex-col gap-1 flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs font-medium text-tx-primary">{fieldLabel}</span>
+                <span className={`text-[10px] font-mono ${cfg.textClass} opacity-70`}>{cfg.label}</span>
+              </div>
+              {change.before && (
+                <div className="text-xs text-tx-dim line-through leading-relaxed truncate" title={normalizeMultiline(change.before)}>
+                  {normalizeMultiline(change.before).slice(0, 120)}{change.before.length > 120 ? '…' : ''}
+                </div>
+              )}
+              {change.after && (
+                <div className="text-xs text-tx-secondary leading-relaxed" style={{ wordBreak: 'break-word' }}>
+                  {normalizeMultiline(change.after).slice(0, 200)}{change.after.length > 200 ? '…' : ''}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
