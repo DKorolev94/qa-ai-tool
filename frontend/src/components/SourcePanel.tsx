@@ -126,6 +126,9 @@ export function SourcePanel({
       </div>
 
       <div className="panel-footer flex flex-col gap-2">
+        <div className="flex items-center justify-end">
+          <span className="text-[10px] text-tx-dim font-mono">Ctrl+Enter — анализировать</span>
+        </div>
         <div className="flex items-center gap-2">
           <button
             className={`btn flex-1 ${canImprove ? 'btn-secondary' : 'btn-primary'}`}

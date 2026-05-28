@@ -47,7 +47,7 @@ export function ImprovedPanel({
   const isEmpty = !result && !loading && !error
 
   return (
-    <div className={`panel flex flex-col transition-opacity duration-300 ${isEmpty ? 'opacity-50' : ''} ${result ? 'panel-active' : ''}`}>
+    <div className={`panel flex flex-col ${result ? 'panel-active' : ''}`}>
       <div className="panel-header">
         <div className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors duration-300 ${
           result ? 'bg-ok' : loading ? 'bg-accent animate-pulse' : 'bg-tx-dim'
@@ -198,15 +198,25 @@ function ImprovedContent({
           <button className="btn btn-secondary text-xs" onClick={onDownload}>
             Скачать JSON
           </button>
-          <button
-            className="btn btn-primary text-sm ml-auto"
-            onClick={onCreateDraft}
-            disabled={draftLoading}
-            title={hasUnresolved ? 'Черновик будет создан с нерешенными замечаниями' : undefined}
-          >
-            {draftLoading ? <Spinner /> : null}
-            {draftLoading ? 'Создание…' : 'Создать черновик в TestIT'}
-          </button>
+          <div className="flex flex-col items-end gap-1.5 ml-auto">
+            {hasUnresolved && (
+              <p className="text-xs text-warn flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+                  <path d="M6 1L11 10H1L6 1Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                  <path d="M6 5v2.5M6 9v.3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+                {unresolvedCount > 0 ? `${unresolvedCount} замечания требуют ручной правки` : 'Есть пункты для ручной правки'}
+              </p>
+            )}
+            <button
+              className="btn btn-primary text-sm"
+              onClick={onCreateDraft}
+              disabled={draftLoading}
+            >
+              {draftLoading ? <Spinner /> : null}
+              {draftLoading ? 'Создание…' : 'Создать черновик в TestIT'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -331,8 +341,8 @@ function ImprovedContent({
           </button>
         {jsonOpen && (
           <pre
-            className="text-xs font-mono text-tx-code bg-bg-surface px-3 py-2.5 overflow-x-auto"
-            style={{ maxHeight: '240px', overflow: 'auto', margin: 0, lineHeight: '1.6' }}
+            className="text-xs font-mono text-tx-code bg-bg-surface px-3 py-2.5 overflow-auto"
+            style={{ maxHeight: '240px', margin: 0, lineHeight: '1.6', scrollbarWidth: 'thin', scrollbarColor: '#2A3048 transparent' }}
           >
             {liveJson}
           </pre>
@@ -532,8 +542,12 @@ function TestCaseView({ tc, updateTC }: { tc: TestCase; updateTC: (p: Partial<Te
       ) : null}
 
       {tc.attributes && Object.keys(tc.attributes).length > 0 && (
-        <div className="text-xs text-tx-dim font-mono px-3 py-2 bg-bg-surface border border-line rounded-lg">
-          Атрибуты TestIT сохранены (UUID-ключи читаются через справочник)
+        <div className="text-xs text-tx-muted px-3 py-2 bg-bg-surface border border-line rounded-lg flex items-center gap-2">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0 text-tx-dim">
+            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M6 5.5v3M6 4v.3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <span>Атрибуты TestIT ({Object.keys(tc.attributes).length} шт.) сохранены и будут переданы при создании черновика</span>
         </div>
       )}
     </div>

@@ -52,7 +52,7 @@ export default function App() {
   const [status, setStatus] = useState<OpStatus | null>(null)
   const improvedPanelRef = useRef<HTMLDivElement | null>(null)
 
-  const anyLoading = fetchLoading || reviewLoading || improveLoading || analyzeLoading
+  const anyLoading = fetchLoading || reviewLoading || improveLoading || analyzeLoading || draftLoading
   const showImproved = !!(improveResult || improveLoading || improveError)
 
   useEffect(() => {
@@ -181,11 +181,17 @@ export default function App() {
 
   async function handleCopy() {
     if (!liveJson) return
-    try { await navigator.clipboard.writeText(liveJson) }
+    try {
+      await navigator.clipboard.writeText(liveJson)
+      setStatus({ msg: 'JSON скопирован в буфер обмена', type: 'success' })
+    }
     catch { setStatus({ msg: 'Нет доступа к буферу обмена', type: 'error' }) }
   }
 
   function handleClear() {
+    if (reviewResult || improveResult) {
+      if (!window.confirm('Очистить всё? Результаты ревью и улучшения будут удалены.')) return
+    }
     setTestItId(''); setManualText('')
     setFetchResult(null); setFetchError(null)
     setWorkItem(null); setSourceWorkItemId(null); setSourceAttributes({})
@@ -203,6 +209,7 @@ export default function App() {
     const link = document.createElement('a')
     link.href = url; link.download = 'improved_testcase.json'; link.click()
     URL.revokeObjectURL(url)
+    setStatus({ msg: 'Файл improved_testcase.json сохранён', type: 'success' })
   }
 
   function handleIssueCheck(index: number, checked: boolean) {
