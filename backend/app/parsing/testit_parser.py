@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from app.parsing.html_cleaner import clean_html
@@ -49,6 +50,19 @@ def _is_short_title(line: str) -> bool:
 def parse_testit_content(raw: str) -> NormalizedTestCase:
     if not raw or not raw.strip():
         return NormalizedTestCase(warnings=["Empty input provided"])
+
+    # Auto-detect JSON input and delegate to workitem mapper
+    stripped = raw.strip()
+    if stripped.startswith('{') or stripped.startswith('['):
+        try:
+            parsed = json.loads(stripped)
+            from app.parsing.testit_workitem_mapper import normalize_testit_workitem
+            if isinstance(parsed, dict):
+                return normalize_testit_workitem(parsed)
+            if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
+                return normalize_testit_workitem(parsed[0])
+        except (json.JSONDecodeError, Exception):
+            pass  # not valid JSON, fall through to text parsing
 
     cleaned = clean_html(raw)
     attachments = extract_attachments(raw)
