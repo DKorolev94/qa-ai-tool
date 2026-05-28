@@ -6,3 +6,5 @@ python-dotenv
 httpx
 beautifulsoup4
 pytest
+instructor>=1.0.0
+openai>=1.40.0
