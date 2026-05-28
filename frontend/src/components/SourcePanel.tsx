@@ -74,20 +74,31 @@ export function SourcePanel({
         <span className="text-sm font-semibold text-tx-primary flex-1">Источник</span>
 
         <div className="flex gap-0.5 p-0.5 bg-bg-hover rounded-md border border-line">
-          {(['testit', 'manual'] as SourceMode[]).map((m) => (
+          <button
+            onClick={() => onModeChange('testit')}
+            className={[
+              'px-3 py-1 text-xs font-medium rounded transition-all duration-150',
+              mode === 'testit'
+                ? 'bg-bg-panel text-tx-primary shadow-card'
+                : 'text-tx-muted hover:text-tx-secondary',
+            ].join(' ')}
+          >
+            TestIT
+          </button>
+          <div className="relative group">
             <button
-              key={m}
-              onClick={() => onModeChange(m)}
-              className={[
-                'px-3 py-1 text-xs font-medium rounded transition-all duration-150',
-                mode === m
-                  ? 'bg-bg-panel text-tx-primary shadow-card'
-                  : 'text-tx-muted hover:text-tx-secondary',
-              ].join(' ')}
+              disabled
+              className="px-3 py-1 text-xs font-medium rounded transition-all duration-150 text-tx-dim cursor-not-allowed opacity-50 flex items-center gap-1"
             >
-              {m === 'testit' ? 'TestIT' : 'Вручную'}
+              Вручную
+              <span className="text-[9px] font-semibold uppercase tracking-wide bg-accent/15 text-accent px-1 py-0.5 rounded">
+                скоро
+              </span>
             </button>
-          ))}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2.5 py-1.5 rounded-md text-xs text-tx-secondary bg-bg-panel border border-line shadow-card whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50">
+              В разработке
+            </div>
+          </div>
         </div>
       </div>
 
