@@ -12,12 +12,30 @@ _PRECONDITION_HEADERS = re.compile(
 )
 
 _STEP_HEADERS = re.compile(
-    r"^\s*(шаги|steps?)\s*:?\s*$",
+    r"^\s*(шаги|steps?|шаги для воспроизведения|steps to reproduce|шаги воспроизведения)\s*:?\s*$",
     re.IGNORECASE,
 )
 
 _EXPECTED_HEADERS = re.compile(
-    r"^\s*(ожидаемый результат|expected results?|expected|result)\s*:?\s*$",
+    r"^\s*(ожидаемый результат|ожидаемые результаты|expected results?|expected|result)\s*:?\s*$",
+    re.IGNORECASE,
+)
+
+# "Ожидаемый результат: <text on same line>"
+_EXPECTED_INLINE = re.compile(
+    r"^\s*(ожидаемый результат|ожидаемые результаты|expected results?|expected|result)\s*:\s*(.+)$",
+    re.IGNORECASE,
+)
+
+# "Заголовок: <title>" or "Title: <title>"
+_TITLE_HEADER = re.compile(
+    r"^\s*(заголовок|название|title|name)\s*:\s*(.+)$",
+    re.IGNORECASE,
+)
+
+# "ID: TC-1.1" or "ID: 123" — identifier line, not a title
+_ID_LINE = re.compile(
+    r"^\s*id\s*:\s*\S+\s*$",
     re.IGNORECASE,
 )
 
@@ -47,11 +65,34 @@ def parse_testit_content(raw: str) -> NormalizedTestCase:
     preconditions: list[TestCaseStep] = []
     steps: list[TestCaseStep] = []
 
-    # Extract title from first short non-empty line
-    first_line = non_empty[0].strip()
-    if _is_short_title(first_line) and not _PRECONDITION_HEADERS.match(first_line) and not _STEP_HEADERS.match(first_line):
-        title = first_line
-        lines = lines[lines.index(non_empty[0]) + 1:]
+    # Scan early lines for explicit title headers or ID line
+    remaining_lines = list(lines)
+    for i, line in enumerate(non_empty[:5]):  # check first 5 non-empty lines
+        stripped = line.strip()
+        title_match = _TITLE_HEADER.match(stripped)
+        if title_match:
+            title = title_match.group(2).strip().rstrip('.')
+            idx = lines.index(line)
+            remaining_lines = lines[idx + 1:]
+            break
+        if _ID_LINE.match(stripped):
+            # skip ID line, continue looking
+            idx = lines.index(line)
+            remaining_lines = lines[idx + 1:]
+            continue
+    else:
+        # No explicit title header found — use first non-empty non-ID line as title
+        first_line = non_empty[0].strip()
+        if (
+            _is_short_title(first_line)
+            and not _PRECONDITION_HEADERS.match(first_line)
+            and not _STEP_HEADERS.match(first_line)
+            and not _ID_LINE.match(first_line)
+        ):
+            title = first_line
+            remaining_lines = lines[lines.index(non_empty[0]) + 1:]
+
+    lines = remaining_lines
 
     mode = "description"
     current_step_action: str | None = None
@@ -82,11 +123,36 @@ def parse_testit_content(raw: str) -> NormalizedTestCase:
             mode = "steps"
             continue
 
+        # "Ожидаемый результат: <text on same line>"
+        inline_expected = _EXPECTED_INLINE.match(stripped)
+        if inline_expected and inline_expected.group(2).strip():
+            text = inline_expected.group(2).strip()
+            if mode == "steps" and current_step_action:
+                current_step_expected.append(text)
+                expected_found = True
+                flush_step()
+                mode = "steps"
+            elif steps:
+                last = steps[-1]
+                existing = last.expected or ""
+                steps[-1] = TestCaseStep(
+                    action=last.action,
+                    expected=(existing + "\n" + text).strip() if existing else text,
+                )
+                expected_found = True
+            continue
+
         if _EXPECTED_HEADERS.match(stripped):
             if mode == "steps" and current_step_action:
                 mode = "expected"
             else:
                 mode = "expected_standalone"
+            continue
+
+        # "Заголовок: <title>" inside body — set title if not yet set
+        title_match = _TITLE_HEADER.match(stripped)
+        if title_match and title is None:
+            title = title_match.group(2).strip().rstrip('.')
             continue
 
         if not stripped:
