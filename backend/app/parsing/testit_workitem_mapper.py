@@ -75,6 +75,21 @@ def map_step(step: dict) -> TestCaseStep:
     )
 
 
+def expand_steps(raw_steps: list) -> list[TestCaseStep]:
+    """Expand steps, recursively resolving shared steps (step.workItem.steps)."""
+    result: list[TestCaseStep] = []
+    for step in raw_steps:
+        if not isinstance(step, dict):
+            continue
+        work_item = step.get("workItem")
+        if work_item and isinstance(work_item, dict):
+            nested = work_item.get("steps") or []
+            result.extend(expand_steps(nested))
+        else:
+            result.append(map_step(step))
+    return result
+
+
 def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
     warnings: list[str] = []
 
@@ -84,10 +99,10 @@ def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
     description = _clean(description_raw)
 
     raw_steps = work_item.get("steps") or []
-    steps = [map_step(s) for s in raw_steps if isinstance(s, dict)]
+    steps = expand_steps(raw_steps)
 
     raw_pre = work_item.get("precondition_steps") or work_item.get("preconditionSteps") or []
-    preconditions = [map_step(s) for s in raw_pre if isinstance(s, dict)]
+    preconditions = expand_steps(raw_pre)
 
     raw_post = work_item.get("postcondition_steps") or work_item.get("postconditionSteps") or []
     postconditions = [map_step(s) for s in raw_post if isinstance(s, dict)]
