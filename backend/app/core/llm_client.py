@@ -58,12 +58,18 @@ def _load_prompt(path: Path) -> str:
         return "You are a QA assistant."
 
 
+_instructor_client: instructor.Instructor | None = None
+
+
 def _get_instructor_client() -> instructor.Instructor:
-    openai_client = OpenAI(
-        base_url=settings.LLM_BASE_URL,
-        api_key=settings.LLM_API_KEY or "no-key",
-    )
-    return instructor.from_openai(openai_client, mode=instructor.Mode.JSON)
+    global _instructor_client
+    if _instructor_client is None:
+        openai_client = OpenAI(
+            base_url=settings.LLM_BASE_URL,
+            api_key=settings.LLM_API_KEY or "no-key",
+        )
+        _instructor_client = instructor.from_openai(openai_client, mode=instructor.Mode.JSON)
+    return _instructor_client
 
 
 def analyze_testcase_with_llm(
