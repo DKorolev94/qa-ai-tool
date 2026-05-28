@@ -35,8 +35,8 @@ def _patch_settings(project_id="proj-uuid", section_id="sect-uuid"):
     return patch(
         "app.services.testit_draft_service.settings",
         SimpleNamespace(
-            TESTIT_PROJECT_ID=project_id,
-            TESTIT_DRAFT_SECTION_ID=section_id,
+            TESTIT_PROJECT_UUID=project_id,
+            TESTIT_DRAFT_SECTION_UUID=section_id,
             TESTIT_BASE_URL="https://testit.example.com",
         ),
     )
@@ -47,11 +47,13 @@ def _make_client(create_return=None, sections=None, section_created=None):
     mock_client.create_work_item = AsyncMock(return_value=create_return or CREATED)
     mock_client.list_sections = AsyncMock(return_value=sections or [])
     mock_client.create_section = AsyncMock(return_value=section_created or {"id": "new-sect-uuid"})
+    mock_client.get_project = AsyncMock(return_value={"globalId": None})
     return mock_client
 
 
 def setup_function():
     testit_draft_service._resolved_section_id = None
+    testit_draft_service._project_global_id = None
 
 
 def test_returns_work_item_id():
@@ -85,7 +87,7 @@ def test_returns_testit_url():
 
 def test_missing_project_id_raises():
     with _patch_settings(project_id=""):
-        with pytest.raises(TestItConfigError, match="TESTIT_PROJECT_ID"):
+        with pytest.raises(TestItConfigError, match="TESTIT_PROJECT_UUID"):
             run(create_draft_in_testit(IMPROVED, "6109"))
 
 

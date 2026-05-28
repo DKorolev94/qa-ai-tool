@@ -22,10 +22,6 @@ async def _resolve_section_id(client: TestItClient, project_id: str) -> str:
     if _resolved_section_id:
         return _resolved_section_id
 
-    if settings.TESTIT_DRAFT_SECTION_ID:
-        _resolved_section_id = settings.TESTIT_DRAFT_SECTION_ID
-        return _resolved_section_id
-
     sections = await client.list_sections(project_id)
     root_id: str | None = None
     for s in sections:
@@ -60,16 +56,19 @@ async def create_draft_in_testit(
     source_work_item_id: str,
     source_attributes: dict | None = None,
 ) -> CreateDraftResponse:
-    if not settings.TESTIT_PROJECT_ID:
-        raise TestItConfigError("TESTIT_PROJECT_ID is not configured in .env")
+    if not settings.TESTIT_PROJECT_UUID:
+        raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env")
 
     client = TestItClient()
-    section_id = await _resolve_section_id(client, settings.TESTIT_PROJECT_ID)
+    if settings.TESTIT_DRAFT_SECTION_UUID:
+        section_id = settings.TESTIT_DRAFT_SECTION_UUID
+    else:
+        section_id = await _resolve_section_id(client, settings.TESTIT_PROJECT_UUID)
 
     payload = build_draft_payload(
         improved=improved_testcase,
         source_id=source_work_item_id,
-        project_id=settings.TESTIT_PROJECT_ID,
+        project_id=settings.TESTIT_PROJECT_UUID,
         section_id=section_id,
         source_attributes=source_attributes,
     )
@@ -77,7 +76,7 @@ async def create_draft_in_testit(
     logger.info(
         "Creating draft work item: name=%s project=%s section=%s",
         payload.get("name"),
-        settings.TESTIT_PROJECT_ID,
+        settings.TESTIT_PROJECT_UUID,
         section_id,
     )
     created = await client.create_work_item(payload)
@@ -88,7 +87,7 @@ async def create_draft_in_testit(
 
     testit_url: str | None = None
     if global_id and settings.TESTIT_BASE_URL:
-        project_global_id = await _resolve_project_global_id(client, settings.TESTIT_PROJECT_ID)
+        project_global_id = await _resolve_project_global_id(client, settings.TESTIT_PROJECT_UUID)
         if project_global_id:
             testit_url = f"{settings.TESTIT_BASE_URL}/projects/{project_global_id}/tests/{global_id}"
         else:

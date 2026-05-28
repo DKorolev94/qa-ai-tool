@@ -7,6 +7,8 @@ _PRIORITY_MAP = {
     "critical": "Critical",
 }
 
+_VALID_STATES = {"Ready", "NotReady", "NeedsWork"}
+
 
 def _map_step(step: dict) -> dict:
     return {
