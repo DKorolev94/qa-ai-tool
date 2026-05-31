@@ -15,8 +15,8 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
   const [localRules, setLocalRules] = useState<ReviewRuleId[]>(enabledRules)
   const wrapRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { setLocalPreset(selectedPreset) }, [selectedPreset])
-  useEffect(() => { setLocalRules(enabledRules) }, [enabledRules])
+  useEffect(() => { if (!open) setLocalPreset(selectedPreset) }, [selectedPreset, open])
+  useEffect(() => { if (!open) setLocalRules(enabledRules) }, [enabledRules, open])
 
   useEffect(() => {
     if (!open) return
@@ -47,7 +47,9 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
     setOpen(false)
   }
 
-  const currentLabel = reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Строгое ревью'
+  const currentLabel = selectedPreset === 'custom'
+    ? 'Кастомный'
+    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Строгое ревью')
 
   return (
     <div className="mode-btn-wrap" ref={wrapRef}>
