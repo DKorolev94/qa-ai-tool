@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Info, Search, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, Info, Minus, Search, X } from 'lucide-react'
 import type { ReviewConfig, ReviewRuleId } from '../types'
 
 interface RulesModalProps {
@@ -57,7 +57,36 @@ const SEVERITY_COLORS: Record<Severity, string> = {
 
 const SEVERITY_ORDER: Severity[] = ['critical', 'medium', 'low']
 
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'all', label: 'Все' },
+  { id: 'critical', label: 'Критичные' },
+  { id: 'medium', label: 'Средние' },
+  { id: 'low', label: 'Низкие' },
+]
+
+function GroupCheckbox({ allChecked, indeterminate, onClick }: {
+  allChecked: boolean
+  indeterminate: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`rules-cb${allChecked || indeterminate ? ' checked' : ''}`}
+      onClick={onClick}
+    >
+      {indeterminate
+        ? <Minus size={11} strokeWidth={2.5} />
+        : allChecked
+          ? <Check size={11} strokeWidth={2.5} />
+          : null
+      }
+    </button>
+  )
+}
+
 export function RulesModal({ reviewConfig, enabledRules, onApply, onClose }: RulesModalProps) {
+  const initialRules = useRef<ReviewRuleId[]>(enabledRules)
   const [localRules, setLocalRules] = useState<ReviewRuleId[]>(enabledRules)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState<Tab>('all')
@@ -65,16 +94,31 @@ export function RulesModal({ reviewConfig, enabledRules, onApply, onClose }: Rul
     ruleId: null, loading: false, text: null,
   })
 
+  const isSearching = searchQuery.trim().length > 0
+  const hasChanges =
+    JSON.stringify([...localRules].sort()) !== JSON.stringify([...initialRules.current].sort())
+
   function toggleRule(ruleId: ReviewRuleId) {
     setLocalRules(prev =>
       prev.includes(ruleId) ? prev.filter(r => r !== ruleId) : [...prev, ruleId]
     )
   }
 
+  function toggleGroup(groupRuleIds: ReviewRuleId[], allChecked: boolean) {
+    if (allChecked) {
+      setLocalRules(prev => prev.filter(r => !groupRuleIds.includes(r)))
+    } else {
+      setLocalRules(prev => {
+        const without = prev.filter(r => !groupRuleIds.includes(r))
+        return [...without, ...groupRuleIds]
+      })
+    }
+  }
+
   async function handleInfoEnter(ruleId: string) {
     setTooltip({ ruleId, loading: true, text: null })
     const text = await fetchRuleDescription(ruleId)
-    setTooltip({ ruleId, loading: false, text })
+    setTooltip(prev => prev.ruleId === ruleId ? { ruleId, loading: false, text } : prev)
   }
 
   function handleInfoLeave() {
@@ -95,12 +139,50 @@ export function RulesModal({ reviewConfig, enabledRules, onApply, onClose }: Rul
     rules: filteredRules.filter(r => getSeverity(r.id) === sev),
   })).filter(g => g.rules.length > 0)
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'all', label: 'Все' },
-    { id: 'critical', label: 'Критичные' },
-    { id: 'medium', label: 'Средние' },
-    { id: 'low', label: 'Низкие' },
-  ]
+  function renderRow(ruleId: string, label: string, showDot: boolean) {
+    const checked = localRules.includes(ruleId as ReviewRuleId)
+    const sev = getSeverity(ruleId)
+    return (
+      <div key={ruleId} className="rules-row">
+        <button
+          type="button"
+          className={`rules-cb${checked ? ' checked' : ''}`}
+          onClick={() => toggleRule(ruleId as ReviewRuleId)}
+        >
+          {checked && <Check size={11} strokeWidth={2.5} />}
+        </button>
+        <span className="rules-name-wrap">
+          <span className="rules-name">{label}</span>
+          <button
+            type="button"
+            className="rules-info-btn"
+            onMouseEnter={() => handleInfoEnter(ruleId)}
+            onMouseLeave={handleInfoLeave}
+          >
+            <Info size={13} strokeWidth={1.75} />
+          </button>
+        </span>
+        {showDot && (
+          <span className={`severity-dot severity-dot-${sev}`} />
+        )}
+        {tooltip.ruleId === ruleId && (
+          <div className="rules-tooltip">
+            {tooltip.loading
+              ? <span className="rules-tooltip-loading">Загрузка описания…</span>
+              : tooltip.text
+            }
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
     <div className="rules-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -143,58 +225,47 @@ export function RulesModal({ reviewConfig, enabledRules, onApply, onClose }: Rul
 
         {/* Rules list */}
         <div className="rules-scroll">
-          {grouped.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--tx-dim)', fontSize: 13 }}>
-              Правила не найдены
-            </div>
-          )}
-          {grouped.map(({ severity, rules }) => (
-            <div key={severity}>
-              <div className="rules-group-label">
-                <span className="severity-dot" style={{ background: SEVERITY_COLORS[severity] }} />
-                {SEVERITY_LABELS[severity]}
-              </div>
-              {rules.map(rule => (
-                <div key={rule.id} className="rules-row">
-                  <button
-                    type="button"
-                    className={`rules-toggle${localRules.includes(rule.id as ReviewRuleId) ? ' on' : ''}`}
-                    onClick={() => toggleRule(rule.id as ReviewRuleId)}
-                  >
-                    <span className="rules-toggle-knob" />
-                  </button>
-                  <span className="rules-name">{rule.label}</span>
-                  <span
-                    className={`severity-dot severity-dot-${severity}`}
-                  />
-                  <button
-                    type="button"
-                    className="rules-info-btn"
-                    onMouseEnter={() => handleInfoEnter(rule.id)}
-                    onMouseLeave={handleInfoLeave}
-                  >
-                    <Info size={14} strokeWidth={1.75} />
-                  </button>
-                  {tooltip.ruleId === rule.id && (
-                    <div className="rules-tooltip">
-                      {tooltip.loading
-                        ? <span className="rules-tooltip-loading">Загрузка описания…</span>
-                        : tooltip.text
-                      }
+          {isSearching ? (
+            filteredRules.length === 0
+              ? <div className="rules-empty">Правила не найдены</div>
+              : filteredRules.map(rule => renderRow(rule.id, rule.label, true))
+          ) : (
+            grouped.length === 0
+              ? <div className="rules-empty">Правила не найдены</div>
+              : grouped.map(({ severity, rules }) => {
+                  const groupIds = rules.map(r => r.id as ReviewRuleId)
+                  const checkedCount = groupIds.filter(id => localRules.includes(id)).length
+                  const allChecked = checkedCount === groupIds.length
+                  const indeterminate = checkedCount > 0 && checkedCount < groupIds.length
+                  return (
+                    <div key={severity}>
+                      <div className="rules-group-label">
+                        <GroupCheckbox
+                          allChecked={allChecked}
+                          indeterminate={indeterminate}
+                          onClick={() => toggleGroup(groupIds, allChecked)}
+                        />
+                        <span className="severity-dot" style={{ background: SEVERITY_COLORS[severity] }} />
+                        {SEVERITY_LABELS[severity]}
+                      </div>
+                      {rules.map(rule => renderRow(rule.id, rule.label, false))}
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ))}
+                  )
+                })
+          )}
         </div>
 
         {/* Footer */}
         <div className="rules-modal-footer">
           <span className="rules-footer-count">Выбрано {localRules.length} правил</span>
           <div className="rules-footer-actions">
-            <button type="button" className="rules-btn-reset" onClick={() => setLocalRules(enabledRules)}>
-              Сбросить
+            <button
+              type="button"
+              className="rules-btn-reset"
+              disabled={!hasChanges}
+              onClick={() => setLocalRules(initialRules.current)}
+            >
+              Сбросить изменения
             </button>
             <button type="button" className="rules-btn-apply" onClick={() => onApply(localRules)}>
               Применить
