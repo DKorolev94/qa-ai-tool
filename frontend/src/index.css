@@ -152,14 +152,13 @@ body { padding: 20px; }
   display: inline-flex; align-items: center; gap: 8px;
   height: 36px; padding: 0 12px; border-radius: var(--r-sm);
   background: var(--bg-panel);
-  border: 1px solid var(--accent);
-  box-shadow: 0 0 0 2px rgba(124,58,237,0.12);
+  border: 0.5px solid var(--border);
   font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--tx-secondary);
   cursor: pointer; white-space: nowrap;
   transition: border-color .14s, background .14s, box-shadow .14s;
 }
-.mode-btn:hover { background: var(--bg-surface); box-shadow: 0 0 0 3px rgba(124,58,237,0.16); }
-.mode-btn.open { background: var(--bg-surface); box-shadow: 0 0 0 3px rgba(124,58,237,0.18); }
+.mode-btn:hover { background: var(--bg-surface); border-color: var(--accent); }
+.mode-btn.open { background: var(--bg-surface); border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124,58,237,0.12); }
 .mode-btn-star { color: #F59E0B; display: flex; flex-shrink: 0; }
 .mode-btn-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
 .mode-btn-pill {
