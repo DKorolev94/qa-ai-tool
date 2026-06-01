@@ -87,6 +87,7 @@ def postprocess_improved_testcase(
     # Validate steps
     steps = result.get("steps") or []
     original_steps = original.get("steps") or []
+    steps_restructured = len(steps) != len(original_steps)
     if not steps:
         validation_warnings.append("Улучшенный тест-кейс не содержит шагов")
     else:
@@ -95,11 +96,13 @@ def postprocess_improved_testcase(
                 continue
             if not step.get("action"):
                 validation_warnings.append(f"Шаг {i + 1}: отсутствует действие")
-            # Only warn if original had expected result but improved lost it —
-            # LLM correctly doesn't invent expected results that never existed
-            orig_expected = original_steps[i].get("expected") if i < len(original_steps) else None
-            if not step.get("expected") and orig_expected:
-                validation_warnings.append(f"Шаг {i + 1}: потерян ожидаемый результат")
+            # Only warn if original had expected result but improved lost it.
+            # Skip index-based check when step count changed — LLM restructured
+            # steps (split/merge) and expected results may have moved to other indices.
+            if not steps_restructured:
+                orig_expected = original_steps[i].get("expected") if i < len(original_steps) else None
+                if not step.get("expected") and orig_expected:
+                    validation_warnings.append(f"Шаг {i + 1}: потерян ожидаемый результат")
 
     # Status: NeedsWork if manual actions remain, Ready if LLM fixed everything
     if result.get("manual_notes"):

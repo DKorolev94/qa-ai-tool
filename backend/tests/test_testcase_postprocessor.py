@@ -123,6 +123,17 @@ def test_step_without_expected_no_warning_if_original_also_missing():
     assert not any("ожидаемый результат" in w for w in result["validation_warnings"])
 
 
+def test_no_expected_warning_when_steps_restructured():
+    # LLM split 1 step into 2 — expected moved to step 2, step 1 has no expected → no warning
+    original = {"steps": [{"action": "Enter + click", "expected": "Redirect to main"}]}
+    improved = _base_improved(steps=[
+        {"action": "Enter credentials", "expected": None},
+        {"action": "Click button", "expected": "Redirect to main"},
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert not any("ожидаемый результат" in w for w in result["validation_warnings"])
+
+
 def test_empty_steps_adds_validation_warning():
     improved = _base_improved(steps=[])
     result = postprocess_improved_testcase({}, improved)
