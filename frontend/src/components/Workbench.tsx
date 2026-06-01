@@ -1346,6 +1346,29 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     </div>
                   </div>
                 )}
+
+                {/* Apply card */}
+                {hasApply && (
+                  <div className="apply-card">
+                    <div className="apply-card-label">
+                      <CheckCircle2 size={13} />
+                      Применено к оригиналу
+                    </div>
+                    <div className="apply-card-name">#{fetchResult.work_item_id} — {applyResult!.title}</div>
+                    <div className="apply-card-meta">
+                      {applyResult!.testit_url && (
+                        <a
+                          className="apply-link"
+                          href={applyResult!.testit_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Открыть в TestIT →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
