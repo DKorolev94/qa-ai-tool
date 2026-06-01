@@ -7,7 +7,7 @@ import { api } from '../api'
 import { ModeButton } from './ModeButton'
 import { ProgressBar } from './ProgressBar'
 import type {
-  AnalyzeResult, DraftResult, FetchResult, ImproveResult,
+  AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult,
   IssueResolution, ParameterTable, ReviewConfig, ReviewIssue, ReviewRuleId, Step, TestCase, WorkItemLink,
 } from '../types'
 
@@ -708,6 +708,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [improveError, setImproveError] = useState<string | null>(null)
   const [draftResult, setDraftResult] = useState<DraftResult | null>(null)
   const [draftLoading, setDraftLoading] = useState(false)
+  const [draftSectionName, setDraftSectionName] = useState<string>(MOCK_SECTIONS[0].name)
+  const [showSectionPicker, setShowSectionPicker] = useState(false)
+  const [applyResult, setApplyResult] = useState<ApplyResult | null>(null)
+  const [applyLoading, setApplyLoading] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
+  const [showConfirmApply, setShowConfirmApply] = useState(false)
   const [activeTab, setActiveTab] = useState<'original' | 'improved' | 'diff' | 'json'>('original')
 
   const tc = fetchResult.normalized_testcase
@@ -804,6 +810,26 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     }
   }
 
+  async function runApplyToOriginal() {
+    if (!improveResult) return
+    setApplyLoading(true)
+    setApplyError(null)
+    setApplyResult(null)
+    try {
+      const result = await api.applyToOriginal({
+        improved_testcase: improveResult.improved_testcase,
+        source_work_item_id: fetchResult.work_item_id,
+        source_attributes: fetchResult.raw_work_item,
+      })
+      setApplyResult(result)
+    } catch (err) {
+      setApplyError((err as Error).message)
+    } finally {
+      setApplyLoading(false)
+      setShowConfirmApply(false)
+    }
+  }
+
   function computeScore(issues: ReviewIssue[]) {
     let s = 100
     for (const i of issues) s -= i.severity === 'high' ? 20 : i.severity === 'medium' ? 10 : 5
@@ -835,6 +861,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   const hasImprove = !!improveResult
   const hasDraft = !!draftResult
+
+  const hasApply = !!applyResult
   const diffCount = improveResult?.diff?.changes?.length
 
   // Strip service footer from LLM-generated description before display
@@ -870,6 +898,21 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     : improveResult
     ? computeImproveStatus(improveResult)
     : null
+
+  const openCriticalCount = analyzeResult?.issues.filter(i =>
+    i.severity === 'high' &&
+    !improveResult?.issue_resolutions?.some(
+      r => r.issue_title === i.title && r.status === 'resolved'
+    )
+  ).length ?? 0
+
+  const canDraft = (improveStatus === 'success' || improveStatus === 'partial') && !applyResult
+  const canApply = improveStatus === 'success' && openCriticalCount === 0 && manualCount === 0 && !applyResult
+  const applyBlockReason = improveStatus === 'partial'
+    ? 'Кейс требует доработки'
+    : (openCriticalCount > 0 || manualCount > 0)
+      ? 'Сначала закройте критичные замечания'
+      : null
 
   // Fields empty in improved result when AI partially processed — shown as ⚠ не обработано
   const partialFields = new Set<string>()
@@ -996,7 +1039,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             </button>
           )}
           {/* Improve / retry */}
-          {analyzeResult && !hasDraft && (
+          {analyzeResult && (
             improveLoading ? (
               <button type="button" className="wb-btn wb-btn-sec" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><Wand2 size={13} /></span>
@@ -1008,7 +1051,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 Повторить
               </button>
             ) : hasImprove ? (
-              <button type="button" className="wb-btn wb-btn-sec" onClick={runImprove}>
+              <button type="button" className="wb-btn wb-btn-sec" onClick={runImprove}
+                disabled={improveLoading || analyzeLoading}>
                 <Wand2 size={13} />
                 Улучшить ещё
               </button>
@@ -1019,33 +1063,89 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               </button>
             )
           )}
-          {/* Draft — disabled on error, warning style on partial */}
-          {improvedTabAccessible && !hasDraft && improveStatus !== 'error' && (
-            draftLoading ? (
+          {/* Draft */}
+          {improvedTabAccessible && improveStatus !== 'error' && (
+            hasDraft ? (
+              <button type="button" className="wb-btn wb-btn-done" disabled>
+                <CheckCircle2 size={13} />
+                Черновик создан
+              </button>
+            ) : draftLoading ? (
               <button type="button" className="wb-btn wb-btn-sec" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><CheckCircle2 size={13} /></span>
                 Создаю...
               </button>
-            ) : (
+            ) : canDraft ? (
               <button
                 type="button"
-                className={`wb-btn ${improveStatus === 'partial' ? 'wb-btn-sec-warn' : 'wb-btn-pri'}`}
-                onClick={runCreateDraft}
+                className={`wb-btn ${improveStatus === 'partial' ? 'wb-btn-sec-warn' : 'wb-btn-sec'}`}
                 title={improveStatus === 'partial' ? 'Кейс улучшен частично — рекомендуется доработка' : undefined}
+                onClick={() => setShowSectionPicker(true)}
               >
                 <CheckCircle2 size={13} />
                 Создать черновик
               </button>
-            )
+            ) : null
           )}
-          {hasDraft && (
-            <button type="button" className="wb-btn wb-btn-done">
-              <CheckCircle2 size={13} />
-              Черновик создан
-            </button>
+          {/* Apply to original */}
+          {improvedTabAccessible && improveStatus !== 'error' && (
+            hasApply ? (
+              <button type="button" className="wb-btn wb-btn-done" disabled>
+                <CheckCircle2 size={13} />
+                Применено
+              </button>
+            ) : applyLoading ? (
+              <button type="button" className="wb-btn-apply" disabled>
+                <span className="spinner" style={{ display: 'inline-flex' }}><Wand2 size={13} /></span>
+                Применяю...
+              </button>
+            ) : (
+              <div className="wb-btn-wrap">
+                <button
+                  type="button"
+                  className="wb-btn-apply"
+                  disabled={!canApply}
+                  onClick={() => canApply && setShowConfirmApply(true)}
+                >
+                  <CheckCircle2 size={13} />
+                  Применить к оригиналу
+                </button>
+                {!canApply && applyBlockReason && (
+                  <span className="wb-btn-tip">{applyBlockReason}</span>
+                )}
+              </div>
+            )
           )}
         </div>
       </div>
+
+      {/* Section picker modal */}
+      {showSectionPicker && (
+        <SectionPickerModal
+          onConfirm={(sectionName) => {
+            setDraftSectionName(sectionName)
+            setShowSectionPicker(false)
+            runCreateDraft()
+          }}
+          onCancel={() => setShowSectionPicker(false)}
+        />
+      )}
+
+      {/* Confirm apply modal */}
+      {showConfirmApply && (
+        <ConfirmApplyModal
+          workItemId={fetchResult.work_item_id}
+          onConfirm={runApplyToOriginal}
+          onCancel={() => setShowConfirmApply(false)}
+        />
+      )}
+
+      {/* Apply error */}
+      {applyError && (
+        <div className="alert alert-error" style={{ margin: '0 0 8px' }}>
+          <span className="alert-text">Ошибка применения: {applyError}</span>
+        </div>
+      )}
 
       {/* Workbench grid */}
       <div className="wb-grid">
