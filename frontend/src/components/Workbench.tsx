@@ -1185,12 +1185,14 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               <>
                 <div className="improve-partial-banner">
                   <AlertTriangle size={14} />
-                  <span>Улучшение выполнено частично. Часть полей требует проверки.</span>
-                  {(improveResult?.validation_warnings?.length ?? 0) > 0 && (
-                    <span className="improve-partial-detail">
-                      {improveResult!.validation_warnings!.join('; ')}
-                    </span>
-                  )}
+                  <div>
+                    <span>Улучшение выполнено частично. Часть полей требует проверки.</span>
+                    {(improveResult?.validation_warnings?.length ?? 0) > 0 && (
+                      <span className="improve-partial-detail">
+                        {improveResult!.validation_warnings!.join('; ')}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <TestCaseView tc={mergedImproved} partialFields={partialFields} />
               </>

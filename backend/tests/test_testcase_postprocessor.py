@@ -107,19 +107,29 @@ def test_all_attributes_kept():
     assert result["attributes"] == attrs
 
 
-def test_step_without_expected_adds_validation_warning():
+def test_step_without_expected_warns_only_if_original_had_expected():
+    # Original had expected — improved lost it → warn
+    original = {"steps": [{"action": "Click button", "expected": "Button is clicked"}]}
     improved = _base_improved(steps=[{"action": "Click button", "expected": None}])
-    result = postprocess_improved_testcase({}, improved)
-    assert any("expected" in w.lower() for w in result["validation_warnings"])
+    result = postprocess_improved_testcase(original, improved)
+    assert any("ожидаемый результат" in w for w in result["validation_warnings"])
+
+
+def test_step_without_expected_no_warning_if_original_also_missing():
+    # Original had no expected — improved also has none → no warning (LLM correctly didn't invent)
+    original = {"steps": [{"action": "Click button", "expected": None}]}
+    improved = _base_improved(steps=[{"action": "Click button", "expected": None}])
+    result = postprocess_improved_testcase(original, improved)
+    assert not any("ожидаемый результат" in w for w in result["validation_warnings"])
 
 
 def test_empty_steps_adds_validation_warning():
     improved = _base_improved(steps=[])
     result = postprocess_improved_testcase({}, improved)
-    assert any("steps" in w.lower() for w in result["validation_warnings"])
+    assert any("шагов" in w.lower() for w in result["validation_warnings"])
 
 
 def test_step_without_action_adds_validation_warning():
     improved = _base_improved(steps=[{"action": "", "expected": "Something"}])
     result = postprocess_improved_testcase({}, improved)
-    assert any("action" in w.lower() for w in result["validation_warnings"])
+    assert any("действие" in w.lower() for w in result["validation_warnings"])

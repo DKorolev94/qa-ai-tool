@@ -86,16 +86,20 @@ def postprocess_improved_testcase(
 
     # Validate steps
     steps = result.get("steps") or []
+    original_steps = original.get("steps") or []
     if not steps:
-        validation_warnings.append("Improved testcase has no steps")
+        validation_warnings.append("Улучшенный тест-кейс не содержит шагов")
     else:
         for i, step in enumerate(steps):
             if not isinstance(step, dict):
                 continue
             if not step.get("action"):
-                validation_warnings.append(f"Step {i + 1} is missing an action")
-            if not step.get("expected"):
-                validation_warnings.append(f"Step {i + 1} is missing an expected result")
+                validation_warnings.append(f"Шаг {i + 1}: отсутствует действие")
+            # Only warn if original had expected result but improved lost it —
+            # LLM correctly doesn't invent expected results that never existed
+            orig_expected = original_steps[i].get("expected") if i < len(original_steps) else None
+            if not step.get("expected") and orig_expected:
+                validation_warnings.append(f"Шаг {i + 1}: потерян ожидаемый результат")
 
     # Status: NeedsWork if manual actions remain, Ready if LLM fixed everything
     if result.get("manual_notes"):
