@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from fastapi import APIRouter, HTTPException
 
 from app.integrations.testit_client import (
@@ -10,6 +11,7 @@ from app.integrations.testit_client import (
     TestItNotFoundError,
     TestItResponseError,
 )
+from app.core.review_config import ReviewConfig, get_review_config
 from app.parsing.testit_parser import parse_testit_content
 from app.parsing.testit_workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import (
@@ -24,11 +26,14 @@ from app.schemas.testit import (
     CreateDraftResponse,
     FetchTestItWorkItemRequest,
     FetchTestItWorkItemResponse,
+    UpdateOriginalRequest,
+    UpdateOriginalResponse,
 )
 from app.services.testcase_analyzer import analyze_raw_testcase
 from app.services.testcase_improver import improve_testcase
 from app.services.testit_draft_service import create_draft_in_testit
 from app.services.testit_workitem_service import fetch_and_normalize_work_item
+from app.services.testit_update_service import apply_to_original_in_testit
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -40,6 +45,11 @@ class RawContentRequest(BaseModel):
 
 class WorkItemRequest(BaseModel):
     work_item: dict
+
+
+@router.get("/review-config", response_model=ReviewConfig)
+async def review_config() -> ReviewConfig:
+    return get_review_config()
 
 
 @router.post("/clean-testcase", response_model=NormalizedTestCase)
@@ -57,10 +67,12 @@ async def analyze_testcase(body: AnalyzeTestCaseRequest) -> AnalyzeTestCaseRespo
     if body.work_item is None and body.raw_content is None:
         raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
     try:
-        return analyze_raw_testcase(
+        return await asyncio.to_thread(
+            analyze_raw_testcase,
             raw_content=body.raw_content,
             work_item=body.work_item,
             source_type=body.source_type,
+            enabled_rules=body.enabled_rules,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -71,11 +83,13 @@ async def improve_testcase_endpoint(body: ImproveTestCaseRequest) -> ImproveTest
     if body.work_item is None and body.raw_content is None:
         raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
     try:
-        return improve_testcase(
+        return await asyncio.to_thread(
+            improve_testcase,
             raw_content=body.raw_content,
             work_item=body.work_item,
             selected_issues=body.selected_issues,
             source_type=body.source_type,
+            enabled_rules=body.enabled_rules,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -113,6 +127,28 @@ async def create_testit_draft(body: CreateDraftRequest) -> CreateDraftResponse:
         raise HTTPException(status_code=503, detail=str(exc))
     except TestItAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
+    except TestItConnectionError as exc:
+        raise HTTPException(status_code=503, detail=f"TestIT unavailable: {exc}")
+    except TestItResponseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except TestItApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/testit/workitem/update-original", response_model=UpdateOriginalResponse)
+async def update_testit_original(body: UpdateOriginalRequest) -> UpdateOriginalResponse:
+    try:
+        return await apply_to_original_in_testit(
+            improved_testcase=body.improved_testcase,
+            source_work_item_id=body.source_work_item_id,
+            source_attributes=body.source_attributes,
+        )
+    except TestItConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except TestItAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except TestItNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     except TestItConnectionError as exc:
         raise HTTPException(status_code=503, detail=f"TestIT unavailable: {exc}")
     except TestItResponseError as exc:

@@ -25,3 +25,16 @@ class CreateDraftResponse(BaseModel):
     global_id: int | None = None
     title: str
     testit_url: str | None = None
+
+
+class UpdateOriginalRequest(BaseModel):
+    improved_testcase: dict
+    source_work_item_id: str
+    source_attributes: dict = {}
+
+
+class UpdateOriginalResponse(BaseModel):
+    work_item_id: str
+    global_id: int | None = None
+    title: str
+    testit_url: str | None = None
