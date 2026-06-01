@@ -1,4 +1,4 @@
-import type { AnalyzeResult, DraftResult, FetchResult, ImproveResult, ReviewIssue, ReviewResult } from './types'
+import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId } from './types'
 
 const BASE = '/api'
 
@@ -15,21 +15,35 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`)
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+  }
+  return res.json() as Promise<T>
+}
+
 export const api = {
+  getReviewConfig: () => get<ReviewConfig>('/review-config'),
+
   fetchWorkItem: (input: string) =>
     post<FetchResult>('/testit/workitem/fetch', { input }),
-
-  reviewTestCase: (body: { work_item?: unknown; raw_content?: string }) =>
-    post<ReviewResult>('/review-testcase', body),
 
   improveTestCase: (body: {
     work_item?: unknown
     raw_content?: string
     selected_issues: ReviewIssue[]
     source_type?: 'testit' | 'manual'
+    enabled_rules?: ReviewRuleId[]
   }) => post<ImproveResult>('/improve-testcase', body),
 
-  analyzeTestCase: (body: { work_item?: unknown; raw_content?: string; source_type?: 'testit' | 'manual' }) =>
+  analyzeTestCase: (body: {
+    work_item?: unknown
+    raw_content?: string
+    source_type?: 'testit' | 'manual'
+    enabled_rules?: ReviewRuleId[]
+  }) =>
     post<AnalyzeResult>('/analyze-testcase', body),
 
   createDraft: (body: {
@@ -37,6 +51,12 @@ export const api = {
     source_work_item_id: string
     source_attributes: Record<string, unknown>
   }) => post<DraftResult>('/testit/workitem/create-draft', body),
+
+  applyToOriginal: (body: {
+    improved_testcase: unknown
+    source_work_item_id: string
+    source_attributes: Record<string, unknown>
+  }) => post<ApplyResult>('/testit/workitem/update-original', body),
 }
 
 export function parseManualInput(raw: string): { work_item?: unknown; raw_content?: string } {

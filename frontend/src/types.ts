@@ -1,4 +1,13 @@
 export type SourceMode = 'testit' | 'manual'
+export type ReviewRuleId =
+  | 'structure'
+  | 'expected_results'
+  | 'test_data'
+  | 'tags'
+  | 'duration'
+  | 'atomicity'
+  | 'independence'
+  | 'requirement_traceability'
 export type Severity = 'high' | 'medium' | 'low'
 export type ResolutionStatus = 'resolved' | 'manual_needed' | 'skipped'
 export type StatusType = 'success' | 'error' | 'loading' | ''
@@ -8,6 +17,18 @@ export interface Step {
   expected?: string | null
   test_data?: string | null
   comments?: string | null
+}
+
+export interface ParameterTable {
+  names: string[]
+  rows: string[][]
+}
+
+export interface WorkItemLink {
+  url?: string | null
+  title?: string | null
+  type?: string | null
+  description?: string | null
 }
 
 export interface TestCase {
@@ -21,7 +42,12 @@ export interface TestCase {
   preconditions?: Step[]
   steps?: Step[]
   postconditions?: Step[]
+  links?: WorkItemLink[]
+  attachments?: Array<{ name?: string; url?: string | null; type?: string | null; file_id?: string }>
   attributes?: Record<string, unknown>
+  parameter_table?: ParameterTable | null
+  section_name?: string | null
+  product_versions?: string[]
 }
 
 export interface FetchResult {
@@ -99,4 +125,48 @@ export interface DraftResult {
 export interface OpStatus {
   msg: string
   type: StatusType
+}
+
+export interface ReviewSourceConfig {
+  id: string
+  label: string
+  enabled: boolean
+  badge?: string | null
+}
+
+export interface ReviewProfileConfig {
+  id: string
+  label: string
+  description?: string
+  rules: ReviewRuleId[]
+}
+
+export interface ReviewRuleConfig {
+  id: ReviewRuleId
+  label: string
+  description?: string
+  group?: string
+  default_for?: string[]
+  profiles?: string[]
+  enabled: boolean
+  order: number
+}
+
+export interface ReviewConfig {
+  sources: ReviewSourceConfig[]
+  profiles: ReviewProfileConfig[]
+  rules: ReviewRuleConfig[]
+  defaults: Record<string, ReviewRuleId[]>
+}
+
+export interface ApplyResult {
+  work_item_id: string
+  global_id?: number
+  title: string
+  testit_url?: string
+}
+
+export interface Section {
+  id: string
+  name: string
 }
