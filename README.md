@@ -84,7 +84,6 @@
 - LLM_TIMEOUT_SECONDS
 - TESTIT_TIMEOUT_SECONDS
 - TESTIT_VERIFY_SSL
-- TESTIT_DRAFT_SECTION_UUID (опционально; если пусто, секция для драфтов создается автоматически)
 
 ## Пример минимального backend/.env
 
