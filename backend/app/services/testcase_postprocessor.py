@@ -102,15 +102,19 @@ def postprocess_improved_testcase(
             if not steps_restructured:
                 orig_expected = original_steps[i].get("expected") if i < len(original_steps) else None
                 if not step.get("expected") and orig_expected:
-                    validation_warnings.append(f"Шаг {i + 1}: потерян ожидаемый результат")
+                    step["expected"] = orig_expected
 
-    # Status: NeedsWork if manual actions remain, Ready if LLM fixed everything
-    if result.get("manual_notes"):
-        result["status"] = "NeedsWork"
-    else:
-        result["status"] = "Ready"
+    # Duration — discard LLM value if suspiciously small (LLM confused ms with seconds/minutes)
+    orig_duration = original.get("duration")
+    improved_duration = result.get("duration")
+    if (
+        isinstance(improved_duration, int)
+        and improved_duration < 5000
+        and isinstance(orig_duration, int)
+        and orig_duration >= 5000
+    ):
+        result["duration"] = orig_duration
 
-    # Duration
     display_duration, raw_duration = _process_duration(result)
     result["display_duration"] = display_duration
     result["raw_duration"] = raw_duration

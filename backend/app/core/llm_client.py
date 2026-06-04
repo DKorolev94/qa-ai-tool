@@ -2,37 +2,40 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
+import time
 
 import instructor
 from openai import OpenAI
 
 from app.core.config import settings
+from app.core.prompt_builder import build_improve_prompt, build_review_prompt
 from app.schemas.analysis import (
     AnalysisIssue,
     AnalyzedTestCase,
     ImproveResult,
     ReviewResult,
     TextParseResult,
+    _LLMReviewResult,
 )
 
 logger = logging.getLogger(__name__)
 
-_PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-PROMPT_REGISTRY: dict[str, dict[str, Path]] = {
-    "review": {
-        "testit": _PROMPTS_DIR / "review_testit.md",
-        "manual": _PROMPTS_DIR / "review_manual.md",
-    },
-    "improve": {
-        "testit": _PROMPTS_DIR / "improve.md",
-        "manual": _PROMPTS_DIR / "improve.md",
-    },
-    "parse": {
-        "manual": _PROMPTS_DIR / "parse_testcase.md",
-    },
-}
+def _root_cause(exc: Exception) -> str:
+    """Walk the exception chain, return compact single-line root cause."""
+    seen: set[int] = set()
+    cause: BaseException = exc
+    while True:
+        if id(cause) in seen:
+            break
+        seen.add(id(cause))
+        nxt = cause.__cause__ or cause.__context__
+        if nxt is None:
+            break
+        cause = nxt
+    msg = str(cause)[:200].replace("\n", " ").strip()
+    return f"{type(cause).__name__}: {msg}"
+
 
 _FALLBACK_REVIEW = ReviewResult(
     summary="LLM недоступен. Тест-кейс распарсен, но анализ не выполнен.",
@@ -53,44 +56,33 @@ _FALLBACK_IMPROVE = ImproveResult(
     warnings=["LLM is unavailable, fallback response returned"],
 )
 
-_FALLBACK_PARSE: TextParseResult | None = None  # None signals "use regex fallback"
+
+def _make_client() -> instructor.Instructor:
+    openai_client = OpenAI(
+        base_url=settings.LLM_BASE_URL,
+        api_key=settings.LLM_API_KEY or "no-key",
+        timeout=float(settings.LLM_TIMEOUT_SECONDS),
+    )
+    return instructor.from_openai(openai_client, mode=instructor.Mode.JSON)
 
 
-def _load_prompt(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8").strip()
-    except Exception as exc:
-        logger.warning("Failed to load prompt %s: %s", path, exc)
-        return "You are a QA assistant."
-
-
-_instructor_client: instructor.Instructor | None = None
-
-
-def _get_instructor_client() -> instructor.Instructor:
-    global _instructor_client
-    if _instructor_client is None:
-        openai_client = OpenAI(
-            base_url=settings.LLM_BASE_URL,
-            api_key=settings.LLM_API_KEY or "no-key",
-        )
-        _instructor_client = instructor.from_openai(openai_client, mode=instructor.Mode.JSON)
-    return _instructor_client
+_client = _make_client()
 
 
 def analyze_testcase_with_llm(
     clean_testcase: dict,
-    source_type: str = "testit",
+    enabled_rules: list[str] | None = None,
 ) -> ReviewResult:
-    prompt_path = PROMPT_REGISTRY["review"].get(source_type, PROMPT_REGISTRY["review"]["testit"])
-    prompt = _load_prompt(prompt_path)
-    client = _get_instructor_client()
+    prompt = build_review_prompt(enabled_rules)
+    rules_count = len(enabled_rules) if enabled_rules else 0
+    logger.info("LLM analyze: model=%s rules=%d title=%s", settings.LLM_MODEL, rules_count, clean_testcase.get("title", "")[:60])
+    t0 = time.perf_counter()
     try:
-        return client.chat.completions.create(
+        llm_result = _client.chat.completions.create(
             model=settings.LLM_MODEL,
-            response_model=ReviewResult,
-            max_retries=2,
-            temperature=settings.LLM_TEMPERATURE,
+            response_model=_LLMReviewResult,
+            max_retries=1,
+            temperature=settings.LLM_TEMPERATURE_REVIEW if settings.LLM_TEMPERATURE_REVIEW is not None else settings.LLM_TEMPERATURE,
             messages=[
                 {"role": "system", "content": prompt},
                 {
@@ -99,55 +91,72 @@ def analyze_testcase_with_llm(
                 },
             ],
         )
+        logger.info("LLM analyze ok: %.1fs issues=%d warnings=%d", time.perf_counter() - t0, len(llm_result.issues), len(llm_result.warnings))
+        return ReviewResult(
+            summary=llm_result.summary,
+            issues=[i.to_issue() for i in llm_result.issues],
+            warnings=llm_result.warnings,
+        )
     except Exception as exc:
-        logger.warning("LLM analyze failed: %s", exc)
+        logger.error("LLM analyze failed (%.1fs): %s", time.perf_counter() - t0, _root_cause(exc))
         return _FALLBACK_REVIEW
 
 
 def improve_testcase_with_llm(
     testcase: dict,
     selected_issues: list[dict],
-    source_type: str = "testit",
 ) -> ImproveResult:
-    prompt_path = PROMPT_REGISTRY["improve"].get(source_type, PROMPT_REGISTRY["improve"]["testit"])
-    prompt = _load_prompt(prompt_path)
-    client = _get_instructor_client()
+    rule_ids = [r for iss in selected_issues if (r := iss.get("rule"))]
+    prompt = build_improve_prompt(rule_ids if rule_ids else None)
+    numbered_issues = [{"issue_index": i, **iss} for i, iss in enumerate(selected_issues)]
     user_content = (
         f"Тест-кейс для улучшения:\n{json.dumps(testcase, ensure_ascii=False, indent=2)}\n\n"
-        f"Проблемы для исправления (выбраны пользователем):\n{json.dumps(selected_issues, ensure_ascii=False, indent=2)}"
+        f"Проблемы для исправления (нумерация с 0, используй issue_index из поля 'issue_index'):\n"
+        f"{json.dumps(numbered_issues, ensure_ascii=False, indent=2)}"
     )
+    logger.info("LLM improve: model=%s issues=%d title=%s", settings.LLM_MODEL, len(selected_issues), testcase.get("title", "")[:60])
+    t0 = time.perf_counter()
     try:
-        return client.chat.completions.create(
+        result = _client.chat.completions.create(
             model=settings.LLM_MODEL,
             response_model=ImproveResult,
-            max_retries=2,
-            temperature=settings.LLM_TEMPERATURE,
+            max_retries=1,
+            temperature=settings.LLM_TEMPERATURE_IMPROVE if settings.LLM_TEMPERATURE_IMPROVE is not None else settings.LLM_TEMPERATURE,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_content},
             ],
         )
+        logger.info("LLM improve ok: %.1fs resolved=%d", time.perf_counter() - t0, len(result.issue_resolutions))
+        return result
     except Exception as exc:
-        logger.warning("LLM improve failed: %s", exc)
+        logger.error("LLM improve failed (%.1fs): %s", time.perf_counter() - t0, _root_cause(exc))
         return _FALLBACK_IMPROVE
 
 
 def parse_testcase_with_llm(raw_text: str) -> TextParseResult | None:
     """Parse free-form test case text. Returns None on failure (caller falls back to regex)."""
-    prompt_path = PROMPT_REGISTRY["parse"]["manual"]
-    prompt = _load_prompt(prompt_path)
-    client = _get_instructor_client()
+    from pathlib import Path
+    _parse_prompt_path = Path(__file__).parent / "prompts" / "parse_testcase.md"
     try:
-        return client.chat.completions.create(
+        prompt = _parse_prompt_path.read_text(encoding="utf-8").strip()
+    except Exception as exc:
+        logger.warning("Failed to load parse prompt: %s", exc)
+        prompt = "You are a QA assistant."
+    t0 = time.perf_counter()
+    try:
+        result = _client.chat.completions.create(
             model=settings.LLM_MODEL,
             response_model=TextParseResult,
-            max_retries=2,
+            max_retries=1,
             temperature=0,
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": f"Разбери этот тест-кейс:\n\n{raw_text}"},
             ],
         )
+        logger.debug("LLM parse ok: %.1fs", time.perf_counter() - t0)
+        return result
     except Exception as exc:
-        logger.warning("LLM parse failed: %s", exc)
+        logger.error("LLM parse failed (%.1fs): %s", time.perf_counter() - t0, _root_cause(exc))
         return None

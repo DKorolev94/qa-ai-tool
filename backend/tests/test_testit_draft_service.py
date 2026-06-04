@@ -23,7 +23,7 @@ IMPROVED = {
 CREATED = {
     "id": "new-uuid-1234",
     "globalId": 7777,
-    "name": "[AI DRAFT] Login test",
+    "name": "Login test",
 }
 
 
@@ -70,11 +70,12 @@ def test_returns_global_id():
     assert result.global_id == 7777
 
 
-def test_returns_title_with_prefix():
+def test_returns_title_without_prefix():
     with _patch_settings(), patch("app.services.testit_draft_service.TestItClient") as MockClient:
         MockClient.return_value = _make_client()
         result = run(create_draft_in_testit(IMPROVED, "6109"))
-    assert "[AI DRAFT]" in result.title
+    assert "[AI DRAFT]" not in result.title
+    assert "Login test" in result.title
 
 
 def test_returns_testit_url():

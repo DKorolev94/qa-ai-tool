@@ -99,5 +99,8 @@ def build_testcase_diff(original: dict, improved: dict) -> dict:
     summary["status_changed"] = _compare_field(
         "status", original.get("status"), improved.get("status"), changes
     )
+    summary["duration_changed"] = _compare_field(
+        "duration", original.get("duration"), improved.get("duration"), changes
+    )
 
     return {"summary": summary, "changes": changes}

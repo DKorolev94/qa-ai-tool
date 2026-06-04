@@ -35,6 +35,18 @@ def test_fetch_returns_200():
     assert "raw_work_item" in data
 
 
+def test_review_config_returns_sources_profiles_and_rules():
+    resp = client.get("/api/review-config")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert any(source["id"] == "testit" and source["enabled"] for source in data["sources"])
+    assert any(source["id"] == "testops" and not source["enabled"] for source in data["sources"])
+    assert any(profile["id"] == "strict" for profile in data["profiles"])
+    assert any(rule["id"] == "requirement_traceability" for rule in data["rules"])
+    assert "requirement_traceability" in data["defaults"]["testit"]
+
+
 def test_fetch_invalid_input_returns_400():
     with patch(
         "app.api.routes.fetch_and_normalize_work_item",

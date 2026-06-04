@@ -24,6 +24,10 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
+
+# Runtime artifacts
+.codex-run/
 
 # IDE
 .idea/

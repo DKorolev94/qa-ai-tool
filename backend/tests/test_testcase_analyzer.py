@@ -26,12 +26,11 @@ def test_analyze_returns_response_with_issues():
 
 def test_analyze_passes_source_type_to_llm():
     with patch("app.services.testcase_analyzer.analyze_testcase_with_llm", return_value=MOCK_REVIEW) as mock_llm:
-        analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, source_type="manual")
+        analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, source_type="testit", enabled_rules=["title"])
 
     mock_llm.assert_called_once()
     call_args = mock_llm.call_args
-    # source_type passed as keyword arg
-    assert call_args.kwargs.get("source_type") == "manual" or (len(call_args.args) > 1 and call_args.args[1] == "manual")
+    assert call_args.kwargs.get("enabled_rules") == ["title"] or (len(call_args.args) > 1 and call_args.args[1] == ["title"])
 
 
 def test_analyze_merges_warnings():

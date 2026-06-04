@@ -23,13 +23,15 @@ async def _resolve_section_id(client: TestItClient, project_id: str) -> str:
         return _resolved_section_id
 
     sections = await client.list_sections(project_id)
+    known_ids = {s["id"] for s in sections}
     root_id: str | None = None
     for s in sections:
         if s.get("name") == DRAFT_SECTION_NAME:
             logger.info("Found existing draft section id=%s", s["id"])
             _resolved_section_id = s["id"]
             return _resolved_section_id
-        if not s.get("parentId"):
+        parent = s.get("parentId")
+        if not parent or parent not in known_ids:
             root_id = s["id"]
 
     created = await client.create_section(project_id, DRAFT_SECTION_NAME, parent_id=root_id)
@@ -55,6 +57,7 @@ async def create_draft_in_testit(
     improved_testcase: dict,
     source_work_item_id: str,
     source_attributes: dict | None = None,
+    manual_notes: list[str] | None = None,
 ) -> CreateDraftResponse:
     if not settings.TESTIT_PROJECT_UUID:
         raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env")
@@ -71,6 +74,7 @@ async def create_draft_in_testit(
         project_id=settings.TESTIT_PROJECT_UUID,
         section_id=section_id,
         source_attributes=source_attributes,
+        manual_notes=manual_notes or [],
     )
 
     logger.info(

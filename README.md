@@ -1,115 +1,101 @@
-# QA AI Tools
+# QA AI Tool
 
-Внутренняя платформа AI-инструментов для QA-инженеров.
+Локальный инструмент для QA
 
-## Что умеет
+## Структура
 
-**Ревью и улучшение тест-кейсов** - загружаешь кейс из TestIT или вставляешь текст/JSON, LLM находит проблемы, ты выбираешь что исправить, LLM генерирует улучшенную версию. Готово - отправляешь черновик обратно в TestIT.
-
----
+- backend: FastAPI API (порт 8000)
+- frontend: Vite + React UI (порт 3000)
 
 ## Быстрый старт
 
-### 1. Backend
+Требования:
+- Python 3.10+
+- Node.js 18+
+- npm 9+
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env             # заполни .env (см. ниже)
-uvicorn app.main:app --reload --port 8000
-```
+1. Склонировать репозиторий и перейти в корень проекта.
+2. Настроить backend-переменные окружения (см. раздел "Переменные окружения").
+3. Запустить backend.
+4. Запустить frontend.
+5. Открыть UI в браузере: http://localhost:3000
 
-Проверка: http://localhost:8000/health → `{"status":"ok"}`
+## Запуск backend
 
-### 2. Frontend
+Из корня проекта:
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+- cd backend
+- python -m venv .venv
+- source .venv/bin/activate (Linux/macOS) или .venv\\Scripts\\activate (Windows)
+- pip install -r requirements.txt
+- uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-Открывай: http://localhost:5173
+Проверка backend:
+- http://localhost:8000/health
+- Ожидаемый ответ: {"status":"ok"}
 
----
+Примечание:
+- В некоторых Linux/WSL окружениях Python может быть "externally managed" (PEP 668).
+- Если установка через pip блокируется, используйте виртуальное окружение (рекомендуется) или установку в user-site/с флагом вашей платформы.
 
-## Настройка .env
+## Запуск frontend
 
-### LLM (обязательно)
+Из корня проекта:
 
-Поддерживается любой OpenAI-совместимый API - Ollama, DeepSeek, удалённый GPU-хост.
+- cd frontend
+- npm install
+- npm run dev
 
-```env
+Открыть:
+- http://localhost:3000
+
+Важно:
+- Во frontend API-запросы идут на путь /api.
+- В dev-режиме Vite проксирует /api на backend: http://localhost:8000.
+
+## Переменные окружения
+
+Переменные читаются backend из файла backend/.env.
+
+1. Создайте backend/.env на основе шаблона:
+- cp backend/.env.example backend/.env
+- или в PowerShell: Copy-Item backend/.env.example backend/.env
+
+2. Заполните значения в backend/.env.
+
+### Обязательные для LLM
+
+- LLM_BASE_URL
+- LLM_MODEL
+- LLM_API_KEY
+
+### Основные для TestIT
+
+- TESTIT_BASE_URL
+- TESTIT_PRIVATE_TOKEN
+- TESTIT_AUTH_SCHEME (обычно PrivateToken)
+- TESTIT_PROJECT_UUID
+
+### Дополнительные
+
+- LLM_TEMPERATURE
+- LLM_TEMPERATURE_REVIEW
+- LLM_TEMPERATURE_IMPROVE
+- LLM_TIMEOUT_SECONDS
+- TESTIT_TIMEOUT_SECONDS
+- TESTIT_VERIFY_SSL
+- TESTIT_DRAFT_SECTION_UUID (опционально; если пусто, секция для драфтов создается автоматически)
+
+## Пример минимального backend/.env
+
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=llama3.3:latest
+LLM_MODEL=gemma3:4b
 LLM_API_KEY=ollama
-LLM_TEMPERATURE=0.2
-```
+TESTIT_BASE_URL=https://testit.example.com
+TESTIT_PRIVATE_TOKEN=your_private_token_here
+TESTIT_AUTH_SCHEME=PrivateToken
+TESTIT_PROJECT_UUID=your_project_uuid_here
 
-Ollama:
-```bash
-ollama pull llama3.3 && ollama serve
-```
+## Где смотреть полный шаблон
 
-### TestIT (для загрузки кейсов и создания черновиков)
-
-```env
-TESTIT_BASE_URL=https://yourteam.testit.software
-TESTIT_PRIVATE_TOKEN=your_private_token
-TESTIT_PROJECT_UUID=your_project_uuid
-TESTIT_DRAFT_SECTION_UUID=          # опционально - если пусто, создаётся раздел "AI Review / Drafts" в корне проекта
-```
-
-Токен хранится только на бэкенде, фронтенд его не видит.
-
----
-
-## Как использовать ревью тест-кейсов
-
-### Источник: TestIT
-
-1. Введи числовой ID тест-кейса (например `3995`) в поле «ID тест-кейса»
-2. Нажми **Загрузить** - кейс подтянется из TestIT
-3. Нажми **Анализировать** - LLM найдёт проблемы и покажет список замечаний
-
-### Источник: текст или JSON
-
-1. Вставь тест-кейс в поле ввода - любой формат:
-   - Свободный текст с заголовками (Заголовок:, Шаги:, ОР: и т.д.)
-   - JSON (структура TestIT work item или произвольный объект)
-2. Нажми **Анализировать**
-
-### Улучшение
-
-1. После анализа отметь галками замечания которые хочешь исправить
-2. Нажми **Улучшить** - LLM исправит выбранные проблемы
-3. Отредактируй поля прямо в интерфейсе - JSON обновляется в реальном времени
-4. Нажми **Создать черновик в TestIT** - кейс попадёт в раздел «AI Review / Drafts»
-
-### История изменений
-
-В нижней части улучшенного кейса - раскрываемый блок **«История изменений»** со списком что именно LLM поменял (поле, было → стало).
-
----
-
-## Тесты
-
-```bash
-cd backend && pytest
-```
-
----
-
-## API
-
-| Метод | Endpoint | Описание |
-|-------|----------|----------|
-| GET | `/health` | Health check |
-| POST | `/api/analyze-testcase` | LLM анализ + список замечаний |
-| POST | `/api/improve-testcase` | LLM улучшение + история изменений |
-| POST | `/api/testit/workitem/fetch` | Загрузить кейс из TestIT |
-| POST | `/api/testit/workitem/create-draft` | Создать черновик в TestIT |
-
-Поле `source_type` в запросах: `"testit"` (по умолчанию) или `"manual"` - выбирает промпт для ревью.
+- backend/.env.example

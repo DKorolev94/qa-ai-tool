@@ -88,8 +88,6 @@ async def improve_testcase_endpoint(body: ImproveTestCaseRequest) -> ImproveTest
             raw_content=body.raw_content,
             work_item=body.work_item,
             selected_issues=body.selected_issues,
-            source_type=body.source_type,
-            enabled_rules=body.enabled_rules,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -122,6 +120,7 @@ async def create_testit_draft(body: CreateDraftRequest) -> CreateDraftResponse:
             improved_testcase=body.improved_testcase,
             source_work_item_id=body.source_work_item_id,
             source_attributes=body.source_attributes,
+            manual_notes=body.manual_notes,
         )
     except TestItConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc))

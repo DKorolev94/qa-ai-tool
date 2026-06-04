@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle, Check, CheckCircle2,
+  AlertTriangle, Check, CheckCircle2, EyeOff, FilePlus, Loader2, X,
   ChevronLeft, ExternalLink, FolderOpen, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
 } from 'lucide-react'
 import { api } from '../api'
+import { ActionBanner } from './ActionBanner'
 import { ModeButton } from './ModeButton'
 import { ProgressBar } from './ProgressBar'
 import type {
-  AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult,
+  ActionNotification, AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult,
   IssueResolution, ParameterTable, ReviewConfig, ReviewIssue, ReviewRuleId, Step, TestCase, WorkItemLink,
 } from '../types'
 
@@ -21,8 +22,8 @@ interface Props {
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
-  High: 'Высокий', Medium: 'Средний', Low: 'Низкий',
-  high: 'Высокий', medium: 'Средний', low: 'Низкий',
+  Highest: 'Самый высокий', High: 'Высокий', Medium: 'Средний', Low: 'Низкий',
+  highest: 'Самый высокий', high: 'Высокий', medium: 'Средний', low: 'Низкий',
 }
 
 // TestIT returns status values in English; map to Russian and badge class
@@ -82,7 +83,7 @@ function StepsTable({
   warnMissingTestData?: boolean
 }) {
   const showTestData = warnMissingTestData || steps.some(s => !!s.test_data)
-  const showComments = true
+  const showComments = steps.some(s => !!s.comments)
   const cols = [
     '28px', '1fr', '1fr',
     ...(showTestData ? ['1fr'] : []),
@@ -103,19 +104,19 @@ function StepsTable({
           <div className="steps-num-cell">{i + 1}</div>
           <div className="steps-cell steps-action">{renderWithParams(step.action)}</div>
           <div className="steps-cell steps-exp">
-            {step.expected ? step.expected : <span className="steps-empty">—</span>}
+            {step.expected || null}
           </div>
           {showTestData && (
             <div className="steps-cell steps-td-col">
               {step.test_data
                 ? <span className="steps-td-mono">{step.test_data}</span>
-                : <span className="steps-empty">—</span>
+                : null
               }
             </div>
           )}
           {showComments && (
             <div className="steps-cell steps-cm-col">
-              {step.comments ?? <span className="steps-empty">—</span>}
+              {step.comments ?? null}
             </div>
           )}
         </div>
@@ -158,6 +159,7 @@ function ParamTableView({ table }: { table: ParameterTable }) {
 const LINK_TYPE_LABELS: Record<string, string> = {
   Issue: 'Задача', Defect: 'Дефект', Requirement: 'Требование',
   BlockedBy: 'Блокирует', Related: 'Связано', Clones: 'Клон',
+  Repository: 'Репозиторий',
 }
 
 // Derive short readable label from a link (strip URL if title == url)
@@ -201,10 +203,10 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
   const priorityLabel = priority ? (PRIORITY_LABELS[priority] ?? priority) : null
   const priorityKey = (priority ?? '').toLowerCase()
   const statusLabel = tc.status ? (STATUS_LABELS[tc.status] ?? tc.status) : null
-  const priorityPill =
-    priorityKey === 'high' ? 'pill-high' :
-    priorityKey === 'medium' ? 'pill-warn' :
-    priorityKey === 'low' ? 'pill-low' : 'pill-neutral'
+  const priorityDotClass =
+    priorityKey === 'highest' || priorityKey === 'high' ? 'pdot-high' :
+    priorityKey === 'medium' ? 'pdot-medium' :
+    priorityKey === 'low' ? 'pdot-low' : 'pdot-neutral'
   const statusPill = tc.status ? (STATUS_PILL[tc.status] ?? 'pill-neutral') : 'pill-neutral'
 
   // TODO: attachments_count from tc.attributes once TestIT mapper populates it
@@ -237,7 +239,8 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
         </div>
         <div className="case-pills">
           {priorityLabel && (
-            <span className={`case-pill ${priorityPill}`}>
+            <span className="case-pill pill-priority">
+              <span className={`priority-dot ${priorityDotClass}`} />
               {priorityLabel}
             </span>
           )}
@@ -276,9 +279,8 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
         const sourceMatch = allTags.map(t => t.match(SOURCE_TAG_RE)).find(Boolean)
         const sourceId = sourceMatch?.[1]
         const withoutSource = allTags.filter(t => !SOURCE_TAG_RE.test(t))
-        const regularTags = withoutSource.filter(t => !SERVICE_TAGS.has(t))
-        const serviceTags = withoutSource.filter(t => SERVICE_TAGS.has(t))
-        const hasAny = regularTags.length > 0 || serviceTags.length > 0
+        const regularTags = withoutSource
+        const hasAny = regularTags.length > 0
 
         return (
           <div>
@@ -289,27 +291,13 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
               </div>
             )}
             {hasAny ? (
-              <>
-                {regularTags.length > 0 && (
-                  <div className="tag-chips">
-                    {regularTags.map(tag => (
-                      <span key={tag} className={`tag-chip${WARN_TAGS.has(tag) ? ' tag-chip-warn' : ''}`}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {serviceTags.length > 0 && (
-                  <div className="tag-service-group">
-                    <span className="tag-service-label">Служебные</span>
-                    <div className="tag-chips">
-                      {serviceTags.map(tag => (
-                        <span key={tag} className="tag-chip-service">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
+              <div className="tag-chips">
+                {regularTags.map(tag => (
+                  <span key={tag} className={`tag-chip${WARN_TAGS.has(tag) ? ' tag-chip-warn' : ''}`}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
             ) : (
               <div className="case-text-box case-text-empty">не указано</div>
             )}
@@ -388,16 +376,12 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       )}
 
       {/* Preconditions */}
-      <StepBlock label="Предусловие" steps={tc.preconditions} warnMissingTestData />
+      <StepBlock label="Предусловие" steps={tc.preconditions} />
 
       {/* Steps — always show; warn on missing test_data */}
       <div>
         <span className="case-sec-label">
-          Шаги{(tc.steps?.length ?? 0) > 0 && (
-            <span style={{ fontFamily: 'monospace', color: 'var(--tx-dim)', fontWeight: 400 }}>
-              {' '}{tc.steps!.length}
-            </span>
-          )}
+          Шаги
         </span>
         {(tc.steps?.length ?? 0) > 0 ? (
           <StepsTable steps={tc.steps!} warnMissingTestData />
@@ -572,23 +556,56 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
   )
 }
 
-function IssueRow({ issue, resolution, hasImprovement }: {
+const ISSUE_TITLE_RU: Record<string, string> = {
+  'test_data': 'Тестовые данные',
+  'steps': 'Шаги',
+  'preconditions': 'Предусловия',
+  'postconditions': 'Постусловия',
+  'duration': 'Длительность',
+  'tags': 'Теги',
+  'links': 'Ссылки',
+  'title': 'Название',
+  'description': 'Описание',
+  'priority': 'Приоритет',
+  'status': 'Статус',
+  'expected_result': 'Ожидаемый результат',
+}
+
+function issueTitleRu(title: string): string {
+  const key = title.toLowerCase().replace(/\s+/g, '_')
+  return ISSUE_TITLE_RU[key] ?? title
+}
+
+function issueDescriptionText(description: string): string {
+  return description.replace(/\s*Пример:\s*[\s\S]*$/i, '').trim()
+}
+
+function IssueRow({ issue, resolution, hasImprovement, onDismiss }: {
   issue: ReviewIssue
   resolution: IssueResolution | undefined
   hasImprovement: boolean
+  onDismiss?: () => void
 }) {
-  const dotClass = issue.severity === 'high' ? 'idot-h' : issue.severity === 'medium' ? 'idot-m' : 'idot-l'
+  const isResolved = resolution?.status === 'resolved'
+  const borderClass = isResolved ? 'iborder-resolved' :
+    issue.severity === 'high' ? 'iborder-h' :
+    issue.severity === 'medium' ? 'iborder-m' : 'iborder-l'
+  const description = issueDescriptionText(issue.description)
   return (
-    <div className="issue-row">
-      <div className={`issue-dot ${dotClass}`} />
+    <div className={`issue-row ${borderClass}${isResolved ? ' issue-row-resolved' : ''}`}>
       <div className="issue-body">
-        <div className="issue-title-text">{issue.title}</div>
-        {issue.description && <div className="issue-loc">{issue.description}</div>}
+        <div className="issue-title-text">{issueTitleRu(issue.title)}</div>
+        {description && <div className="issue-loc">{description}</div>}
       </div>
       {resolution?.status === 'resolved' && <span className="issue-badge ib-resolved">Решено</span>}
       {resolution?.status === 'manual_needed' && <span className="issue-badge ib-manual">Вручную</span>}
       {resolution?.status === 'skipped' && <span className="issue-badge ib-skipped">Пропущено</span>}
       {hasImprovement && !resolution && <span className="issue-badge ib-skipped">Не обработано</span>}
+      {onDismiss && (
+        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title="Отклонить замечание">
+          <X size={11} />
+        </button>
+      )}
     </div>
   )
 }
@@ -610,8 +627,6 @@ function RailLoading() {
 // TODO: fetch from GET /testit/sections once backend endpoint is added
 const MOCK_SECTIONS = [
   { id: 'ai-review-drafts', name: 'AI Review / Drafts' },
-  { id: 'drafts', name: 'Черновики' },
-  { id: 'ai-workspace', name: 'AI Workspace' },
 ]
 
 function SectionPickerModal({
@@ -631,16 +646,20 @@ function SectionPickerModal({
           <span className="action-modal-title">Создать черновик</span>
         </div>
         <div className="action-modal-body">
-          <label className="action-modal-label">Сохранить в</label>
-          <select
-            className="action-modal-select"
-            value={selectedId}
-            onChange={e => setSelectedId(e.target.value)}
-          >
+          <label className="action-modal-label">Сохранить в секцию</label>
+          <div className="action-modal-options">
             {MOCK_SECTIONS.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <button
+                key={s.id}
+                type="button"
+                className={`action-modal-option${selectedId === s.id ? ' selected' : ''}`}
+                onClick={() => setSelectedId(s.id)}
+              >
+                <span className="action-modal-option-radio" />
+                {s.name}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
         <div className="action-modal-footer">
           <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel}>
@@ -665,33 +684,43 @@ function SectionPickerModal({
 
 function ConfirmApplyModal({
   workItemId,
+  loading,
   onConfirm,
   onCancel,
 }: {
   workItemId: string
+  loading: boolean
   onConfirm: () => void
   onCancel: () => void
 }) {
   return (
-    <div className="action-modal-overlay" onClick={onCancel}>
-      <div className="action-modal" onClick={e => e.stopPropagation()}>
-        <div className="action-modal-header">
-          <span className="action-modal-icon action-modal-icon-warn">
-            <AlertTriangle size={16} strokeWidth={1.75} />
+    <div className="action-modal-overlay" onClick={loading ? undefined : onCancel}>
+      <div className="action-modal action-modal-destructive" onClick={e => e.stopPropagation()}>
+        <div className="action-modal-header action-modal-header-destructive">
+          <span className="action-modal-icon-destructive">
+            <AlertTriangle size={18} strokeWidth={1.75} />
           </span>
-          <span className="action-modal-title">Заменить оригинал #{workItemId}?</span>
+          <div>
+            <div className="action-modal-title">Заменить оригинал?</div>
+            <div className="action-modal-subtitle">#{workItemId}</div>
+          </div>
         </div>
         <div className="action-modal-body">
-          Улучшенная версия заменит исходный тест-кейс.
-          <div className="action-modal-warn-text">Действие необратимо.</div>
+          Улучшенная версия полностью заменит исходный тест-кейс в TestIT.
+          <div className="action-modal-warn-text">
+            <span className="action-modal-warn-dot" />
+            Действие необратимо
+          </div>
         </div>
         <div className="action-modal-footer">
-          <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel}>
+          <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel} disabled={loading}>
             Отмена
           </button>
-          <button type="button" className="wb-btn-danger" onClick={onConfirm}>
-            <AlertTriangle size={13} />
-            Заменить
+          <button type="button" className="wb-btn-danger" onClick={onConfirm} disabled={loading}>
+            {loading
+              ? <><Loader2 size={13} className="spin-icon" /> Применяется…</>
+              : <><AlertTriangle size={13} /> Заменить</>
+            }
           </button>
         </div>
       </div>
@@ -715,6 +744,9 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [applyError, setApplyError] = useState<string | null>(null)
   const [showConfirmApply, setShowConfirmApply] = useState(false)
   const [activeTab, setActiveTab] = useState<'original' | 'improved' | 'diff' | 'json'>('original')
+  const [dismissedIndices, setDismissedIndices] = useState<Set<number>>(new Set())
+  const [showDismissed, setShowDismissed] = useState(false)
+  const [showResolved, setShowResolved] = useState(false)
 
   const tc = fetchResult.normalized_testcase
 
@@ -728,6 +760,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       setImproveResult(null)
       setImproveError(null)
       setDraftResult(null)
+      setDismissedIndices(new Set())
       setActiveTab('original')
       try {
         const result = await api.analyzeTestCase({
@@ -754,6 +787,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     setImproveResult(null)
     setImproveError(null)
     setDraftResult(null)
+    setDismissedIndices(new Set())
+    setApplyResult(null)
     setActiveTab('original')
     try {
       const result = await api.analyzeTestCase({
@@ -776,10 +811,18 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     setImproveLoading(true)
     setImproveError(null)
     setImproveResult(null)
+    setDraftResult(null)
+    setApplyResult(null)
     try {
+      const enabledLabels = new Set(
+        reviewConfig.rules.filter(r => enabledRules.includes(r.id)).map(r => r.label)
+      )
+      const issuesToFix = analyzeResult.issues.filter((i, idx) =>
+        enabledLabels.has(i.title) && !dismissedIndices.has(idx)
+      )
       const result = await api.improveTestCase({
         work_item: fetchResult.raw_work_item,
-        selected_issues: analyzeResult.issues,
+        selected_issues: issuesToFix,
         source_type: 'testit',
         enabled_rules: enabledRules,
       })
@@ -793,14 +836,16 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     }
   }
 
-  async function runCreateDraft() {
+  async function runCreateDraft(sectionNameOverride?: string) {
     if (!improveResult) return
+    const effectiveSectionName = sectionNameOverride ?? draftSectionName
     setDraftLoading(true)
     try {
       const result = await api.createDraft({
         improved_testcase: improveResult.improved_testcase,
         source_work_item_id: fetchResult.work_item_id,
-        source_attributes: fetchResult.raw_work_item,
+        source_attributes: (fetchResult.raw_work_item.attributes ?? {}) as Record<string, unknown>,
+        manual_notes: improveResult.manual_notes ?? [],
       })
       setDraftResult(result)
     } catch {
@@ -819,7 +864,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       const result = await api.applyToOriginal({
         improved_testcase: improveResult.improved_testcase,
         source_work_item_id: fetchResult.work_item_id,
-        source_attributes: fetchResult.raw_work_item,
+        source_attributes: (fetchResult.raw_work_item.attributes ?? {}) as Record<string, unknown>,
       })
       setApplyResult(result)
     } catch (err) {
@@ -836,18 +881,40 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     return Math.max(0, s)
   }
 
+  // Reconstruct the same filter used in runImprove so resolution indices match.
+  // Backend numbers issues 0..N from selected_issues, not from analyzeResult.issues.
+  const _enabledLabels = new Set(
+    reviewConfig.rules.filter(r => enabledRules.includes(r.id)).map(r => r.label)
+  )
+  const selectedIssuesForImprove = (analyzeResult?.issues ?? []).filter((i, idx) =>
+    _enabledLabels.has(i.title) && !dismissedIndices.has(idx)
+  )
+
   function getResolution(issue: ReviewIssue): IssueResolution | undefined {
-    return improveResult?.issue_resolutions?.find(r => r.issue_title === issue.title)
+    const selectedIdx = selectedIssuesForImprove.indexOf(issue)
+    if (selectedIdx === -1) return undefined
+    return improveResult?.issue_resolutions?.find(r => r.issue_index === selectedIdx)
   }
 
-  const score = analyzeResult ? computeScore(analyzeResult.issues) : null
+  const unresolvedIssues = analyzeResult?.issues.filter(issue => {
+    const selectedIdx = selectedIssuesForImprove.indexOf(issue)
+    if (selectedIdx === -1) return true
+    return !improveResult?.issue_resolutions?.some(r => r.issue_index === selectedIdx && r.status === 'resolved')
+  }) ?? analyzeResult?.issues
+  const score = analyzeResult ? computeScore(improveResult ? (unresolvedIssues ?? []) : analyzeResult.issues) : null
   const R = 22
   const CIRC = 2 * Math.PI * R
   const scoreArc = score !== null ? (score / 100) * CIRC : 0
 
-  const highIssues = analyzeResult?.issues.filter(i => i.severity === 'high') ?? []
-  const medIssues = analyzeResult?.issues.filter(i => i.severity === 'medium') ?? []
-  const lowIssues = analyzeResult?.issues.filter(i => i.severity === 'low') ?? []
+  const allIssuesWithIdx = (analyzeResult?.issues ?? []).map((issue, idx) => ({ issue, idx }))
+  const visibleIssues = allIssuesWithIdx.filter(({ idx }) => !dismissedIndices.has(idx))
+  const dismissedIssuesList = allIssuesWithIdx.filter(({ idx }) => dismissedIndices.has(idx))
+  // Split visible into unresolved (needs attention) and resolved (done)
+  const unresolvedVisible = visibleIssues.filter(({ issue }) => getResolution(issue)?.status !== 'resolved')
+  const resolvedVisible = visibleIssues.filter(({ issue }) => getResolution(issue)?.status === 'resolved')
+  const highIssues = unresolvedVisible.filter(({ issue }) => issue.severity === 'high')
+  const medIssues = unresolvedVisible.filter(({ issue }) => issue.severity === 'medium')
+  const lowIssues = unresolvedVisible.filter(({ issue }) => issue.severity === 'low')
 
   const resolvedCount = improveResult?.issue_resolutions?.filter(r => r.status === 'resolved').length ?? 0
   const manualCount = improveResult?.issue_resolutions?.filter(r => r.status === 'manual_needed').length ?? 0
@@ -875,11 +942,13 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   // TODO: result_status — placeholder until backend provides explicit field.
   // Detects partial: validation errors, empty critical fields, or unprocessed service footer.
   function computeImproveStatus(r: ImproveResult): 'success' | 'partial' {
+    if ((r.manual_notes?.length ?? 0) > 0) return 'partial'
     if ((r.validation_warnings?.length ?? 0) > 0) return 'partial'
     if (!r.improved_testcase.title?.trim()) return 'partial'
     if (!r.improved_testcase.steps?.length) return 'partial'
     const desc = r.improved_testcase.description ?? ''
-    if (SERVICE_FOOTER_MARKERS.some(m => desc.includes(m))) return 'partial'
+    const origDesc = String((r.original_normalized_testcase as Record<string, unknown>)?.description ?? '')
+    if (SERVICE_FOOTER_MARKERS.some(m => desc.includes(m) && !origDesc.includes(m))) return 'partial'
     return 'success'
   }
 
@@ -899,27 +968,32 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     ? computeImproveStatus(improveResult)
     : null
 
-  const openCriticalCount = analyzeResult?.issues.filter(i =>
-    i.severity === 'high' &&
-    !improveResult?.issue_resolutions?.some(
-      r => r.issue_title === i.title && r.status === 'resolved'
-    )
-  ).length ?? 0
+  const openCriticalCount = analyzeResult?.issues.filter((issue, absIdx) => {
+    if (issue.severity !== 'high') return false
+    if (dismissedIndices.has(absIdx)) return false
+    const selectedIdx = selectedIssuesForImprove.indexOf(issue)
+    if (selectedIdx === -1) return true
+    return !improveResult?.issue_resolutions?.some(r => r.issue_index === selectedIdx && r.status === 'resolved')
+  }).length ?? 0
 
   const canDraft = (improveStatus === 'success' || improveStatus === 'partial') && !applyResult
   const canApply = improveStatus === 'success' && openCriticalCount === 0 && manualCount === 0 && !applyResult
   const applyBlockReason = improveStatus === 'partial'
-    ? 'Кейс требует доработки'
-    : (openCriticalCount > 0 || manualCount > 0)
-      ? 'Сначала закройте критичные замечания'
-      : null
+    ? 'Кейс улучшен частично, необходима доработка'
+    : openCriticalCount > 0 && manualCount > 0
+      ? `Нерешённые критичные замечания (${openCriticalCount}) и требующие ручной правки (${manualCount})`
+      : openCriticalCount > 0
+        ? `Нерешённые критичные замечания: ${openCriticalCount}`
+        : manualCount > 0
+          ? `${manualCount} ${manualCount === 1 ? 'замечание требует' : 'замечания требуют'} ручной правки в TestIT`
+          : null
 
   // Fields empty in improved result when AI partially processed — shown as ⚠ не обработано
   const partialFields = new Set<string>()
   if (improveStatus === 'partial' && improveResult) {
     const it = improveResult.improved_testcase
     if (!it.title?.trim()) partialFields.add('title')
-    if (!it.description?.trim()) partialFields.add('description')
+    if (!it.description?.trim() && tc.description?.trim()) partialFields.add('description')
     if (!it.steps?.length) partialFields.add('steps')
     if (!it.preconditions?.length && tc.preconditions?.length) partialFields.add('preconditions')
   }
@@ -941,11 +1015,25 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     { id: 'original' as const, label: 'Оригинал', disabled: false, count: null },
     { id: 'improved' as const, label: 'Улучшенный', disabled: !improvedTabAccessible,
       count: improveStatus === 'success' ? '✓' : improveStatus === 'partial' ? '!' : improveStatus === 'error' ? '✕' : null },
-    { id: 'diff' as const, label: 'Diff', disabled: !hasImprove, count: diffCount ? String(diffCount) : null },
+    { id: 'diff' as const, label: 'Изменения', disabled: !hasImprove, count: diffCount ? String(diffCount) : null },
     { id: 'json' as const, label: 'JSON', disabled: false, count: null },
   ]
 
   const isLoading = analyzeLoading || improveLoading || draftLoading
+  const bannerNotifications: ActionNotification[] = [
+    ...(draftResult ? [{
+      type: 'draft' as const,
+      id: draftResult.global_id != null ? String(draftResult.global_id) : draftResult.work_item_id,
+      testit_url: draftResult.testit_url,
+      sectionName: draftSectionName,
+      isPartial: improveStatus === 'partial' || manualCount > 0,
+    }] : []),
+    ...(applyResult ? [{
+      type: 'apply' as const,
+      id: applyResult.global_id != null ? String(applyResult.global_id) : applyResult.work_item_id,
+      testit_url: applyResult.testit_url,
+    }] : []),
+  ]
 
   return (
     <>
@@ -1079,7 +1167,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               <button
                 type="button"
                 className={`wb-btn ${improveStatus === 'partial' ? 'wb-btn-sec-warn' : 'wb-btn-sec'}`}
-                title={improveStatus === 'partial' ? 'Кейс улучшен частично — рекомендуется доработка' : undefined}
+                title={improveStatus === 'partial' ? 'Кейс улучшен частично, рекомендуется доработка' : undefined}
                 onClick={() => setShowSectionPicker(true)}
               >
                 <CheckCircle2 size={13} />
@@ -1125,7 +1213,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
           onConfirm={(sectionName) => {
             setDraftSectionName(sectionName)
             setShowSectionPicker(false)
-            runCreateDraft()
+            runCreateDraft(sectionName)
           }}
           onCancel={() => setShowSectionPicker(false)}
         />
@@ -1135,6 +1223,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       {showConfirmApply && (
         <ConfirmApplyModal
           workItemId={fetchResult.work_item_id}
+          loading={applyLoading}
           onConfirm={runApplyToOriginal}
           onCancel={() => setShowConfirmApply(false)}
         />
@@ -1146,6 +1235,9 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
           <span className="alert-text">Ошибка применения: {applyError}</span>
         </div>
       )}
+
+      {/* Action result banner */}
+      <ActionBanner notifications={bannerNotifications} />
 
       {/* Workbench grid */}
       <div className="wb-grid">
@@ -1279,38 +1371,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="ai-text">{analyzeResult.summary}</div>
                 </div>
 
-                {/* Issues by severity */}
-                {highIssues.length > 0 && (
-                  <div>
-                    <div className="issues-section-label isl-high">Критичные · {highIssues.length}</div>
-                    {highIssues.map((issue, i) => (
-                      <IssueRow key={i} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove} />
-                    ))}
-                  </div>
-                )}
-                {medIssues.length > 0 && (
-                  <div>
-                    <div className="issues-section-label isl-medium">Средние · {medIssues.length}</div>
-                    {medIssues.map((issue, i) => (
-                      <IssueRow key={i} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove} />
-                    ))}
-                  </div>
-                )}
-                {lowIssues.length > 0 && (
-                  <div>
-                    <div className="issues-section-label isl-low">Низкие · {lowIssues.length}</div>
-                    {lowIssues.map((issue, i) => (
-                      <IssueRow key={i} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove} />
-                    ))}
-                  </div>
-                )}
-                {analyzeResult.issues.length === 0 && (
-                  <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--tx-muted)', fontSize: 13 }}>
-                    Проблем не найдено
-                  </div>
-                )}
-
-                {/* Manual work banner */}
+                {/* Manual work banner — top priority, shown first */}
                 {hasImprove && (improveResult!.manual_notes?.length ?? 0) > 0 && (
                   <div className="manual-banner">
                     <div className="mb-head">
@@ -1325,58 +1386,84 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   </div>
                 )}
 
-                {/* Draft card */}
-                {hasDraft && (
-                  <div className="draft-card">
-                    <div className="draft-label">
-                      <CheckCircle2 size={13} />
-                      Черновик создан в TestIT
-                    </div>
-                    <div className="draft-name">{draftResult!.title}</div>
-                    <div className="draft-meta">
-                      <span className="draft-section-badge">AI Review / Черновики</span>
-                      {draftResult!.testit_url && (
-                        <a
-                          className="draft-link"
-                          href={draftResult!.testit_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Открыть в TestIT →
-                        </a>
-                      )}
-                    </div>
+                {/* Unresolved issues by severity */}
+                {highIssues.length > 0 && (
+                  <div>
+                    <div className="issues-section-label isl-high">Критичные · {highIssues.length}</div>
+                    {highIssues.map(({ issue, idx }) => (
+                      <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
+                    ))}
+                  </div>
+                )}
+                {medIssues.length > 0 && (
+                  <div>
+                    <div className="issues-section-label isl-medium">Средние · {medIssues.length}</div>
+                    {medIssues.map(({ issue, idx }) => (
+                      <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
+                    ))}
+                  </div>
+                )}
+                {lowIssues.length > 0 && (
+                  <div>
+                    <div className="issues-section-label isl-low">Низкие · {lowIssues.length}</div>
+                    {lowIssues.map(({ issue, idx }) => (
+                      <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
+                    ))}
                   </div>
                 )}
 
-                {/* Apply card */}
-                {hasApply && (
-                  <div className="apply-card">
-                    <div className="apply-card-label">
-                      <CheckCircle2 size={13} />
-                      Применено к оригиналу
-                    </div>
-                    <div className="apply-card-name">#{fetchResult.work_item_id} — {applyResult!.title}</div>
-                    <div className="apply-card-meta">
-                      {applyResult!.testit_url && (
-                        <a
-                          className="apply-link"
-                          href={applyResult!.testit_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Открыть в TestIT →
-                        </a>
-                      )}
-                    </div>
+                {/* Resolved issues — collapsed group at the bottom */}
+                {resolvedVisible.length > 0 && (
+                  <div className="resolved-section">
+                    <button type="button" className="resolved-toggle" onClick={() => setShowResolved(v => !v)}>
+                      <Check size={11} strokeWidth={2.5} />
+                      Решено
+                      <span className="resolved-toggle-count">{resolvedVisible.length}</span>
+                      <span className="resolved-toggle-hint">{showResolved ? '▲' : '▼'}</span>
+                    </button>
+                    {showResolved && resolvedVisible.map(({ issue, idx }) => (
+                      <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
+                    ))}
                   </div>
                 )}
+
+                {dismissedIssuesList.length > 0 && (
+                  <div className="dismissed-section">
+                    <button type="button" className="dismissed-toggle" onClick={() => setShowDismissed(v => !v)}>
+                      <EyeOff size={11} />
+                      Исключено · {dismissedIssuesList.length}
+                      <span className="dismissed-toggle-hint">{showDismissed ? '▲' : '▼'}</span>
+                    </button>
+                    {showDismissed && dismissedIssuesList.map(({ issue, idx }) => (
+                      <div key={idx} className="issue-row iborder-resolved issue-row-dismissed">
+                        <div className="issue-body">
+                          <div className="issue-title-text issue-title-dismissed">{issueTitleRu(issue.title)}</div>
+                        </div>
+                        <button type="button" className="issue-restore-btn"
+                          onClick={() => setDismissedIndices(prev => { const s = new Set(prev); s.delete(idx); return s })}
+                          title="Восстановить">
+                          <RotateCcw size={11} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {analyzeResult.issues.length === 0 && (
+                  <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--tx-muted)', fontSize: 13 }}>
+                    Проблем не найдено
+                  </div>
+                )}
+
               </>
             )}
           </div>
         </div>
       </div>
     </div>
-    </>
+</>
   )
 }

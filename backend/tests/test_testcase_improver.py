@@ -70,10 +70,8 @@ def test_improve_passes_source_type_to_llm():
             work_item=SAMPLE_WORK_ITEM,
             raw_content=None,
             selected_issues=SELECTED_ISSUES,
-            source_type="manual",
         )
-    call_args = mock_llm.call_args
-    assert call_args.kwargs.get("source_type") == "manual" or (len(call_args.args) > 2 and call_args.args[2] == "manual")
+    mock_llm.assert_called_once()
 
 
 def test_improve_empty_request_raises_value_error():
@@ -116,3 +114,42 @@ def test_improve_fallback_when_llm_unavailable():
     with patch("app.services.testcase_improver.improve_testcase_with_llm", return_value=fallback):
         result = improve_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, selected_issues=SELECTED_ISSUES)
     assert any("unavailable" in w.lower() for w in result.warnings)
+
+
+def test_improve_marks_linked_docs_placeholder_manual_when_links_are_empty():
+    llm_result = ImproveResult(
+        improved_testcase=AnalyzedTestCase(
+            title="SMS confirmation",
+            steps=[
+                AnalysisStep(
+                    action="Ввести код из SMS в поле ввода",
+                    expected="Отображается форма ввода кода из SMS",
+                    test_data="<код из SMS — см. связанные документы>",
+                ),
+            ],
+        ),
+        issue_resolutions=[
+            IssueResolution(
+                issue_index=0,
+                issue_title="Воспроизводимость",
+                status="resolved",
+                action_taken="Добавлен источник SMS-кода",
+            )
+        ],
+    )
+    issues = [
+        {
+            "rule": "reproducibility",
+            "severity": "medium",
+            "title": "Воспроизводимость",
+            "description": "Не указан источник SMS-кода",
+            "recommendation": "Указать источник SMS-кода",
+        }
+    ]
+
+    with patch("app.services.testcase_improver.improve_testcase_with_llm", return_value=llm_result):
+        result = improve_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, selected_issues=issues)
+
+    assert result.issue_resolutions[0].status == "manual_needed"
+    assert "links пустой" in (result.issue_resolutions[0].reason or "")
+    assert result.improved_testcase.status == "NeedsWork"

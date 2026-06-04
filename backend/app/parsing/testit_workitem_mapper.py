@@ -2,15 +2,25 @@ from __future__ import annotations
 
 from app.parsing.html_cleaner import clean_html
 from app.parsing.attachment_parser import extract_attachments, _EXT_TYPE_MAP
-from app.schemas.testcase import Attachment, NormalizedTestCase, TestCaseStep
+from app.schemas.testcase import Attachment, NormalizedTestCase, ParameterTable, TestCaseStep, WorkItemLink
 
 _SUPPORTED_EXTS = tuple(_EXT_TYPE_MAP.keys())
+
+
+_NOISE_COMMENTS = {"тест", "test", "todo", "fixme", "n/a", "н/а", ".", "-", "—", "?", "!"}
 
 
 def _clean(value: object) -> str:
     if value is None:
         return ""
     return clean_html(str(value)).strip()
+
+
+def _clean_comments(value: object) -> str | None:
+    text = _clean(value)
+    if not text or text.lower() in _NOISE_COMMENTS:
+        return None
+    return text
 
 
 def _extract_str(value: object) -> str | None:
@@ -24,6 +34,39 @@ def _extract_str(value: object) -> str | None:
             if v and isinstance(v, str):
                 return v.strip()
     return str(value).strip() or None
+
+
+def _format_duration_ms(ms: int) -> str:
+    if ms >= 3600000:
+        hours = ms // 3600000
+        minutes = (ms % 3600000) // 60000
+        return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+    if ms >= 60000:
+        minutes = ms // 60000
+        seconds = (ms % 60000) // 1000
+        return f"{minutes}m {seconds}s" if seconds else f"{minutes}m"
+    if ms >= 1000:
+        return f"{ms // 1000}s"
+    return f"{ms}ms"
+
+
+def _display_duration(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return _format_duration_ms(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return _format_duration_ms(int(stripped)) if stripped.isdigit() else stripped
+    return None
+
+
+def _count_or_none(value: object) -> int | None:
+    if isinstance(value, (list, tuple, set, dict)):
+        return len(value)
+    return None
 
 
 def _extract_tags(raw: object) -> list[str]:
@@ -50,6 +93,90 @@ def _attachment_type_from_name(name: str | None) -> str | None:
     return "unknown"
 
 
+def _extract_parameter_table(work_item: dict) -> ParameterTable | None:
+    """Extract parameter table from iterations (rows x columns)."""
+    iterations = work_item.get("iterations") or []
+    if not isinstance(iterations, list) or not iterations:
+        # Fallback: direct parameters list
+        params = work_item.get("parameters") or []
+        if not isinstance(params, list) or not params:
+            return None
+        names: list[str] = []
+        rows: list[list[str]] = []
+        for p in params:
+            if not isinstance(p, dict):
+                continue
+            name = str(p.get("parameterName") or p.get("name") or "").strip()
+            value = str(p.get("value") or "").strip()
+            if name and name not in names:
+                names.append(name)
+                rows.append([value])
+        return ParameterTable(names=names, rows=rows) if names else None
+
+    # Build table from iterations
+    ordered_names: list[str] = []
+    name_set: set[str] = set()
+    table_rows: list[list[str]] = []
+
+    for iteration in iterations:
+        if not isinstance(iteration, dict):
+            continue
+        iter_params = iteration.get("parameters") or []
+        row_map: dict[str, str] = {}
+        for p in iter_params:
+            if not isinstance(p, dict):
+                continue
+            name = str(p.get("parameterName") or p.get("name") or "").strip()
+            value = str(p.get("value") or "").strip()
+            if name and name not in name_set:
+                ordered_names.append(name)
+                name_set.add(name)
+            if name:
+                row_map[name] = value
+        table_rows.append([row_map.get(n, "") for n in ordered_names])
+
+    # Fix rows that were added before all columns were discovered
+    for i, row in enumerate(table_rows):
+        if len(row) < len(ordered_names):
+            table_rows[i] = row + [""] * (len(ordered_names) - len(row))
+
+    return ParameterTable(names=ordered_names, rows=table_rows) if ordered_names else None
+
+
+def _extract_product_versions(work_item: dict) -> list[str]:
+    """Extract product versions from TestIT work item."""
+    result: list[str] = []
+
+    # Try productVersions field (some TestIT versions)
+    raw = work_item.get("productVersions") or work_item.get("product_versions") or []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str) and item.strip():
+                result.append(item.strip())
+            elif isinstance(item, dict):
+                name = item.get("name") or item.get("value") or item.get("title") or item.get("id")
+                if name:
+                    result.append(str(name))
+
+    if result:
+        return result
+
+    # Try customAttributes
+    custom = work_item.get("customAttributes") or work_item.get("custom_attributes") or {}
+    if isinstance(custom, dict):
+        for key in ("productVersions", "product_versions", "версия_продукта"):
+            val = custom.get(key)
+            if isinstance(val, list):
+                for item in val:
+                    n = item.get("name") if isinstance(item, dict) else item
+                    if n:
+                        result.append(str(n))
+            elif val:
+                result.append(str(val))
+
+    return result
+
+
 def _map_attachment(raw: dict) -> Attachment:
     name = raw.get("name") or raw.get("fileName")
     url = raw.get("url") or raw.get("fileUrl")
@@ -65,7 +192,7 @@ def map_step(step: dict) -> TestCaseStep:
     test_data_raw = step.get("test_data") or step.get("testData")
     test_data = _clean(test_data_raw) if test_data_raw else None
     comments_raw = step.get("comments")
-    comments = _clean(comments_raw) if comments_raw else None
+    comments = _clean_comments(comments_raw)
 
     return TestCaseStep(
         action=action,
@@ -114,18 +241,69 @@ def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
     if not attachments and description_raw:
         attachments = extract_attachments(str(description_raw))
 
+    raw_links = work_item.get("links") or []
+    links = [
+        WorkItemLink(
+            url=lnk.get("url"),
+            title=lnk.get("title"),
+            type=lnk.get("type"),
+            description=lnk.get("description") or None,
+        )
+        for lnk in raw_links
+        if isinstance(lnk, dict) and lnk.get("url")
+    ]
+
     tags = _extract_tags(work_item.get("tags"))
 
     priority = _extract_str(work_item.get("priority"))
     status = _extract_str(work_item.get("state") or work_item.get("status"))
 
     duration = work_item.get("duration")
+    display_duration = _display_duration(duration)
 
     attributes_raw = work_item.get("attributes")
-    attributes: dict = attributes_raw if isinstance(attributes_raw, dict) else {}
+    attributes: dict = dict(attributes_raw) if isinstance(attributes_raw, dict) else {}
+    attributes.update(
+        {
+            "uuid": work_item.get("id"),
+            "globalId": work_item.get("globalId"),
+            "versionId": work_item.get("versionId"),
+            "versionNumber": work_item.get("versionNumber"),
+            "projectId": work_item.get("projectId"),
+            "sectionId": work_item.get("sectionId"),
+            "entityTypeName": work_item.get("entityTypeName"),
+            "sourceType": work_item.get("sourceType"),
+            "isAutomated": work_item.get("isAutomated"),
+            "createdDate": work_item.get("createdDate"),
+            "modifiedDate": work_item.get("modifiedDate"),
+            "duration": duration,
+            "display_duration": display_duration,
+            "medianDuration": work_item.get("medianDuration"),
+            "display_median_duration": _display_duration(work_item.get("medianDuration")),
+            "links_count": _count_or_none(work_item.get("links")),
+            "parameters_count": _count_or_none(work_item.get("parameters")),
+            "externalIssues_count": _count_or_none(work_item.get("externalIssues")),
+            "autoTests_count": _count_or_none(work_item.get("autoTests")),
+            "autoTestCases_count": _count_or_none(work_item.get("autoTestCases")),
+            "iterations_count": _count_or_none(work_item.get("iterations")),
+            "attachments_count": len(attachments),
+        }
+    )
+    attributes = {key: value for key, value in attributes.items() if value is not None}
 
     if not steps:
         warnings.append("Could not confidently extract steps from raw content")
+
+    # Section name — prefer nested object, fallback to None (service resolves via API)
+    section_obj = work_item.get("section") or {}
+    section_name = (
+        _extract_str(section_obj.get("name"))
+        if isinstance(section_obj, dict)
+        else None
+    )
+
+    parameter_table = _extract_parameter_table(work_item)
+    product_versions = _extract_product_versions(work_item)
 
     return NormalizedTestCase(
         title=title,
@@ -134,10 +312,15 @@ def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
         steps=steps,
         postconditions=postconditions,
         attachments=attachments,
+        links=links,
         tags=tags,
         priority=priority,
         status=status,
         duration=duration,
+        display_duration=display_duration,
         attributes=attributes,
         warnings=warnings,
+        parameter_table=parameter_table,
+        section_name=section_name,
+        product_versions=product_versions,
     )

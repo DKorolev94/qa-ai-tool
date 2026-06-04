@@ -108,11 +108,12 @@ def test_all_attributes_kept():
 
 
 def test_step_without_expected_warns_only_if_original_had_expected():
-    # Original had expected — improved lost it → warn
+    # Original had expected — improved lost it → postprocessor restores it silently
     original = {"steps": [{"action": "Click button", "expected": "Button is clicked"}]}
     improved = _base_improved(steps=[{"action": "Click button", "expected": None}])
     result = postprocess_improved_testcase(original, improved)
-    assert any("ожидаемый результат" in w for w in result["validation_warnings"])
+    assert result["steps"][0]["expected"] == "Button is clicked"
+    assert not any("ожидаемый результат" in w for w in result["validation_warnings"])
 
 
 def test_step_without_expected_no_warning_if_original_also_missing():

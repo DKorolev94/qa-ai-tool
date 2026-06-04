@@ -65,8 +65,8 @@ export default {
         bad: '#D92D20',
       },
       fontFamily: {
-        sans: ['"Onest"', '"IBM Plex Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"Fira Code"', 'ui-monospace', 'monospace'],
+        sans: ['\"Hanken Grotesk\"', '-apple-system', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'Consolas', '"Liberation Mono"', 'monospace'],
       },
       fontSize: {
         '2xs': ['11px', { lineHeight: '15px', letterSpacing: '0.025em' }],
@@ -99,6 +99,10 @@ export default {
         slideUp: {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideInRight: {
+          from: { opacity: '0', transform: 'translateX(100%)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
         },
         fadeIn: {
           from: { opacity: '0' },
@@ -150,6 +154,7 @@ export default {
       },
       animation: {
         'slide-up': 'slideUp 0.22s cubic-bezier(0.4,0,0.2,1)',
+        'slide-in-right': 'slideInRight 0.26s cubic-bezier(0.4,0,0.2,1)',
         'fade-in': 'fadeIn 0.18s ease-out',
         shimmer: 'shimmer 1.8s ease-in-out infinite',
         'shimmer-vibrant': 'shimmerVibrant 1.6s ease-in-out infinite',

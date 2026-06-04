@@ -211,8 +211,14 @@ class TestItClient:
     async def create_work_item(self, payload: dict) -> dict:
         self._check_config()
         url = f"{self._base_url}/api/v2/workItems"
-        logger.debug("POST TestIT create work item name=%s", payload.get("name", ""))
-        logger.debug("POST TestIT payload: %s", payload)
+        logger.debug(
+            "POST TestIT create work item: name=%s steps=%d pre=%d post=%d tags=%s",
+            payload.get("name", ""),
+            len(payload.get("steps", [])),
+            len(payload.get("preconditionSteps", [])),
+            len(payload.get("postconditionSteps", [])),
+            [t["name"] for t in payload.get("tags", [])],
+        )
 
         try:
             async with httpx.AsyncClient(
@@ -254,8 +260,9 @@ class TestItClient:
         return data
 
     async def update_work_item(self, work_item_id: str, payload: dict) -> dict:
+        """PUT /api/v2/workItems — id must be in body, returns 204 No Content."""
         self._check_config()
-        url = f"{self._base_url}/api/v2/workItems/{work_item_id}"
+        url = f"{self._base_url}/api/v2/workItems"
         logger.debug("PUT TestIT update work item id=%s", work_item_id)
 
         try:
@@ -277,6 +284,14 @@ class TestItClient:
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
         if resp.status_code == 404:
             raise TestItNotFoundError(f"TestIT work item not found: {work_item_id}")
+
+        if resp.status_code == 204:
+            # Success — no body returned; reconstruct minimal response from payload
+            return {
+                "id": payload.get("id", work_item_id),
+                "globalId": payload.get("globalId"),
+                "name": payload.get("name", ""),
+            }
 
         try:
             data = resp.json()

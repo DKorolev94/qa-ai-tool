@@ -50,6 +50,7 @@ export const api = {
     improved_testcase: unknown
     source_work_item_id: string
     source_attributes: Record<string, unknown>
+    manual_notes?: string[]
   }) => post<DraftResult>('/testit/workitem/create-draft', body),
 
   applyToOriginal: (body: {

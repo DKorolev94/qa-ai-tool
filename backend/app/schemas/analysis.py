@@ -1,6 +1,30 @@
 from __future__ import annotations
+import re
 from typing import Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+ReviewRuleId = Literal[
+    "title",
+    "description",
+    "preconditions",
+    "steps",
+    "postconditions",
+    "priority",
+    "expected_results",
+    "test_data",
+    "tags",
+    "duration",
+    "atomicity",
+    "independence",
+    "requirement_traceability",
+    "reproducibility",
+    "stability",
+    "access_control",
+    "api_db",
+    "data_security",
+    "structure",  # deprecated: kept for backward compat, use title/preconditions/steps/postconditions/priority
+]
 
 
 class ParsedStep(BaseModel):
@@ -23,10 +47,118 @@ class TextParseResult(BaseModel):
 
 
 class AnalysisIssue(BaseModel):
+    rule: str | None = None
     severity: Literal["low", "medium", "high"]
     title: str
     description: str
     recommendation: str
+
+
+# LLM sometimes outputs field names instead of rule IDs — map them to closest valid rule
+_RULE_ALIASES: dict[str, str] = {
+    "title": "title",
+    "description": "description",
+    "preconditions": "preconditions",
+    "steps": "steps",
+    "postconditions": "postconditions",
+    "priority": "priority",
+    "links": "requirement_traceability",
+    "expected": "expected_results",
+    "expected_result": "expected_results",
+    "test_data_field": "test_data",
+    "data": "test_data",
+    # deprecated alias
+    "structure": "title",
+}
+
+_RULE_LABELS: dict[str, str] = {
+    "title": "Заголовок",
+    "description": "Описание",
+    "preconditions": "Предусловия",
+    "steps": "Шаги",
+    "postconditions": "Постусловия",
+    "priority": "Приоритет",
+    "expected_results": "Ожидаемые результаты",
+    "test_data": "Тестовые данные",
+    "tags": "Теги",
+    "duration": "Длительность",
+    "atomicity": "Атомарность",
+    "independence": "Независимость",
+    "requirement_traceability": "Связь с требованиями",
+    "reproducibility": "Воспроизводимость",
+    "stability": "Стабильность",
+    "access_control": "Роли и права доступа",
+    "api_db": "API / DB проверки",
+    "data_security": "Безопасность данных",
+    "structure": "Структура",  # deprecated
+}
+
+
+_EMPTY_EVIDENCE_RE = re.compile(
+    r"=\s*(?:null|none|\[\]|\{\}|\"\"|'')\s*\.?$",
+    re.IGNORECASE,
+)
+_EMPTY_ASSIGNMENT_RE = re.compile(
+    r"=\s*(?:null|none|\[\]|\{\}|\"\"|''|“”|‘’)(?:\s|,|\.|$)",
+    re.IGNORECASE,
+)
+_EMPTY_EVIDENCE_TEXT_RE = re.compile(
+    r"^(?:поле\s+)?[\wА-Яа-яЁё ._-]+\s+"
+    r"(?:пустое|пустой|пустая|пусто|отсутствует|не заполнено|не заполнена)\.?$",
+    re.IGNORECASE,
+)
+
+
+def _has_meaningful_evidence(evidence: str | None) -> bool:
+    if not evidence or not evidence.strip():
+        return False
+
+    text = evidence.strip()
+    normalized = " ".join(text.split())
+    if _EMPTY_EVIDENCE_RE.search(normalized):
+        return False
+    if _EMPTY_ASSIGNMENT_RE.search(normalized):
+        return False
+    if _EMPTY_EVIDENCE_TEXT_RE.fullmatch(normalized):
+        return False
+    return True
+
+
+class _LLMIssue(BaseModel):
+    """Internal model matching prompt output. rule is constrained to valid ReviewRuleId values."""
+    rule: ReviewRuleId
+    severity: Literal["low", "medium", "high"]
+    field: str | None = None
+    problem: str
+    evidence: str | None = None
+    recommendation: str
+
+    @field_validator("rule", mode="before")
+    @classmethod
+    def normalize_rule(cls, v: object) -> object:
+        if isinstance(v, str):
+            return _RULE_ALIASES.get(v, v)
+        return v
+
+    def to_issue(self) -> AnalysisIssue:
+        desc = self.problem
+        if _has_meaningful_evidence(self.evidence):
+            desc = f"{self.problem}\n\nПример: {self.evidence}"
+        return AnalysisIssue(
+            rule=self.rule,
+            severity=self.severity,
+            title=_RULE_LABELS.get(self.rule, self.rule),
+            description=desc,
+            recommendation=self.recommendation,
+        )
+
+
+class _LLMReviewResult(BaseModel):
+    """Internal model for LLM output — converted to ReviewResult before returning."""
+    reasoning: str
+    summary: str
+    issues: list[_LLMIssue] = []
+    warnings: list[str] = []
 
 
 class AnalysisStep(BaseModel):
@@ -77,6 +209,7 @@ class AnalyzeTestCaseRequest(BaseModel):
     raw_content: str | None = None
     work_item: dict | None = None
     source_type: Literal["testit", "manual"] = "testit"
+    enabled_rules: list[ReviewRuleId] | None = None
 
 
 class AnalyzeTestCaseResponse(BaseModel):

@@ -18,6 +18,7 @@ class CreateDraftRequest(BaseModel):
     improved_testcase: dict
     source_work_item_id: str
     source_attributes: dict = {}
+    manual_notes: list[str] = []
 
 
 class CreateDraftResponse(BaseModel):

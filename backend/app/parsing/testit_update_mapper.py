@@ -11,8 +11,8 @@ _PRIORITY_MAP = {
 }
 _VALID_STATES = {"Ready", "NotReady", "NeedsWork"}
 _SERVICE_FOOTER_SEP = "\n\n---\n"
-_SERVICE_TAGS = re.compile(r"^source-\d+$")
 _DROP_TAGS = {"needs-review"}
+_SERVICE_TAGS = re.compile(r"^source-\d+$")
 
 
 def _strip_service_footer(desc: str | None) -> str:

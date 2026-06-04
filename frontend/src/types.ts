@@ -1,6 +1,7 @@
 export type SourceMode = 'testit' | 'manual'
 export type ReviewRuleId =
   | 'structure'
+  | 'description'
   | 'expected_results'
   | 'test_data'
   | 'tags'
@@ -58,6 +59,7 @@ export interface FetchResult {
 }
 
 export interface ReviewIssue {
+  rule?: string
   severity: Severity
   title: string
   description: string
@@ -79,6 +81,7 @@ export interface ReviewResult {
 }
 
 export interface IssueResolution {
+  issue_index: number
   issue_title: string
   status: ResolutionStatus
   action_taken?: string
@@ -99,6 +102,7 @@ export interface Diff {
 
 export interface ImproveResult {
   improved_testcase: TestCase
+  original_normalized_testcase?: Record<string, unknown>
   issue_resolutions?: IssueResolution[]
   diff?: Diff
   warnings?: string[]
@@ -164,6 +168,14 @@ export interface ApplyResult {
   global_id?: number
   title: string
   testit_url?: string
+}
+
+export interface ActionNotification {
+  type: 'apply' | 'draft'
+  id: string
+  testit_url?: string
+  sectionName?: string
+  isPartial?: boolean
 }
 
 export interface Section {

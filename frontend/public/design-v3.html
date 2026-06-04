@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>QA AI Tools — Design v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --sb-bg:#1E1B4B;
+  --sb-active-bg:rgba(255,255,255,0.09);
+  --sb-active-border:rgba(255,255,255,0.13);
+  --sb-hover:rgba(255,255,255,0.05);
+  --sb-divider:rgba(255,255,255,0.08);
+  --sb-icon-bg:rgba(255,255,255,0.06);
+  --sb-icon-border:rgba(255,255,255,0.09);
+  --sb-text:rgba(255,255,255,0.44);
+  --sb-text-active:rgba(255,255,255,0.92);
+  --sb-section:rgba(255,255,255,0.26);
+
+  --accent:#7C3AED;
+  --accent-dim:rgba(124,58,237,0.08);
+  --accent-border:rgba(124,58,237,0.22);
+
+  --green:#16A34A;
+  --green-bg:rgba(22,163,74,0.07);
+  --green-border:rgba(22,163,74,0.22);
+
+  --ok:#079455;
+  --ok-bg:rgba(7,148,85,0.07);
+  --ok-border:rgba(7,148,85,0.2);
+
+  --bad:#D92D20;
+  --bad-bg:rgba(217,45,32,0.07);
+  --bad-border:rgba(217,45,32,0.2);
+
+  --bg-panel:#FFFFFF;
+  --bg-surface:#F7F8FC;
+  --bg-hover:#F1F3F8;
+
+  --tx-primary:#0F1117;
+  --tx-secondary:#3D4558;
+  --tx-muted:#6B7280;
+  --tx-dim:#A0ABC0;
+
+  --border:rgba(220,224,238,0.9);
+  --border-hover:rgba(196,202,222,0.95);
+
+  --r-sm:6px;
+  --r-md:10px;
+  --r-lg:14px;
+
+  --font:'Hanken Grotesk',-apple-system,system-ui,sans-serif;
+}
+
+html,body{
+  height:100%;
+  font-family:var(--font);
+  -webkit-font-smoothing:antialiased;
+  /* outer bg — visible around the app card */
+  background:#C8D6EC;
+  min-height:100vh;
+}
+body{padding:20px;}
+
+/* ── Slide system ──────────────────────────────────────── */
+.slide{display:none;}
+.slide.active{display:flex;flex-direction:column;}
+
+/* ── Slide nav ─────────────────────────────────────────── */
+.slide-nav{
+  display:flex;align-items:center;justify-content:center;
+  gap:10px;padding:0 0 14px;
+}
+.slide-nav-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:var(--r-sm);
+  background:rgba(255,255,255,0.35);border:1px solid rgba(255,255,255,0.5);
+  font-family:var(--font);font-size:12px;font-weight:500;color:#3D4558;
+  cursor:pointer;transition:background .14s;
+  backdrop-filter:blur(8px);
+}
+.slide-nav-btn:hover{background:rgba(255,255,255,0.55);}
+.slide-nav-btn.current{background:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.8);cursor:default;}
+.slide-nav-sep{width:1px;height:18px;background:rgba(255,255,255,0.4);}
+.slide-nav-dot{width:6px;height:6px;border-radius:50%;background:#7C3AED;opacity:0.5;}
+.slide-nav-dot.active{opacity:1;}
+
+/* ── App shell ─────────────────────────────────────────── */
+.app{
+  display:flex;
+  height:calc(100vh - 82px); /* 40px padding + 42px nav */
+  min-height:560px;
+  border-radius:var(--r-lg);
+  overflow:hidden;
+  border:1px solid rgba(180,192,218,0.6);
+  box-shadow:0 2px 24px rgba(30,27,75,0.10),0 1px 4px rgba(30,27,75,0.06);
+}
+
+/* ── Sidebar ───────────────────────────────────────────── */
+.sidebar{
+  width:220px;flex-shrink:0;
+  background:var(--sb-bg);
+  display:flex;flex-direction:column;
+  user-select:none;
+}
+.sb-logo{
+  padding:15px 14px;display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--sb-divider);flex-shrink:0;
+}
+.sb-mark{
+  width:30px;height:30px;flex-shrink:0;border-radius:var(--r-sm);
+  background:var(--accent);display:flex;align-items:center;justify-content:center;
+}
+.sb-mark span{font-size:10px;font-weight:700;color:#fff;letter-spacing:-0.03em;}
+.sb-brand{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.sb-brand-name{font-size:13px;font-weight:500;color:rgba(255,255,255,0.9);line-height:17px;white-space:nowrap;}
+.sb-brand-sub{font-size:11px;font-weight:400;color:var(--sb-section);text-transform:uppercase;letter-spacing:0.06em;line-height:14px;white-space:nowrap;}
+.sb-section{padding:14px 14px 5px;flex-shrink:0;}
+.sb-section-label{font-size:11px;font-weight:400;color:var(--sb-section);text-transform:uppercase;letter-spacing:0.07em;}
+.sb-nav{flex:1;padding:4px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+.sb-item{
+  display:flex;align-items:center;gap:10px;padding:5px 8px;min-height:36px;
+  border-radius:var(--r-sm);border:1px solid transparent;
+  color:var(--sb-text);cursor:pointer;
+  transition:background .14s,color .14s,border-color .14s;position:relative;
+}
+.sb-item:hover{background:var(--sb-hover);color:rgba(255,255,255,0.68);}
+.sb-item-active{background:var(--sb-active-bg);border-color:var(--sb-active-border);color:var(--sb-text-active);cursor:default;}
+.sb-item-active:hover{background:var(--sb-active-bg);color:var(--sb-text-active);}
+.sb-item-active::before{
+  content:'';position:absolute;left:0;top:7px;bottom:7px;
+  width:2px;border-radius:2px;background:var(--accent);opacity:0.9;
+}
+.sb-item-soon{cursor:default;color:rgba(255,255,255,0.24);}
+.sb-item-soon:hover{background:transparent;color:rgba(255,255,255,0.24);}
+.sb-icon{
+  width:26px;height:26px;flex-shrink:0;border-radius:var(--r-sm);
+  background:var(--sb-icon-bg);border:1px solid var(--sb-icon-border);
+  display:flex;align-items:center;justify-content:center;
+}
+.sb-item-active .sb-icon{background:rgba(255,255,255,0.11);border-color:rgba(255,255,255,0.16);}
+.sb-item-soon .sb-icon{background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.055);}
+.sb-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+.sb-title{font-size:13px;font-weight:400;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit;}
+.sb-sub{font-size:11px;font-weight:400;line-height:14px;color:rgba(255,255,255,0.3);white-space:nowrap;}
+.sb-item-active .sb-sub{color:rgba(255,255,255,0.46);}
+.sb-badge{
+  flex-shrink:0;font-size:10px;font-weight:400;color:rgba(255,255,255,0.28);
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);
+  padding:2px 6px;border-radius:var(--r-sm);text-transform:uppercase;letter-spacing:0.03em;
+  white-space:nowrap;line-height:1.4;
+}
+.sb-divider{margin:4px 12px;border-top:1px solid var(--sb-divider);flex-shrink:0;}
+.sb-bottom{padding:4px 8px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;}
+
+/* ── Workspace ─────────────────────────────────────────── */
+.workspace{
+  flex:1;overflow-y:auto;position:relative;
+  /* gradient background — the main ask */
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 0%, rgba(124,58,237,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 60% at 90% 100%, rgba(22,163,74,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 10%, rgba(56,189,248,0.05) 0%, transparent 55%),
+    linear-gradient(160deg,#E8F0FB 0%,#EEF2F8 35%,#EAF4F0 65%,#F2EDFA 100%);
+}
+
+/* ── Workspace inner ───────────────────────────────────── */
+.workspace-inner{
+  padding:28px 32px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+/* ── Workspace content column (header + panel) ─────────── */
+.workspace-col{
+  width:100%;
+  max-width:740px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+/* ── Page header ───────────────────────────────────────── */
+.page-header{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:16px;
+}
+.page-header-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.back-btn{
+  width:32px;height:32px;flex-shrink:0;
+  border-radius:var(--r-sm);
+  background:var(--bg-panel);
+  border:0.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--tx-secondary);cursor:pointer;
+  transition:background .14s,border-color .14s;
+}
+.back-btn:hover{background:var(--bg-surface);border-color:var(--border-hover);}
+.page-title{
+  font-size:18px;
+  font-weight:500;
+  color:var(--tx-primary);
+  line-height:24px;
+}
+.mode-btn-wrap{position:relative;flex-shrink:0;}
+
+.mode-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  height:36px;padding:0 12px;border-radius:var(--r-sm);
+  background:var(--bg-panel);
+  border:1px solid var(--accent);
+  box-shadow:0 0 0 2px rgba(124,58,237,0.12);
+  font-family:var(--font);font-size:13px;font-weight:500;color:var(--tx-secondary);
+  cursor:pointer;white-space:nowrap;
+  transition:border-color .14s,background .14s,box-shadow .14s;
+}
+.mode-btn:hover{background:var(--bg-surface);box-shadow:0 0 0 3px rgba(124,58,237,0.16);}
+.mode-btn.open{background:var(--bg-surface);box-shadow:0 0 0 3px rgba(124,58,237,0.18);}
+.mode-btn-star{color:#F59E0B;display:flex;flex-shrink:0;}
+.mode-btn-sep{width:1px;height:14px;background:var(--border);flex-shrink:0;}
+.mode-btn-pill{
+  font-size:11px;font-weight:500;
+  background:#EEEDFE;color:var(--accent);
+  padding:2px 7px;border-radius:var(--r-sm);
+  white-space:nowrap;
+}
+.mode-btn-chevron{color:var(--tx-dim);display:flex;flex-shrink:0;transition:transform .18s;}
+.mode-btn-chevron.open{transform:rotate(180deg);}
+
+/* ── Review dropdown ────────────────────────────────────── */
+.review-dropdown{
+  display:none;
+  position:absolute;top:calc(100% + 6px);right:0;
+  width:320px;
+  background:var(--bg-panel);border-radius:var(--r-md);
+  border:1px solid var(--border);
+  box-shadow:0 8px 28px rgba(30,27,75,0.14),0 2px 8px rgba(30,27,75,0.06);
+  z-index:100;
+  overflow:hidden;
+}
+.review-dropdown.open{display:block;}
+
+.rd-header{
+  padding:14px 16px 10px;
+  font-size:13px;font-weight:500;color:var(--tx-primary);
+  border-bottom:1px solid var(--border);
+}
+
+/* Presets */
+.rd-presets{display:flex;flex-direction:column;gap:4px;padding:10px 12px;}
+.rd-preset{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:var(--r-sm);
+  cursor:pointer;border:1px solid transparent;
+  transition:background .12s,border-color .12s;
+}
+.rd-preset:hover{background:var(--bg-surface);}
+.rd-preset.active{background:#EEEDFE;border-color:rgba(124,58,237,0.18);}
+
+.rd-radio{
+  width:16px;height:16px;flex-shrink:0;border-radius:50%;
+  border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .12s;
+}
+.rd-preset.active .rd-radio{border-color:var(--accent);background:var(--accent);}
+.rd-radio-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#fff;display:none;
+}
+.rd-preset.active .rd-radio-dot{display:block;}
+
+.rd-preset-copy{flex:1;min-width:0;}
+.rd-preset-name{font-size:13px;font-weight:500;color:var(--tx-primary);line-height:17px;}
+.rd-preset.active .rd-preset-name{color:var(--accent);}
+.rd-preset-desc{font-size:11px;color:var(--tx-muted);line-height:15px;}
+.rd-preset-count{
+  font-size:11px;font-weight:500;
+  background:rgba(124,58,237,0.08);color:var(--accent);
+  padding:2px 7px;border-radius:var(--r-sm);
+  flex-shrink:0;white-space:nowrap;
+}
+
+/* Rules list */
+.rd-rules-section{padding:4px 12px 10px;}
+.rd-rules-label{
+  font-size:10px;font-weight:500;color:var(--tx-dim);
+  text-transform:uppercase;letter-spacing:0.07em;
+  padding:6px 2px 6px;
+}
+.rd-rule{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 2px;cursor:pointer;
+  border-bottom:1px solid rgba(220,224,238,0.5);
+}
+.rd-rule:last-child{border-bottom:none;}
+
+.rd-cb{
+  width:16px;height:16px;flex-shrink:0;border-radius:4px;
+  border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .12s,border-color .12s;
+}
+.rd-cb.checked{background:var(--accent);border-color:var(--accent);}
+.rd-cb-mark{
+  display:none;color:#fff;
+}
+.rd-cb.checked .rd-cb-mark{display:flex;}
+
+.rd-rule-text{font-size:12px;color:var(--tx-secondary);line-height:16px;}
+.rd-rule.disabled .rd-rule-text{color:var(--tx-dim);}
+
+/* Footer */
+.rd-footer{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px 12px;
+  border-top:1px solid var(--border);
+}
+.rd-link{
+  font-size:12px;font-weight:500;color:var(--accent);
+  background:none;border:none;cursor:pointer;
+  font-family:var(--font);padding:0;
+  text-decoration:none;
+  transition:opacity .14s;
+}
+.rd-link:hover{opacity:0.75;}
+.rd-apply{
+  height:32px;padding:0 14px;border-radius:var(--r-sm);
+  background:var(--accent);color:#fff;
+  font-family:var(--font);font-size:12px;font-weight:500;
+  border:none;cursor:pointer;
+  transition:background .14s;
+}
+.rd-apply:hover{background:#6D28D9;}
+
+/* ── Source panel ──────────────────────────────────────── */
+.source-panel{
+  background:var(--bg-panel);border-radius:var(--r-lg);
+  border:1px solid var(--border);width:100%;overflow:hidden;
+}
+.source-hero{
+  display:flex;align-items:flex-start;gap:14px;
+  padding:18px 18px 16px;border-bottom:1px solid var(--border);
+}
+.source-hero-icon{
+  width:38px;height:38px;flex-shrink:0;border-radius:var(--r-md);
+  background:var(--accent-dim);border:1px solid var(--accent-border);
+  display:flex;align-items:center;justify-content:center;color:var(--accent);
+}
+.source-hero-copy{flex:1;min-width:0;}
+.source-hero-title{font-size:15px;font-weight:500;color:var(--tx-primary);line-height:20px;margin-bottom:4px;}
+.source-hero-desc{font-size:12px;font-weight:400;color:var(--tx-muted);line-height:17px;}
+.source-tabs{display:flex;padding:0 18px;border-bottom:1px solid var(--border);}
+.source-tab{
+  display:flex;align-items:center;gap:7px;padding:10px 2px;margin-right:18px;
+  font-size:13px;font-weight:400;color:var(--tx-muted);cursor:pointer;
+  border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:color .14s,border-color .14s;font-family:var(--font);
+}
+.source-tab-active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500;cursor:default;}
+.source-tab-disabled{cursor:default;color:var(--tx-dim);opacity:0.7;}
+.tab-badge{
+  font-size:10px;font-weight:400;background:var(--bg-surface);
+  border:1px solid var(--border);color:var(--tx-dim);
+  padding:1px 5px;border-radius:var(--r-sm);line-height:1.4;
+}
+.source-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:14px;}
+
+/* TMS grid */
+.tms-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.tms-card{
+  border:1px solid var(--border);border-radius:var(--r-md);
+  padding:11px 12px;display:flex;align-items:center;gap:10px;
+  background:var(--bg-surface);cursor:default;
+}
+.tms-card-active{border:1.5px solid var(--accent-border);background:var(--bg-panel);cursor:pointer;}
+.tms-card-disabled{opacity:0.45;cursor:not-allowed;}
+.tms-icon{
+  width:34px;height:34px;flex-shrink:0;border-radius:var(--r-sm);
+  border:1px solid var(--border);background:var(--bg-panel);
+  display:flex;align-items:center;justify-content:center;color:var(--tx-muted);
+}
+.tms-card-active .tms-icon{background:var(--accent-dim);border-color:var(--accent-border);color:var(--accent);}
+.tms-copy{flex:1;min-width:0;}
+.tms-name{font-size:13px;font-weight:500;color:var(--tx-primary);line-height:17px;}
+.tms-sub{font-size:11px;font-weight:400;color:var(--tx-dim);line-height:15px;}
+.tms-state{
+  font-size:11px;font-weight:400;padding:2px 7px;border-radius:var(--r-sm);
+  border:1px solid;white-space:nowrap;flex-shrink:0;line-height:1.5;
+}
+.tms-state-ok{color:var(--green);background:var(--green-bg);border-color:var(--green-border);}
+.tms-state-soon{color:var(--tx-dim);background:transparent;border-color:var(--border);}
+
+/* Input */
+.source-label{display:block;font-size:12px;font-weight:500;color:var(--tx-secondary);margin-bottom:7px;line-height:16px;}
+.source-input-row{display:flex;gap:8px;align-items:center;}
+.source-id-input{
+  flex:1;height:40px;border:1px solid var(--border);border-radius:var(--r-sm);
+  background:var(--bg-panel);padding:0 12px;
+  font-family:var(--font);font-size:13px;font-weight:400;color:var(--tx-primary);
+  outline:none;transition:border-color .14s,box-shadow .14s;
+}
+.source-id-input::placeholder{color:var(--tx-dim);}
+.source-id-input:hover{border-color:var(--border-hover);}
+.source-id-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,58,237,0.11);}
+.source-fetch-btn{
+  height:40px;padding:0 16px;border-radius:var(--r-sm);
+  background:var(--accent);color:#fff;font-family:var(--font);
+  font-size:13px;font-weight:500;border:none;cursor:pointer;
+  display:flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0;
+  transition:background .14s;
+}
+.source-fetch-btn:hover{background:#6D28D9;}
+.source-fetch-btn-muted{
+  background:var(--bg-surface);color:var(--tx-dim);
+  border:1px solid var(--border);cursor:not-allowed;
+}
+.source-fetch-btn-muted:hover{background:var(--bg-surface);}
+
+/* Status bar */
+.status-bar{
+  display:flex;align-items:stretch;
+  border-radius:var(--r-sm);border:1px solid var(--border);
+  background:var(--bg-surface);overflow:hidden;
+}
+.status-chip{
+  display:flex;align-items:center;gap:6px;padding:9px 12px;
+  font-size:12px;color:var(--tx-muted);flex:1;
+}
+.status-chip+.status-chip{border-left:1px solid var(--border);}
+.status-chip-icon{color:var(--tx-dim);display:flex;flex-shrink:0;}
+.status-chip-label{font-size:11px;color:var(--tx-dim);}
+.status-chip-value{font-weight:500;color:var(--tx-secondary);}
+
+/* Info cards */
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.info-card{
+  border:1px solid var(--border);border-radius:var(--r-md);
+  background:var(--bg-surface);padding:12px;display:flex;flex-direction:column;gap:8px;
+}
+.info-card-title{
+  display:flex;align-items:center;gap:7px;
+  font-size:12px;font-weight:500;color:var(--tx-secondary);line-height:16px;
+}
+.info-card-title-icon{color:var(--tx-muted);display:flex;flex-shrink:0;}
+.info-card-body{font-size:12px;color:var(--tx-muted);line-height:17px;}
+.info-steps{display:flex;flex-direction:column;gap:5px;}
+.info-step{display:flex;align-items:flex-start;gap:7px;font-size:12px;color:var(--tx-muted);line-height:17px;}
+.info-step-num{
+  width:17px;height:17px;flex-shrink:0;border-radius:50%;
+  background:var(--accent-dim);border:1px solid var(--accent-border);
+  color:var(--accent);font-size:10px;font-weight:500;
+  display:flex;align-items:center;justify-content:center;line-height:1;
+}
+.info-tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--tx-muted);
+  background:var(--bg-panel);border:1px solid var(--border);
+  padding:2px 8px;border-radius:var(--r-sm);width:fit-content;margin-top:4px;
+}
+
+/* Manual panel */
+.manual-panel{
+  border:1px solid var(--border);border-radius:var(--r-sm);
+  background:var(--bg-surface);overflow:hidden;
+}
+.manual-panel-btn{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  width:100%;background:none;border:none;cursor:pointer;
+  font-family:var(--font);text-align:left;transition:background .14s;
+}
+.manual-panel-btn:hover{background:var(--bg-hover);}
+.manual-panel-icon{color:var(--tx-dim);display:flex;flex-shrink:0;}
+.manual-panel-copy{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;}
+.manual-panel-title{font-size:12px;font-weight:500;color:var(--tx-secondary);flex-shrink:0;}
+.manual-panel-desc{font-size:12px;color:var(--tx-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.manual-panel-chevron{color:var(--tx-dim);display:flex;flex-shrink:0;transition:transform .18s;}
+.manual-panel-chevron.open{transform:rotate(180deg);}
+.manual-panel-content{
+  border-top:1px solid var(--border);padding:10px 14px;
+  font-size:12px;color:var(--tx-muted);line-height:18px;
+}
+.manual-panel-content b{font-weight:500;color:var(--tx-secondary);}
+
+/* ── Alerts ─────────────────────────────────────────────── */
+.alert{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:11px 13px;border-radius:var(--r-sm);border:1px solid;
+}
+.alert-error{background:var(--bad-bg);border-color:var(--bad-border);}
+.alert-success{background:var(--ok-bg);border-color:var(--ok-border);}
+.alert-icon-err{color:var(--bad);display:flex;flex-shrink:0;margin-top:1px;}
+.alert-icon-ok{color:var(--ok);display:flex;flex-shrink:0;margin-top:1px;}
+.alert-text{font-size:12px;color:var(--tx-secondary);line-height:17px;flex:1;}
+.alert-text strong{font-weight:500;}
+.alert-id{
+  margin-left:auto;flex-shrink:0;font-size:11px;font-family:monospace;
+  color:var(--tx-muted);background:var(--bg-surface);
+  border:1px solid var(--border);padding:2px 7px;border-radius:var(--r-sm);align-self:center;
+}
+
+/* ── Fetch skeleton ─────────────────────────────────────── */
+.fetch-skeleton{
+  border:1px solid var(--accent-border);border-radius:var(--r-md);
+  background:var(--accent-dim);overflow:hidden;
+}
+.fetch-skeleton-head{padding:12px 13px;border-bottom:1px solid var(--accent-border);}
+.fetch-skeleton-loading{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;font-weight:500;color:var(--accent);margin-bottom:10px;
+}
+.fetch-skeleton-body{padding:10px 13px;display:flex;flex-direction:column;gap:10px;}
+.fetch-skeleton-step{display:flex;align-items:flex-start;gap:10px;}
+.skel{
+  border-radius:4px;
+  background:linear-gradient(90deg,rgba(124,58,237,0.08) 0%,rgba(124,58,237,0.14) 50%,rgba(124,58,237,0.08) 100%);
+  background-size:400px 100%;
+  animation:shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{animation:spin .8s linear infinite;display:flex;}
+
+/* ── Slide 2 — states grid ──────────────────────────────── */
+.states-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:20px;
+  padding:28px 32px;
+}
+.state-block{display:flex;flex-direction:column;gap:8px;}
+.state-label{
+  font-size:11px;font-weight:500;color:rgba(30,27,75,0.45);
+  text-transform:uppercase;letter-spacing:0.07em;
+}
+
+/* ── Slide 3 — Workbench ────────────────────────────────── */
+.workspace-inner-wb{
+  padding:20px 24px;display:flex;flex-direction:column;gap:12px;
+  min-height:100%;
+}
+
+/* Workbench header card */
+.wb-card{
+  background:var(--bg-panel);border:1px solid var(--border);
+  border-radius:var(--r-md);padding:12px 16px;
+  display:flex;align-items:center;gap:14px;
+}
+.wb-card-left{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
+.wb-title{font-size:15px;font-weight:500;color:var(--tx-primary);line-height:20px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wb-meta-row{display:flex;align-items:center;gap:8px;}
+.wb-source-badge{
+  font-size:11px;color:var(--tx-muted);background:var(--bg-surface);
+  border:1px solid var(--border);padding:2px 7px;border-radius:999px;
+}
+.wb-source-id{font-size:11px;font-family:monospace;color:var(--tx-muted);}
+.wb-status-ok{font-size:12px;font-weight:500;color:var(--ok);display:flex;align-items:center;gap:4px;}
+.wb-status-analyzed{font-size:12px;font-weight:500;color:var(--accent);display:flex;align-items:center;gap:4px;}
+.wb-metric{
+  font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.wb-metric-ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-border);}
+.wb-metric-warn{color:var(--warn);background:rgba(181,71,8,0.06);border-color:rgba(181,71,8,0.2);}
+
+.wb-actions{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.wb-btn{
+  height:32px;padding:0 12px;border-radius:var(--r-sm);
+  font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+  transition:background .14s,border-color .14s;border:1px solid transparent;
+}
+.wb-btn-sec{background:var(--bg-panel);border-color:var(--border);color:var(--tx-secondary);}
+.wb-btn-sec:hover{background:var(--bg-surface);border-color:var(--border-hover);}
+.wb-btn-pri{background:var(--accent);color:#fff;border-color:transparent;}
+.wb-btn-pri:hover{background:#6D28D9;}
+.wb-btn-done{background:var(--ok-bg);border-color:var(--ok-border);color:var(--ok);cursor:default;}
+
+/* Workbench grid */
+.wb-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;flex:1;}
+
+.wb-main{
+  background:var(--bg-panel);border:1px solid var(--border);
+  border-radius:var(--r-md);overflow:hidden;display:flex;flex-direction:column;
+}
+.wb-tabs-row{
+  display:flex;align-items:stretch;min-height:40px;
+  border-bottom:1px solid var(--border);background:var(--bg-surface);padding:0 16px;
+}
+.wb-tab{
+  display:flex;align-items:center;gap:5px;padding:0 11px;
+  font-family:var(--font);font-size:12px;font-weight:400;color:var(--tx-muted);
+  background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+  transition:color .14s;white-space:nowrap;
+}
+.wb-tab-active{color:var(--accent);font-weight:500;border-bottom-color:var(--accent);}
+.wb-tab-count{
+  font-size:10px;background:var(--bg-hover);color:var(--tx-dim);
+  padding:1px 5px;border-radius:999px;
+}
+.wb-tab-active .wb-tab-count{background:rgba(124,58,237,0.1);color:var(--accent);}
+.wb-content{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;}
+
+/* Case content */
+.case-sec-label{
+  font-size:10px;font-weight:500;color:var(--tx-dim);
+  text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;display:block;
+}
+.case-tc-title{font-size:15px;font-weight:500;color:var(--tx-primary);line-height:21px;margin-bottom:8px;}
+.case-pills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:2px;}
+.case-pill{
+  display:inline-flex;align-items:center;height:20px;padding:0 7px;
+  border-radius:4px;font-size:11px;font-weight:500;border:1px solid;
+}
+.pill-high{color:#92400E;background:rgba(245,158,11,0.09);border-color:rgba(245,158,11,0.25);}
+.pill-ok{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-border);}
+.pill-tag{color:var(--accent);background:var(--accent-dim);border-color:var(--accent-border);}
+.case-text-box{
+  background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:10px 12px;font-size:12px;color:var(--tx-secondary);line-height:18px;
+}
+
+/* Steps table */
+.steps-tbl{border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;}
+.steps-head{
+  display:grid;grid-template-columns:28px 1fr 1fr;
+  background:var(--bg-surface);border-bottom:1px solid var(--border);
+}
+.steps-th{
+  padding:5px 10px;font-size:10px;font-weight:500;color:var(--tx-dim);
+  text-transform:uppercase;letter-spacing:0.06em;
+}
+.steps-th-num{text-align:center;padding:5px 4px;border-right:1px solid var(--border);}
+.steps-row{display:grid;grid-template-columns:28px 1fr 1fr;border-top:1px solid rgba(220,224,238,0.5);}
+.steps-num-cell{
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:9px 4px 8px;font-family:monospace;font-size:11px;color:var(--tx-dim);
+  border-right:1px solid var(--border);
+}
+.steps-cell{padding:8px 12px;font-size:12px;line-height:18px;}
+.steps-action{color:var(--tx-secondary);border-right:1px solid rgba(220,224,238,0.5);}
+.steps-exp{color:var(--tx-muted);}
+.steps-empty{color:var(--tx-dim);}
+
+/* Diff items */
+.diff-item{border:1px solid;border-radius:var(--r-sm);overflow:hidden;margin-bottom:6px;}
+.diff-item-changed{border-color:rgba(3,105,161,0.2);background:rgba(3,105,161,0.015);}
+.diff-item-added{border-color:var(--ok-border);background:rgba(7,148,85,0.015);}
+.diff-item-head{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 12px;border-bottom:1px solid rgba(220,224,238,0.5);
+  background:rgba(255,255,255,0.6);
+}
+.diff-type{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;}
+.diff-type-chg{color:#0369a1;background:rgba(3,105,161,0.1);}
+.diff-type-add{color:var(--ok);background:var(--ok-bg);}
+.diff-field{font-size:12px;font-weight:500;color:var(--tx-secondary);flex:1;}
+.diff-compare{
+  padding:8px 12px;display:grid;grid-template-columns:1fr 20px 1fr;gap:0;
+  align-items:start;
+}
+.diff-before{
+  font-size:12px;color:var(--bad);opacity:.75;
+  text-decoration:line-through;text-decoration-color:rgba(217,45,32,0.3);
+  line-height:18px;padding-right:8px;
+}
+.diff-after{font-size:12px;color:var(--tx-secondary);line-height:18px;padding-left:8px;}
+.diff-arr{display:flex;align-items:center;justify-content:center;color:var(--tx-dim);}
+.diff-added-text{
+  padding:8px 12px;
+  font-size:12px;color:var(--tx-secondary);line-height:18px;
+}
+
+/* Review rail */
+.rail-panel{
+  background:var(--bg-panel);border:1px solid var(--border);
+  border-radius:var(--r-md);overflow:hidden;display:flex;flex-direction:column;
+}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  min-height:40px;padding:0 14px;border-bottom:1px solid var(--border);
+  background:var(--bg-surface);flex-shrink:0;
+}
+.rail-title{font-size:13px;font-weight:500;color:var(--tx-primary);}
+.rail-count{
+  font-size:11px;color:var(--tx-muted);background:var(--bg-hover);
+  border:1px solid var(--border);padding:2px 7px;border-radius:999px;font-family:monospace;
+}
+.rail-scroll{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+
+/* Score */
+.score-card{border:1px solid var(--border);border-radius:var(--r-md);padding:12px;background:var(--bg-surface);}
+.score-head{font-size:12px;font-weight:500;color:var(--tx-secondary);margin-bottom:10px;}
+.score-main{display:flex;align-items:center;gap:12px;}
+.score-ring{position:relative;width:56px;height:56px;flex-shrink:0;}
+.score-ring svg{width:56px;height:56px;transform:rotate(-90deg);}
+.score-overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+}
+.score-num{font-size:18px;font-weight:700;color:var(--tx-primary);line-height:20px;}
+.score-den{font-size:9px;color:var(--tx-dim);}
+.score-copy{flex:1;display:flex;flex-direction:column;gap:5px;}
+.score-badge{
+  display:inline-flex;width:fit-content;
+  font-size:11px;font-weight:500;padding:2px 8px;
+  border-radius:var(--r-sm);border:1px solid;
+}
+.score-good{color:#0369a1;background:rgba(3,105,161,0.07);border-color:rgba(3,105,161,0.2);}
+.score-ctrs{display:flex;gap:10px;flex-wrap:wrap;}
+.score-ctr{font-size:11px;font-weight:500;display:flex;align-items:center;gap:4px;}
+.sctr-ok{color:var(--ok);}.sctr-warn{color:var(--warn);}
+
+/* AI summary */
+.ai-summary{
+  border:1px solid var(--accent-border);border-radius:var(--r-sm);
+  background:var(--accent-dim);padding:10px 12px;
+}
+.ai-label{
+  font-size:10px;font-weight:500;color:var(--accent);
+  text-transform:uppercase;letter-spacing:0.05em;
+  margin-bottom:5px;display:flex;align-items:center;gap:5px;
+}
+.ai-text{font-size:12px;color:var(--tx-secondary);line-height:17px;}
+
+/* Issues */
+.issues-section-label{
+  font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:0.04em;padding:6px 2px 4px;
+}
+.isl-high{color:#D92D20;}.isl-medium{color:#B45309;}.isl-low{color:#0369a1;}
+
+.issue-row{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:8px 10px;border-radius:var(--r-sm);
+  border:1px solid var(--border);background:rgba(255,255,255,0.82);
+}
+.issue-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.idot-h{background:#D92D20;}.idot-m{background:#F59E0B;}.idot-l{background:#60A5FA;}
+.issue-body{flex:1;min-width:0;}
+.issue-title-text{font-size:12px;font-weight:500;color:var(--tx-secondary);line-height:16px;}
+.issue-loc{font-size:11px;color:var(--tx-dim);line-height:14px;margin-top:1px;}
+.issue-badge{
+  font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;
+  border:1px solid;white-space:nowrap;flex-shrink:0;margin-top:1px;
+}
+.ib-resolved{color:var(--ok);background:var(--ok-bg);border-color:var(--ok-border);}
+.ib-manual{color:var(--warn);background:rgba(181,71,8,0.06);border-color:rgba(181,71,8,0.2);}
+
+/* Manual banner */
+.manual-banner{
+  border:1px solid rgba(181,71,8,0.2);border-radius:var(--r-sm);
+  background:rgba(181,71,8,0.05);padding:10px 12px;
+}
+.mb-head{display:flex;align-items:center;gap:6px;color:var(--warn);font-size:12px;font-weight:500;margin-bottom:7px;}
+.mb-item{border-left:2px solid rgba(181,71,8,0.2);padding-left:8px;margin-bottom:4px;}
+.mb-item:last-child{margin-bottom:0;}
+.mb-item-title{font-size:12px;font-weight:500;color:var(--tx-secondary);line-height:16px;}
+.mb-item-desc{font-size:11px;color:var(--tx-muted);line-height:14px;}
+
+/* Draft card */
+.draft-card{
+  border:1px solid var(--ok-border);border-radius:var(--r-md);
+  background:linear-gradient(160deg,rgba(255,255,255,0.96),rgba(7,148,85,0.05));
+  padding:12px;
+}
+.draft-label{font-size:11px;font-weight:500;color:var(--ok);display:flex;align-items:center;gap:5px;margin-bottom:6px;}
+.draft-name{font-size:12px;color:var(--tx-secondary);line-height:17px;margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.draft-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.draft-section-badge{
+  font-size:11px;color:var(--tx-muted);background:var(--bg-surface);
+  border:1px solid var(--border);padding:2px 7px;border-radius:var(--r-sm);
+}
+.draft-link{
+  font-size:11px;font-weight:500;color:var(--ok);
+  text-decoration:underline;text-underline-offset:2px;background:none;border:none;cursor:pointer;padding:0;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Slide nav ───────────────────────────────────────── -->
+<div class="slide-nav">
+  <button class="slide-nav-btn current" id="btn1" onclick="goSlide(1)">
+    <i data-lucide="layout-dashboard" style="width:13px;height:13px;"></i>
+    Экран 1 — Основной вид
+  </button>
+  <div class="slide-nav-sep"></div>
+  <button class="slide-nav-btn" id="btn2" onclick="goSlide(2)">
+    <i data-lucide="layers" style="width:13px;height:13px;"></i>
+    Экран 2 — Состояния панели
+  </button>
+  <div class="slide-nav-sep"></div>
+  <button class="slide-nav-btn" id="btn3" onclick="goSlide(3)">
+    <i data-lucide="check-square" style="width:13px;height:13px;"></i>
+    Экран 3 — Ревью и улучшение
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- СЛАЙД 1 — Основной вид                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide active" id="slide1">
+  <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sb-logo">
+        <div class="sb-mark"><span>QA</span></div>
+        <div class="sb-brand">
+          <span class="sb-brand-name">QA AI Tools</span>
+          <span class="sb-brand-sub">AI Review Workspace</span>
+        </div>
+      </div>
+      <div class="sb-section"><span class="sb-section-label">Инструменты</span></div>
+      <nav class="sb-nav">
+        <div class="sb-item sb-item-active">
+          <div class="sb-icon"><i data-lucide="file-check-2"></i></div>
+          <div class="sb-copy">
+            <span class="sb-title">Ревью и улучшение</span>
+            <span class="sb-sub">тест-кейсов</span>
+          </div>
+        </div>
+        <div class="sb-item sb-item-soon">
+          <div class="sb-icon"><i data-lucide="sparkles"></i></div>
+          <div class="sb-copy"><span class="sb-title">Генерация</span><span class="sb-sub">тест-кейсов</span></div>
+          <span class="sb-badge">Скоро</span>
+        </div>
+        <div class="sb-item sb-item-soon">
+          <div class="sb-icon"><i data-lucide="zap"></i></div>
+          <div class="sb-copy"><span class="sb-title">Генерация</span><span class="sb-sub">api-тестов</span></div>
+          <span class="sb-badge">Скоро</span>
+        </div>
+      </nav>
+      <div class="sb-divider"></div>
+      <div class="sb-bottom">
+        <div class="sb-item">
+          <div class="sb-icon"><i data-lucide="settings"></i></div>
+          <div class="sb-copy"><span class="sb-title">Настройки</span></div>
+        </div>
+        <div class="sb-item">
+          <div class="sb-icon"><i data-lucide="panel-left-close"></i></div>
+          <div class="sb-copy"><span class="sb-title">Свернуть</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Workspace с градиентом -->
+    <main class="workspace">
+      <div class="workspace-inner">
+        <div class="workspace-col">
+
+        <!-- Page header -->
+        <div class="page-header">
+          <div class="mode-btn-wrap">
+            <button class="mode-btn" id="modeBtnMain" onclick="toggleDropdown()">
+              <span class="mode-btn-star"><i data-lucide="star" style="fill:#F59E0B;stroke:#F59E0B;stroke-width:1.5;"></i></span>
+              <span id="modeBtnLabel">Строгое ревью</span>
+              <span class="mode-btn-sep"></span>
+              <span class="mode-btn-pill" id="modeBtnPill">8 правил</span>
+              <span class="mode-btn-chevron" id="modeBtnChevron"><i data-lucide="chevron-down"></i></span>
+            </button>
+
+            <!-- Dropdown -->
+            <div class="review-dropdown" id="reviewDropdown">
+
+              <div class="rd-header">Режим ревью</div>
+
+              <!-- Presets -->
+              <div class="rd-presets">
+
+                <div class="rd-preset active" data-preset="strict" data-label="Строгое ревью" data-count="8" onclick="selectPreset(this)">
+                  <div class="rd-radio"><div class="rd-radio-dot"></div></div>
+                  <div class="rd-preset-copy">
+                    <div class="rd-preset-name">Строгое ревью</div>
+                    <div class="rd-preset-desc">Все проверки включены</div>
+                  </div>
+                  <span class="rd-preset-count">8 правил</span>
+                </div>
+
+                <div class="rd-preset" data-preset="basic" data-label="Базовое ревью" data-count="4" onclick="selectPreset(this)">
+                  <div class="rd-radio"><div class="rd-radio-dot"></div></div>
+                  <div class="rd-preset-copy">
+                    <div class="rd-preset-name">Базовое ревью</div>
+                    <div class="rd-preset-desc">Только критичные проверки</div>
+                  </div>
+                  <span class="rd-preset-count">4 правила</span>
+                </div>
+
+                <div class="rd-preset" data-preset="custom" data-label="Своё" onclick="selectPreset(this)">
+                  <div class="rd-radio"><div class="rd-radio-dot"></div></div>
+                  <div class="rd-preset-copy">
+                    <div class="rd-preset-name">Своё</div>
+                    <div class="rd-preset-desc">Выберите правила вручную</div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Rules -->
+              <div class="rd-rules-section">
+                <div class="rd-rules-label">Активные правила</div>
+
+                <div class="rd-rule" onclick="toggleRule(this)">
+                  <div class="rd-cb checked">
+                    <span class="rd-cb-mark"><i data-lucide="check" style="width:10px;height:10px;stroke-width:2.5;"></i></span>
+                  </div>
+                  <span class="rd-rule-text">Чёткость формулировок шагов</span>
+                </div>
+
+                <div class="rd-rule" onclick="toggleRule(this)">
+                  <div class="rd-cb checked">
+                    <span class="rd-cb-mark"><i data-lucide="check" style="width:10px;height:10px;stroke-width:2.5;"></i></span>
+                  </div>
+                  <span class="rd-rule-text">Наличие ожидаемого результата</span>
+                </div>
+
+                <div class="rd-rule" onclick="toggleRule(this)">
+                  <div class="rd-cb checked">
+                    <span class="rd-cb-mark"><i data-lucide="check" style="width:10px;height:10px;stroke-width:2.5;"></i></span>
+                  </div>
+                  <span class="rd-rule-text">Атомарность тест-кейса</span>
+                </div>
+
+                <div class="rd-rule disabled" onclick="toggleRule(this)">
+                  <div class="rd-cb">
+                    <span class="rd-cb-mark"><i data-lucide="check" style="width:10px;height:10px;stroke-width:2.5;"></i></span>
+                  </div>
+                  <span class="rd-rule-text">Покрытие негативных сценариев</span>
+                </div>
+
+              </div>
+
+              <!-- Footer -->
+              <div class="rd-footer">
+                <button class="rd-link">Все правила →</button>
+                <button class="rd-apply" onclick="applyMode()">Применить</button>
+              </div>
+
+            </div><!-- /review-dropdown -->
+          </div><!-- /mode-btn-wrap -->
+
+        </div>
+
+        <div class="source-panel">
+
+          <!-- Hero -->
+          <div class="source-hero">
+            <div class="source-hero-icon"><i data-lucide="file-input"></i></div>
+            <div class="source-hero-copy">
+              <h2 class="source-hero-title">Загрузите тест-кейс для ревью</h2>
+              <p class="source-hero-desc">Импортируйте тест-кейс из TestIT по ID — остальные TMS будут доступны позже.</p>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div class="source-tabs">
+            <button class="source-tab source-tab-active">Из TMS</button>
+            <button class="source-tab source-tab-disabled">
+              Вручную <span class="tab-badge">Скоро</span>
+            </button>
+          </div>
+
+          <div class="source-body">
+
+            <!-- TMS grid -->
+            <div class="tms-grid">
+              <div class="tms-card tms-card-active">
+                <div class="tms-icon"><img src="https://docs.testit.software/images/testit_logo_icon_blue.png" width="20" height="20" alt="TestIT" style="object-fit:contain;"/></div>
+                <div class="tms-copy">
+                  <div class="tms-name">TestIT</div>
+                </div>
+                <span class="tms-state tms-state-ok">Доступно</span>
+              </div>
+              <div class="tms-card tms-card-disabled">
+                <div class="tms-icon"><img src="https://codaio.imgix.net/packs/21236/unversioned/assets/LOGO/ba1091c59bab89cd2fd0f289622731fe16113d7b00905abe64759c313a4b73b76c1b0426076ed76cb74752234c734131df46992d5b8b48fc13e264240e4f7119f736cfeb64df36ded54b5cbf6198b9cadedf18dd0cac5c7dbcd16e6336c29363cd1292ba" width="20" height="20" alt="TestRail" style="object-fit:contain;border-radius:4px;"/></div>
+                <div class="tms-copy">
+                  <div class="tms-name">TestRail</div>
+                </div>
+                <span class="tms-state tms-state-soon">Скоро</span>
+              </div>
+              <div class="tms-card tms-card-disabled">
+                <div class="tms-icon"><img src="https://img.stackshare.io/service/40438/default_a9d9f8f8546d65b5f12a32106e6d03e6921e11fa.png" width="20" height="20" alt="Allure TestOps" style="object-fit:contain;border-radius:4px;"/></div>
+                <div class="tms-copy">
+                  <div class="tms-name">Allure TestOps</div>
+                </div>
+                <span class="tms-state tms-state-soon">Скоро</span>
+              </div>
+              <div class="tms-card tms-card-disabled">
+                <div class="tms-icon"><img src="https://www.testingtoolsguide.net/wp-content/uploads/2016/11/zephyr.jpg" width="20" height="20" alt="Zephyr" style="object-fit:contain;border-radius:4px;"/></div>
+                <div class="tms-copy">
+                  <div class="tms-name">Zephyr</div>
+                </div>
+                <span class="tms-state tms-state-soon">Скоро</span>
+              </div>
+            </div>
+
+            <!-- Input -->
+            <div>
+              <label class="source-label" for="testit-id-1">ID тест-кейса в TestIT</label>
+              <div class="source-input-row">
+                <input id="testit-id-1" class="source-id-input" type="text" placeholder="Например: 6110" spellcheck="false"/>
+                <button class="source-fetch-btn">
+                  <i data-lucide="upload"></i>
+                  Загрузить из TestIT
+                </button>
+              </div>
+            </div>
+
+            <!-- Status bar -->
+            <div class="status-bar">
+              <div class="status-chip">
+                <span class="status-chip-icon"><i data-lucide="hard-drive"></i></span>
+                <span class="status-chip-label">Источник</span>
+                <span class="status-chip-value">TestIT</span>
+              </div>
+              <div class="status-chip">
+                <span class="status-chip-icon"><i data-lucide="clock-3"></i></span>
+                <span class="status-chip-label">Режим</span>
+                <span class="status-chip-value">Строгое ревью</span>
+              </div>
+              <div class="status-chip">
+                <span class="status-chip-icon"><i data-lucide="shield-check"></i></span>
+                <span class="status-chip-value">8 правил</span>
+              </div>
+            </div>
+
+            <!-- Info cards -->
+            <div class="info-grid">
+              <div class="info-card">
+                <div class="info-card-title">
+                  <span class="info-card-title-icon"><i data-lucide="list"></i></span>
+                  Как это работает
+                </div>
+                <div class="info-steps">
+                  <div class="info-step"><span class="info-step-num">1</span>Выберите источник</div>
+                  <div class="info-step"><span class="info-step-num">2</span>Загрузите тест-кейс</div>
+                  <div class="info-step"><span class="info-step-num">3</span>Получите ревью и улучшения</div>
+                </div>
+              </div>
+              <div class="info-card">
+                <div class="info-card-title">
+                  <span class="info-card-title-icon"><i data-lucide="file-text"></i></span>
+                  Что будет загружено
+                </div>
+                <div class="info-card-body">
+                  Название, описание, предусловия, шаги, постусловия и метаданные TestIT.
+                </div>
+                <div class="info-tag">
+                  <i data-lucide="lock" style="width:10px;height:10px;stroke-width:2;"></i>
+                  Только для чтения
+                </div>
+              </div>
+              <div class="info-card">
+                <div class="info-card-title">
+                  <span class="info-card-title-icon"><i data-lucide="shield"></i></span>
+                  Режим ревью
+                </div>
+                <div class="info-card-body">
+                  Проверки настраиваются через режим ревью и кастомные правила.
+                </div>
+              </div>
+            </div>
+
+            <!-- Manual panel -->
+            <div class="manual-panel">
+              <button class="manual-panel-btn" onclick="toggleManual(this)">
+                <span class="manual-panel-icon"><i data-lucide="align-left"></i></span>
+                <span class="manual-panel-copy">
+                  <span class="manual-panel-title">Ручной ввод</span>
+                  <span class="manual-panel-desc">При выборе «Вручную» будет доступно поле ввода тест-кейса.</span>
+                </span>
+                <span class="manual-panel-chevron"><i data-lucide="chevron-down"></i></span>
+              </button>
+              <div class="manual-panel-content" style="display:none">
+                Нажмите <b>«Вручную»</b> в переключателе выше, чтобы вставить тест-кейс в формате JSON или plain text.
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        </div><!-- /workspace-col -->
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- СЛАЙД 2 — Состояния                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide" id="slide2">
+  <div class="app">
+
+    <!-- Sidebar (копия) -->
+    <aside class="sidebar">
+      <div class="sb-logo">
+        <div class="sb-mark"><span>QA</span></div>
+        <div class="sb-brand">
+          <span class="sb-brand-name">QA AI Tools</span>
+          <span class="sb-brand-sub">AI Review Workspace</span>
+        </div>
+      </div>
+      <div class="sb-section"><span class="sb-section-label">Инструменты</span></div>
+      <nav class="sb-nav">
+        <div class="sb-item sb-item-active">
+          <div class="sb-icon"><i data-lucide="file-check-2"></i></div>
+          <div class="sb-copy"><span class="sb-title">Ревью и улучшение</span><span class="sb-sub">тест-кейсов</span></div>
+        </div>
+        <div class="sb-item sb-item-soon">
+          <div class="sb-icon"><i data-lucide="sparkles"></i></div>
+          <div class="sb-copy"><span class="sb-title">Генерация</span><span class="sb-sub">тест-кейсов</span></div>
+          <span class="sb-badge">Скоро</span>
+        </div>
+        <div class="sb-item sb-item-soon">
+          <div class="sb-icon"><i data-lucide="zap"></i></div>
+          <div class="sb-copy"><span class="sb-title">Генерация</span><span class="sb-sub">api-тестов</span></div>
+          <span class="sb-badge">Скоро</span>
+        </div>
+      </nav>
+      <div class="sb-divider"></div>
+      <div class="sb-bottom">
+        <div class="sb-item">
+          <div class="sb-icon"><i data-lucide="settings"></i></div>
+          <div class="sb-copy"><span class="sb-title">Настройки</span></div>
+        </div>
+        <div class="sb-item">
+          <div class="sb-icon"><i data-lucide="panel-left-close"></i></div>
+          <div class="sb-copy"><span class="sb-title">Свернуть</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Workspace -->
+    <main class="workspace" style="overflow-y:auto;">
+      <div class="states-grid">
+
+        <!-- STATE 1: Ожидание -->
+        <div class="state-block">
+          <span class="state-label">1 — Ожидание ввода</span>
+          <div class="source-panel">
+            <div class="source-body" style="padding-top:14px;">
+              <div>
+                <label class="source-label">ID тест-кейса в TestIT</label>
+                <div class="source-input-row">
+                  <input class="source-id-input" type="text" placeholder="Например: 6110" spellcheck="false"/>
+                  <button class="source-fetch-btn source-fetch-btn-muted" style="cursor:not-allowed;opacity:.55;">
+                    <i data-lucide="upload"></i>
+                    Загрузить
+                  </button>
+                </div>
+              </div>
+              <div class="status-bar">
+                <div class="status-chip">
+                  <span class="status-chip-icon"><i data-lucide="hard-drive"></i></span>
+                  <span class="status-chip-label">Источник</span>
+                  <span class="status-chip-value">TestIT</span>
+                </div>
+                <div class="status-chip">
+                  <span class="status-chip-icon"><i data-lucide="shield-check"></i></span>
+                  <span class="status-chip-value">8 правил</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE 2: Ошибка -->
+        <div class="state-block">
+          <span class="state-label">2 — Ошибка загрузки</span>
+          <div class="source-panel">
+            <div class="source-body" style="padding-top:14px;">
+              <div>
+                <label class="source-label">ID тест-кейса в TestIT</label>
+                <div class="source-input-row">
+                  <input class="source-id-input" type="text" value="9999" spellcheck="false"/>
+                  <button class="source-fetch-btn">
+                    <i data-lucide="upload"></i>
+                    Загрузить
+                  </button>
+                </div>
+              </div>
+              <div class="alert alert-error">
+                <span class="alert-icon-err"><i data-lucide="alert-circle"></i></span>
+                <span class="alert-text">Тест-кейс <strong>#9999</strong> не найден. Проверьте ID и повторите попытку.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE 5: Ручной ввод открыт -->
+        <div class="state-block">
+          <span class="state-label">3 — Аккордеон «Ручной ввод»</span>
+          <div class="source-panel">
+            <div class="source-body" style="padding-top:14px;">
+              <div class="manual-panel">
+                <button class="manual-panel-btn">
+                  <span class="manual-panel-icon"><i data-lucide="align-left"></i></span>
+                  <span class="manual-panel-copy">
+                    <span class="manual-panel-title">Ручной ввод</span>
+                    <span class="manual-panel-desc">Вставьте тест-кейс в JSON или plain text.</span>
+                  </span>
+                  <span class="manual-panel-chevron open"><i data-lucide="chevron-down"></i></span>
+                </button>
+                <div class="manual-panel-content">
+                  Нажмите <b>«Вручную»</b> в переключателе выше, чтобы вставить тест-кейс в формате JSON или plain text.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STATE 6: Кнопка disabled (нет ID) -->
+        <div class="state-block">
+          <span class="state-label">4 — Кнопка неактивна (без ID)</span>
+          <div class="source-panel">
+            <div class="source-body" style="padding-top:14px;">
+              <div>
+                <label class="source-label">ID тест-кейса в TestIT</label>
+                <div class="source-input-row">
+                  <input class="source-id-input" type="text" placeholder="Например: 6110" spellcheck="false"/>
+                  <button class="source-fetch-btn" disabled style="opacity:.38;cursor:not-allowed;">
+                    <i data-lucide="upload"></i>
+                    Загрузить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- СЛАЙД 3 — Воркбенч: ревью + улучшение + черновик      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide" id="slide3">
+  <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sb-logo">
+        <div class="sb-mark"><span>QA</span></div>
+        <div class="sb-brand">
+          <span class="sb-brand-name">QA AI Tools</span>
+          <span class="sb-brand-sub">AI Review Workspace</span>
+        </div>
+      </div>
+      <div class="sb-section"><span class="sb-section-label">Инструменты</span></div>
+      <nav class="sb-nav">
+        <div class="sb-item sb-item-active">
+          <div class="sb-icon"><i data-lucide="file-check-2"></i></div>
+          <div class="sb-copy"><span class="sb-title">Ревью и улучшение</span><span class="sb-sub">тест-кейсов</span></div>
+        </div>
+        <div class="sb-item sb-item-soon">
+          <div class="sb-icon"><i data-lucide="sparkles"></i></div>
+          <div class="sb-copy"><span class="sb-title">Генерация</span><span class="sb-sub">тест-кейсов</span></div>
+          <span class="sb-badge">Скоро</span>
+        </div>
+        <div class="sb-item sb-item-soon">
+          <div class="sb-icon"><i data-lucide="zap"></i></div>
+          <div class="sb-copy"><span class="sb-title">Генерация</span><span class="sb-sub">api-тестов</span></div>
+          <span class="sb-badge">Скоро</span>
+        </div>
+      </nav>
+      <div class="sb-divider"></div>
+      <div class="sb-bottom">
+        <div class="sb-item">
+          <div class="sb-icon"><i data-lucide="settings"></i></div>
+          <div class="sb-copy"><span class="sb-title">Настройки</span></div>
+        </div>
+        <div class="sb-item">
+          <div class="sb-icon"><i data-lucide="panel-left-close"></i></div>
+          <div class="sb-copy"><span class="sb-title">Свернуть</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Workspace -->
+    <main class="workspace">
+      <div class="workspace-inner-wb">
+
+        <!-- Page header -->
+        <div class="page-header" style="justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button class="back-btn" title="Назад"><i data-lucide="chevron-left"></i></button>
+            <h1 class="page-title">Ревью и улучшение тест-кейсов</h1>
+          </div>
+          <button class="mode-btn">
+            <span class="mode-btn-star"><i data-lucide="star" style="fill:#F59E0B;stroke:#F59E0B;stroke-width:1.5;"></i></span>
+            <span>Строгое ревью</span>
+            <span class="mode-btn-sep"></span>
+            <span class="mode-btn-pill">8 правил</span>
+            <span class="mode-btn-chevron"><i data-lucide="chevron-down"></i></span>
+          </button>
+        </div>
+
+        <!-- Workbench header card -->
+        <div class="wb-card">
+          <div class="wb-card-left">
+            <div class="wb-title">Авторизация пользователя по email и паролю</div>
+            <div class="wb-meta-row">
+              <span class="wb-source-badge">TestIT</span>
+              <span class="wb-source-id">#6110</span>
+              <span class="wb-status-ok">
+                <i data-lucide="check-circle-2" style="width:13px;height:13px;"></i>
+                Улучшен
+              </span>
+              <span class="wb-metric wb-metric-ok">
+                <i data-lucide="check" style="width:11px;height:11px;stroke-width:2.5;"></i>
+                3 решено
+              </span>
+              <span class="wb-metric wb-metric-warn">
+                <i data-lucide="alert-triangle" style="width:11px;height:11px;"></i>
+                1 вручную
+              </span>
+            </div>
+          </div>
+          <div class="wb-actions">
+            <button class="wb-btn wb-btn-sec">
+              <i data-lucide="rotate-ccw"></i>
+              Повторить ревью
+            </button>
+            <button class="wb-btn wb-btn-sec">
+              <i data-lucide="wand-2"></i>
+              Улучшить ещё
+            </button>
+            <button class="wb-btn wb-btn-done">
+              <i data-lucide="check-circle-2"></i>
+              Черновик создан
+            </button>
+          </div>
+        </div>
+
+        <!-- Workbench grid -->
+        <div class="wb-grid">
+
+          <!-- Left: test case panel with tabs -->
+          <div class="wb-main">
+            <div class="wb-tabs-row" id="wb-tabs">
+              <button class="wb-tab" onclick="switchWbTab('original',this)">Оригинал</button>
+              <button class="wb-tab wb-tab-active" onclick="switchWbTab('improved',this)">
+                Улучшенный
+                <span class="wb-tab-count">✓</span>
+              </button>
+              <button class="wb-tab" onclick="switchWbTab('diff',this)">
+                Diff
+                <span class="wb-tab-count">4</span>
+              </button>
+              <button class="wb-tab" onclick="switchWbTab('json',this)">JSON</button>
+            </div>
+
+            <!-- Tab: Улучшенный -->
+            <div class="wb-content" id="tab-improved">
+              <div>
+                <div class="case-tc-title">Авторизация пользователя по email и паролю</div>
+                <div class="case-pills">
+                  <span class="case-pill pill-high">Высокий</span>
+                  <span class="case-pill pill-ok">Готов</span>
+                  <span class="case-pill pill-tag">auth</span>
+                  <span class="case-pill pill-tag">login</span>
+                  <span class="case-pill pill-tag">smoke</span>
+                  <span class="case-pill pill-tag">security</span>
+                </div>
+              </div>
+
+              <div>
+                <span class="case-sec-label">Предусловие</span>
+                <div class="case-text-box">Пользователь зарегистрирован в системе с валидными email и паролем. Открыта страница входа /login.</div>
+              </div>
+
+              <div>
+                <span class="case-sec-label">Шаги <span style="font-family:monospace;color:var(--tx-dim);font-weight:400;">3</span></span>
+                <div class="steps-tbl">
+                  <div class="steps-head">
+                    <div class="steps-th steps-th-num">#</div>
+                    <div class="steps-th">Действие</div>
+                    <div class="steps-th">Ожидаемый результат</div>
+                  </div>
+                  <div class="steps-row">
+                    <div class="steps-num-cell">1</div>
+                    <div class="steps-cell steps-action">Ввести корректный email пользователя в поле «Email»</div>
+                    <div class="steps-cell steps-exp">Поле заполнено, введённое значение отображается корректно</div>
+                  </div>
+                  <div class="steps-row">
+                    <div class="steps-num-cell">2</div>
+                    <div class="steps-cell steps-action">Ввести корректный пароль в поле «Пароль»</div>
+                    <div class="steps-cell steps-exp">Поле заполнено, символы скрыты звёздочками</div>
+                  </div>
+                  <div class="steps-row">
+                    <div class="steps-num-cell">3</div>
+                    <div class="steps-cell steps-action">Нажать кнопку «Войти»</div>
+                    <div class="steps-cell steps-exp">Пользователь авторизован, перенаправлен на главную страницу. В хедере отображается имя пользователя.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span class="case-sec-label">Постусловие</span>
+                <div class="case-text-box">Пользователь находится на главной странице в авторизованном состоянии.</div>
+              </div>
+            </div>
+
+            <!-- Tab: Оригинал (hidden) -->
+            <div class="wb-content" id="tab-original" style="display:none;">
+              <div>
+                <div class="case-tc-title">Авторизация по email</div>
+                <div class="case-pills">
+                  <span class="case-pill pill-high">Высокий</span>
+                  <span class="case-pill pill-ok">Готов</span>
+                </div>
+              </div>
+              <div>
+                <span class="case-sec-label">Предусловие</span>
+                <div class="case-text-box">Пользователь зарегистрирован.</div>
+              </div>
+              <div>
+                <span class="case-sec-label">Шаги <span style="font-family:monospace;color:var(--tx-dim);font-weight:400;">3</span></span>
+                <div class="steps-tbl">
+                  <div class="steps-head">
+                    <div class="steps-th steps-th-num">#</div>
+                    <div class="steps-th">Действие</div>
+                    <div class="steps-th">Ожидаемый результат</div>
+                  </div>
+                  <div class="steps-row">
+                    <div class="steps-num-cell">1</div>
+                    <div class="steps-cell steps-action">Ввести email</div>
+                    <div class="steps-cell steps-exp"><span class="steps-empty">—</span></div>
+                  </div>
+                  <div class="steps-row">
+                    <div class="steps-num-cell">2</div>
+                    <div class="steps-cell steps-action">Ввести пароль</div>
+                    <div class="steps-cell steps-exp"><span class="steps-empty">—</span></div>
+                  </div>
+                  <div class="steps-row">
+                    <div class="steps-num-cell">3</div>
+                    <div class="steps-cell steps-action">Нажать «Войти»</div>
+                    <div class="steps-cell steps-exp">Пользователь авторизован</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab: Diff (hidden) -->
+            <div class="wb-content" id="tab-diff" style="display:none;">
+
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 8px;">
+                <span style="font-size:13px;font-weight:500;color:var(--tx-primary);">История изменений</span>
+                <div style="display:flex;gap:6px;">
+                  <span class="wb-metric wb-metric-ok" style="font-size:11px;">+4 добавлено</span>
+                  <span style="font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid rgba(3,105,161,0.2);background:rgba(3,105,161,0.07);color:#0369a1;">2 изменено</span>
+                </div>
+              </div>
+
+              <div>
+                <div class="diff-item diff-item-changed">
+                  <div class="diff-item-head">
+                    <span class="diff-type diff-type-chg">Изменено</span>
+                    <span class="diff-field">Название</span>
+                  </div>
+                  <div class="diff-compare">
+                    <div class="diff-before">Авторизация по email</div>
+                    <div class="diff-arr"><i data-lucide="arrow-right" style="width:13px;height:13px;"></i></div>
+                    <div class="diff-after">Авторизация пользователя по email и паролю</div>
+                  </div>
+                </div>
+
+                <div class="diff-item diff-item-changed">
+                  <div class="diff-item-head">
+                    <span class="diff-type diff-type-chg">Изменено</span>
+                    <span class="diff-field">Предусловие</span>
+                  </div>
+                  <div class="diff-compare">
+                    <div class="diff-before">Пользователь зарегистрирован.</div>
+                    <div class="diff-arr"><i data-lucide="arrow-right" style="width:13px;height:13px;"></i></div>
+                    <div class="diff-after">Пользователь зарегистрирован в системе с валидными email и паролем. Открыта страница входа /login.</div>
+                  </div>
+                </div>
+
+                <div class="diff-item diff-item-added">
+                  <div class="diff-item-head">
+                    <span class="diff-type diff-type-add">Добавлено</span>
+                    <span class="diff-field">Шаг 1 — Ожидаемый результат</span>
+                  </div>
+                  <div class="diff-added-text">Поле заполнено, введённое значение отображается корректно</div>
+                </div>
+
+                <div class="diff-item diff-item-added">
+                  <div class="diff-item-head">
+                    <span class="diff-type diff-type-add">Добавлено</span>
+                    <span class="diff-field">Шаг 2 — Ожидаемый результат</span>
+                  </div>
+                  <div class="diff-added-text">Поле заполнено, символы скрыты звёздочками</div>
+                </div>
+
+                <div class="diff-item diff-item-added">
+                  <div class="diff-item-head">
+                    <span class="diff-type diff-type-add">Добавлено</span>
+                    <span class="diff-field">Теги</span>
+                  </div>
+                  <div class="diff-added-text">security, smoke</div>
+                </div>
+
+                <div class="diff-item diff-item-added">
+                  <div class="diff-item-head">
+                    <span class="diff-type diff-type-add">Добавлено</span>
+                    <span class="diff-field">Постусловие</span>
+                  </div>
+                  <div class="diff-added-text">Пользователь находится на главной странице в авторизованном состоянии.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab: JSON (hidden) -->
+            <div class="wb-content" id="tab-json" style="display:none;">
+              <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;font-family:monospace;font-size:11px;color:var(--tx-secondary);line-height:18px;overflow-x:auto;">
+                <span style="color:var(--tx-dim);">{</span><br>
+                &nbsp;&nbsp;<span style="color:#0369a1;">"title"</span>: <span style="color:var(--ok);">"Авторизация пользователя по email и паролю"</span>,<br>
+                &nbsp;&nbsp;<span style="color:#0369a1;">"priority"</span>: <span style="color:var(--ok);">"high"</span>,<br>
+                &nbsp;&nbsp;<span style="color:#0369a1;">"tags"</span>: [<span style="color:var(--ok);">"auth"</span>, <span style="color:var(--ok);">"login"</span>, <span style="color:var(--ok);">"smoke"</span>, <span style="color:var(--ok);">"security"</span>],<br>
+                &nbsp;&nbsp;<span style="color:#0369a1;">"preconditions"</span>: <span style="color:var(--ok);">"Пользователь зарегистрирован..."</span>,<br>
+                &nbsp;&nbsp;<span style="color:#0369a1;">"steps"</span>: [<span style="color:var(--tx-dim);">...</span>]<br>
+                <span style="color:var(--tx-dim);">}</span>
+              </div>
+            </div>
+
+          </div><!-- /wb-main -->
+
+          <!-- Right: Review rail -->
+          <div class="rail-panel">
+            <div class="rail-head">
+              <span class="rail-title">AI Ревью</span>
+              <span class="rail-count">4</span>
+            </div>
+            <div class="rail-scroll">
+
+              <!-- Score card -->
+              <div class="score-card">
+                <div class="score-head">Оценка качества</div>
+                <div class="score-main">
+                  <div class="score-ring">
+                    <svg viewBox="0 0 56 56">
+                      <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(220,224,238,0.9)" stroke-width="5"/>
+                      <!-- 76% of 2π×22 ≈ 104.9 out of 138.2 -->
+                      <circle cx="28" cy="28" r="22" fill="none" stroke="#0369a1" stroke-width="5"
+                        stroke-dasharray="104.9 138.2" stroke-linecap="round"/>
+                    </svg>
+                    <div class="score-overlay">
+                      <span class="score-num">76</span>
+                      <span class="score-den">/100</span>
+                    </div>
+                  </div>
+                  <div class="score-copy">
+                    <span class="score-badge score-good">Хорошо</span>
+                    <div class="score-ctrs">
+                      <span class="score-ctr sctr-ok">
+                        <i data-lucide="check" style="width:11px;height:11px;stroke-width:2.5;"></i>
+                        3 решено
+                      </span>
+                      <span class="score-ctr sctr-warn">
+                        <i data-lucide="alert-triangle" style="width:11px;height:11px;"></i>
+                        1 вручную
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI summary -->
+              <div class="ai-summary">
+                <div class="ai-label">
+                  <i data-lucide="sparkles" style="width:11px;height:11px;"></i>
+                  AI Ревью
+                </div>
+                <div class="ai-text">Тест-кейс улучшен: добавлены ожидаемые результаты для всех шагов, уточнено предусловие, добавлен тег security. Рекомендуется вручную добавить тестовые данные (конкретный email/пароль).</div>
+              </div>
+
+              <!-- Issues: HIGH -->
+              <div>
+                <div class="issues-section-label isl-high">Критичные · 1</div>
+
+                <div class="issue-row">
+                  <div class="issue-dot idot-h"></div>
+                  <div class="issue-body">
+                    <div class="issue-title-text">Отсутствуют тестовые данные</div>
+                    <div class="issue-loc">Шаги 1–2 · test_data</div>
+                  </div>
+                  <span class="issue-badge ib-manual">Вручную</span>
+                </div>
+              </div>
+
+              <!-- Issues: MEDIUM -->
+              <div>
+                <div class="issues-section-label isl-medium">Средние · 2</div>
+
+                <div class="issue-row">
+                  <div class="issue-dot idot-m"></div>
+                  <div class="issue-body">
+                    <div class="issue-title-text">Нет ожидаемого результата в шагах</div>
+                    <div class="issue-loc">Шаги 1, 2</div>
+                  </div>
+                  <span class="issue-badge ib-resolved">Решено</span>
+                </div>
+
+                <div class="issue-row" style="margin-top:5px;">
+                  <div class="issue-dot idot-m"></div>
+                  <div class="issue-body">
+                    <div class="issue-title-text">Теги не указаны</div>
+                    <div class="issue-loc">Метаданные · tags</div>
+                  </div>
+                  <span class="issue-badge ib-resolved">Решено</span>
+                </div>
+              </div>
+
+              <!-- Issues: LOW -->
+              <div>
+                <div class="issues-section-label isl-low">Низкие · 1</div>
+
+                <div class="issue-row">
+                  <div class="issue-dot idot-l"></div>
+                  <div class="issue-body">
+                    <div class="issue-title-text">Предусловие слишком краткое</div>
+                    <div class="issue-loc">preconditions</div>
+                  </div>
+                  <span class="issue-badge ib-resolved">Решено</span>
+                </div>
+              </div>
+
+              <!-- Manual work banner -->
+              <div class="manual-banner">
+                <div class="mb-head">
+                  <i data-lucide="tool" style="width:13px;height:13px;"></i>
+                  Требует ручной работы
+                </div>
+                <div class="mb-item">
+                  <div class="mb-item-title">Добавить тестовые данные</div>
+                  <div class="mb-item-desc">Укажите конкретный email и пароль тестового пользователя в шагах 1–2.</div>
+                </div>
+              </div>
+
+              <!-- Draft card -->
+              <div class="draft-card">
+                <div class="draft-label">
+                  <i data-lucide="check-circle-2" style="width:13px;height:13px;"></i>
+                  Черновик создан в TestIT
+                </div>
+                <div class="draft-name">Авторизация пользователя по email и паролю</div>
+                <div class="draft-meta">
+                  <span class="draft-section-badge">AI Review / Черновики</span>
+                  <button class="draft-link">Открыть в TestIT →</button>
+                </div>
+              </div>
+
+            </div><!-- /rail-scroll -->
+          </div><!-- /rail-panel -->
+
+        </div><!-- /wb-grid -->
+
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+lucide.createIcons({ attrs: { 'stroke-width': '1.75', width: '16', height: '16' } });
+
+// fix sizes
+document.querySelectorAll('.source-hero-icon svg').forEach(s=>{s.setAttribute('width','18');s.setAttribute('height','18');});
+document.querySelectorAll('.source-fetch-btn svg,.source-fetch-btn-muted svg').forEach(s=>{s.setAttribute('width','14');s.setAttribute('height','14');});
+document.querySelectorAll('.alert-icon-err svg,.alert-icon-ok svg').forEach(s=>{s.setAttribute('width','15');s.setAttribute('height','15');});
+document.querySelectorAll('.slide-nav-btn svg').forEach(s=>{s.setAttribute('width','13');s.setAttribute('height','13');});
+document.querySelectorAll('.info-tag svg').forEach(s=>{s.setAttribute('width','10');s.setAttribute('height','10');});
+
+/* ── Dropdown ── */
+function toggleDropdown() {
+  const dd = document.getElementById('reviewDropdown');
+  const btn = document.getElementById('modeBtnMain');
+  const chevron = document.getElementById('modeBtnChevron');
+  const isOpen = dd.classList.contains('open');
+  dd.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  chevron.classList.toggle('open', !isOpen);
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.mode-btn-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const dd = document.getElementById('reviewDropdown');
+    const btn = document.getElementById('modeBtnMain');
+    const chevron = document.getElementById('modeBtnChevron');
+    if (dd) dd.classList.remove('open');
+    if (btn) btn.classList.remove('open');
+    if (chevron) chevron.classList.remove('open');
+  }
+});
+
+function selectPreset(el) {
+  document.querySelectorAll('.rd-preset').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  const label = el.dataset.label;
+  const count = el.dataset.count;
+  document.getElementById('modeBtnLabel').textContent = label;
+  const pill = document.getElementById('modeBtnPill');
+  if (count) {
+    pill.textContent = count + (count === '1' ? ' правило' : (count < 5 ? ' правила' : ' правил'));
+    pill.style.display = '';
+  } else {
+    pill.style.display = 'none';
+    updateCustomCount();
+    pill.style.display = '';
+  }
+}
+
+function updateCustomCount() {
+  const checked = document.querySelectorAll('.rd-rule .rd-cb.checked').length;
+  const pill = document.getElementById('modeBtnPill');
+  pill.textContent = checked + ' ' + (checked === 1 ? 'правило' : (checked < 5 ? 'правила' : 'правил'));
+}
+
+function toggleRule(el) {
+  const cb = el.querySelector('.rd-cb');
+  const isChecked = cb.classList.contains('checked');
+  cb.classList.toggle('checked', !isChecked);
+  el.classList.toggle('disabled', isChecked);
+  // if custom preset active — update count
+  const active = document.querySelector('.rd-preset.active');
+  if (active && active.dataset.preset === 'custom') updateCustomCount();
+}
+
+function applyMode() {
+  toggleDropdown();
+}
+
+function goSlide(n) {
+  document.querySelectorAll('.slide').forEach((s,i)=>{
+    s.classList.toggle('active', i+1===n);
+  });
+  [1,2,3].forEach(i=>{
+    const b=document.getElementById('btn'+i);
+    if(b) b.classList.toggle('current', i===n);
+  });
+}
+
+function switchWbTab(name, btn) {
+  ['original','improved','diff','json'].forEach(t=>{
+    const el=document.getElementById('tab-'+t);
+    if(el) el.style.display=(t===name?'flex':'none');
+  });
+  document.querySelectorAll('#wb-tabs .wb-tab').forEach(b=>{
+    b.classList.toggle('wb-tab-active', b===btn);
+  });
+}
+
+function toggleManual(btn) {
+  const chevron = btn.querySelector('.manual-panel-chevron');
+  const content = btn.nextElementSibling;
+  const isOpen = content.style.display !== 'none';
+  content.style.display = isOpen ? 'none' : 'block';
+  chevron.classList.toggle('open', !isOpen);
+}
+</script>
+</body>
+</html>

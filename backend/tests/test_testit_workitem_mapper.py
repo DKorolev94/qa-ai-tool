@@ -115,6 +115,41 @@ def test_status_dict():
     assert result.status == "In Review"
 
 
+def test_testit_metadata_exposed_for_ui_and_review():
+    wi = _basic_workitem()
+    wi.update(
+        {
+            "id": "workitem-uuid",
+            "globalId": 6110,
+            "versionId": "version-uuid",
+            "versionNumber": 3,
+            "projectId": "project-uuid",
+            "sectionId": "section-uuid",
+            "duration": 600000,
+            "medianDuration": 120000,
+            "links": [{"id": "link-1"}],
+            "parameters": [{"name": "email"}],
+            "externalIssues": [{"key": "BUG-1"}],
+            "attributes": {"custom-attr": ["value-1", "value-2"]},
+        }
+    )
+
+    result = normalize_testit_workitem(wi)
+
+    assert result.duration == 600000
+    assert result.display_duration == "10m"
+    assert result.attributes["uuid"] == "workitem-uuid"
+    assert result.attributes["globalId"] == 6110
+    assert result.attributes["projectId"] == "project-uuid"
+    assert result.attributes["sectionId"] == "section-uuid"
+    assert result.attributes["display_duration"] == "10m"
+    assert result.attributes["display_median_duration"] == "2m"
+    assert result.attributes["links_count"] == 1
+    assert result.attributes["parameters_count"] == 1
+    assert result.attributes["externalIssues_count"] == 1
+    assert result.attributes["custom-attr"] == ["value-1", "value-2"]
+
+
 def test_no_crash_on_empty_workitem():
     result = normalize_testit_workitem({})
     assert result is not None

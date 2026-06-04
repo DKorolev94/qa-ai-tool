@@ -10,21 +10,6 @@ interface ModeButtonProps {
   onApply: (presetId: string, rules: ReviewRuleId[]) => void
 }
 
-const SEVERITY_MAP: Record<string, 'critical' | 'medium' | 'low'> = {
-  structure: 'critical',
-  expected_results: 'critical',
-  test_data: 'medium',
-  atomicity: 'medium',
-  independence: 'medium',
-  requirement_traceability: 'medium',
-  tags: 'low',
-  duration: 'low',
-}
-
-function getSeverity(ruleId: string): 'critical' | 'medium' | 'low' {
-  return SEVERITY_MAP[ruleId] ?? 'medium'
-}
-
 export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply }: ModeButtonProps) {
   const [open, setOpen] = useState(false)
   const [localPreset, setLocalPreset] = useState(selectedPreset)
@@ -57,21 +42,18 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
     setOpen(false)
   }
 
-  function handleRulesApply(rules: ReviewRuleId[]) {
+  function handleRulesApply(presetId: string, rules: ReviewRuleId[]) {
     setLocalRules(rules)
-    setLocalPreset('custom')
-    onApply('custom', rules)
+    setLocalPreset(presetId)
+    onApply(presetId, rules)
     setRulesModalOpen(false)
   }
 
   const currentLabel = selectedPreset === 'custom'
-    ? 'Кастомный'
+    ? 'Свои настройки'
     : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Строгое ревью')
 
   const total = reviewConfig.rules.length
-  const criticalCount = localRules.filter(id => getSeverity(id) === 'critical').length
-  const mediumCount = localRules.filter(id => getSeverity(id) === 'medium').length
-  const lowCount = localRules.filter(id => getSeverity(id) === 'low').length
 
   return (
     <>
@@ -121,22 +103,6 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
               <div className="rd-summary-line">
                 Активно <strong>{localRules.length}</strong> из {total} правил
               </div>
-              <div className="rd-category-dots">
-                <span className="rd-cat-dot">
-                  <span className="rd-cat-dot-circle" style={{ background: '#D92D20' }} />
-                  Критичные {criticalCount}
-                </span>
-                <span style={{ color: 'var(--tx-dim)' }}>·</span>
-                <span className="rd-cat-dot">
-                  <span className="rd-cat-dot-circle" style={{ background: '#F59E0B' }} />
-                  Средние {mediumCount}
-                </span>
-                <span style={{ color: 'var(--tx-dim)' }}>·</span>
-                <span className="rd-cat-dot">
-                  <span className="rd-cat-dot-circle" style={{ background: '#60A5FA' }} />
-                  Низкие {lowCount}
-                </span>
-              </div>
             </div>
 
             <div className="rd-footer">
@@ -156,6 +122,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
       {rulesModalOpen && (
         <RulesModal
           reviewConfig={reviewConfig}
+          selectedPreset={localPreset}
           enabledRules={localRules}
           onApply={handleRulesApply}
           onClose={() => setRulesModalOpen(false)}

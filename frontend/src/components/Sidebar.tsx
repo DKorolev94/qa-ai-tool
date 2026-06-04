@@ -1,12 +1,13 @@
-import { FileCheck2, Sparkles, Zap, Settings, PanelLeftClose } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileCheck2, Sparkles, Zap, Settings } from 'lucide-react'
 
 interface SidebarProps {
+  collapsed: boolean
   onToggle: () => void
 }
 
-export function Sidebar({ onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' sb-collapsed' : ''}`}>
       <div className="sb-logo">
         <div className="sb-mark"><span>QA</span></div>
         <div className="sb-brand">
@@ -44,12 +45,18 @@ export function Sidebar({ onToggle }: SidebarProps) {
       </nav>
       <div className="sb-divider" />
       <div className="sb-bottom">
-        <div className="sb-item">
+        <div className="sb-item sb-item-soon">
           <div className="sb-icon"><Settings size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy"><span className="sb-title">Настройки</span></div>
+          <span className="sb-badge">Скоро</span>
         </div>
         <button type="button" className="sb-item" onClick={onToggle}>
-          <div className="sb-icon"><PanelLeftClose size={16} strokeWidth={1.75} /></div>
+          <div className="sb-icon">
+            {collapsed
+              ? <ChevronRight size={16} strokeWidth={1.75} />
+              : <ChevronLeft size={16} strokeWidth={1.75} />
+            }
+          </div>
           <div className="sb-copy"><span className="sb-title">Свернуть</span></div>
         </button>
       </div>

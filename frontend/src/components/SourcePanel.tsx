@@ -51,7 +51,7 @@ export function SourcePanel({
           <div className="tms-card tms-card-active">
             <div className="tms-icon">
               <img
-                src="https://docs.testit.software/images/testit_logo_icon_blue.png"
+                src="/icons/testit.png"
                 width={20} height={20} alt="TestIT"
                 style={{ objectFit: 'contain' }}
               />
@@ -60,9 +60,9 @@ export function SourcePanel({
             <span className="tms-state tms-state-ok">Доступно</span>
           </div>
           {([
-            { name: 'TestRail', src: 'https://codaio.imgix.net/packs/21236/unversioned/assets/LOGO/ba1091c59bab89cd2fd0f289622731fe16113d7b00905abe64759c313a4b73b76c1b0426076ed76cb74752234c734131df46992d5b8b48fc13e264240e4f7119f736cfeb64df36ded54b5cbf6198b9cadedf18dd0cac5c7dbcd16e6336c29363cd1292ba' },
-            { name: 'Allure TestOps', src: 'https://img.stackshare.io/service/40438/default_a9d9f8f8546d65b5f12a32106e6d03e6921e11fa.png' },
-            { name: 'Zephyr', src: 'https://www.testingtoolsguide.net/wp-content/uploads/2016/11/zephyr.jpg' },
+            { name: 'TestRail', src: '/icons/testrail.png' },
+            { name: 'Allure TestOps', src: '/icons/allure.png' },
+            { name: 'Zephyr', src: '/icons/zephyr.png' },
           ] as const).map(tms => (
             <div key={tms.name} className="tms-card tms-card-disabled">
               <div className="tms-icon">

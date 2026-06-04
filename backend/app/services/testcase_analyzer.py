@@ -75,6 +75,7 @@ def analyze_raw_testcase(
     raw_content: str | None,
     work_item: dict | None,
     source_type: str = "testit",
+    enabled_rules: list[str] | None = None,
 ) -> AnalyzeTestCaseResponse:
     if raw_content is None and work_item is None:
         raise ValueError("Provide raw_content or work_item")
@@ -85,7 +86,10 @@ def analyze_raw_testcase(
         normalized = parse_testit_content(raw_content)  # type: ignore[arg-type]
 
     clean_dict = normalized.model_dump()
-    llm_result: ReviewResult = analyze_testcase_with_llm(clean_dict, source_type=source_type)
+    llm_result: ReviewResult = analyze_testcase_with_llm(
+        clean_dict,
+        enabled_rules=enabled_rules,
+    )
 
     parse_warnings = normalized.warnings or []
     all_warnings = list(dict.fromkeys(parse_warnings + llm_result.warnings))

@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gemma3:4b"
     LLM_API_KEY: str = "ollama"
     LLM_TEMPERATURE: float = 0.2
+    LLM_TEMPERATURE_REVIEW: float | None = None
+    LLM_TEMPERATURE_IMPROVE: float | None = None
+    LLM_TIMEOUT_SECONDS: int = 120
 
     TESTIT_BASE_URL: str = ""
     TESTIT_PRIVATE_TOKEN: str = ""
