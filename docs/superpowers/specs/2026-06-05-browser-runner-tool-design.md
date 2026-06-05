@@ -5,9 +5,28 @@ Status: Approved
 
 ## Goal
 
-Add a standalone "Browser Runner" tool to qa-ai-tool that lets a user enter a TestIT test case ID, automatically fetches and formats it, sends it to the browser-use runner, and displays the result (passed / failed / blocked) with a screenshot gallery.
+Add a standalone "Browser Runner" tool to qa-ai-tool. User enters a TestIT test case ID → backend fetches and formats it → sends to browser-use runner → UI shows result (passed / failed / blocked) + screenshot gallery.
 
-The browser-use runner (`browser-use-qa`) remains an independent service. qa-ai-tool is one of its clients — alongside n8n. When the runner moves to a remote machine, only `RUNNER_URL` in `.env` changes.
+The runner code moves from `browser-use-qa` into this repo as `runner/` — a separate service with its own dependencies. Runner supports multiple LLM providers: DeepSeek, OpenAI, Claude, Ollama.
+
+---
+
+## Repository Structure
+
+```
+qa-ai-tool/
+  backend/          ← existing FastAPI :8000 (unchanged deps)
+  runner/           ← browser-use runner :8008 (own pyproject.toml, own venv)
+    main.py
+    views.py
+    llm_factory.py  ← NEW: provider-agnostic LLM factory
+    .env.example
+    start.sh
+    pyproject.toml
+  frontend/         ← existing Vite/React
+```
+
+Runner is a separate process. `backend/` calls it via HTTP (`RUNNER_URL`). When runner moves to a remote machine — only `RUNNER_URL` in `backend/.env` changes.
 
 ---
 
@@ -21,7 +40,7 @@ Sidebar → "Browser Runner" tab
   → UI: result card
       - status badge: PASSED / FAILED / BLOCKED
       - summary text
-      - steps_count
+      - steps_count + duration
       - errors list (if any)
       - screenshot gallery (thumbnails → click for full size)
 ```
@@ -37,32 +56,77 @@ Frontend (RunnerView.tsx)
 qa-ai-tool backend (runner_service.py)
   1. fetch_and_normalize_work_item(work_item_id)   ← reuse existing
   2. build_runner_request(testcase) → RunRequest
-  3. httpx.post(RUNNER_URL + "/run", json=..., timeout=180)
+  3. httpx.AsyncClient.post(RUNNER_URL + "/run", timeout=180s)
         ↓
-browser-use runner (:8008)
-  → browser agent runs test → returns RunResponse
+runner/ service (:8008)
+  → llm_factory creates LLM by provider
+  → browser-use Agent runs test
+  → returns RunResponse
         ↓
 qa-ai-tool backend
+  → maps screenshots to /api/runner/screenshot?path=...
   → returns RunnerRunResponse to frontend
 
 GET /api/runner/screenshot?path=<abs_path>
-  → backend reads file from FS → returns image/*
-  (runner and qa-ai-tool share local filesystem when running on same host)
+  → backend reads file from shared FS → returns image/*
 ```
 
 ---
 
-## Backend Changes
+## Runner Changes
 
-### New file: `app/services/runner_service.py`
+### New file: `runner/llm_factory.py`
 
-Responsibility: build `RunRequest` from a normalized `TestCase`.
+Creates LLM client for browser-use based on `LLM_PROVIDER` env var.
 
-- Formats preconditions as "Before starting:" block
-- Formats steps as numbered list: `N. {action}\n   Expected: {expected}`
-- Extracts first `http(s)://` URL from preconditions or steps as `start_url`
-- Wraps everything in a QA-agent system prompt
-- Calls `httpx.AsyncClient.post(RUNNER_URL/run, ...)` with `timeout=180`
+```python
+# LLM_PROVIDER=deepseek  → browser_use.llm.ChatDeepSeek (existing)
+# LLM_PROVIDER=openai    → langchain_openai.ChatOpenAI
+# LLM_PROVIDER=claude    → langchain_anthropic.ChatAnthropic
+# LLM_PROVIDER=ollama    → langchain_ollama.ChatOllama
+```
+
+### `runner/.env.example` additions
+
+```
+LLM_PROVIDER=deepseek          # deepseek | openai | claude | ollama
+
+# DeepSeek
+DEEPSEEK_API_KEY=
+
+# OpenAI
+OPENAI_API_KEY=
+# OPENAI_BASE_URL=             # optional: custom endpoint
+
+# Claude
+ANTHROPIC_API_KEY=
+
+# Ollama (local, no key needed)
+OLLAMA_BASE_URL=http://localhost:11434
+
+RUNNER_LLM_MODEL=deepseek-chat # model name for selected provider
+```
+
+### `runner/main.py`
+
+Replace hardcoded `DeepSeekWithUsage(...)` with `llm_factory.create_llm()`.
+
+### `runner/pyproject.toml`
+
+Add optional deps:
+```toml
+[project.optional-dependencies]
+openai   = ["langchain-openai"]
+claude   = ["langchain-anthropic"]
+ollama   = ["langchain-ollama"]
+all      = ["langchain-openai", "langchain-anthropic", "langchain-ollama"]
+```
+
+Core deps include `browser-use`, `fastapi`, `uvicorn`, `httpx`, `python-dotenv`.
+
+---
+
+## Backend Changes (qa-ai-tool/backend/)
 
 ### New file: `app/schemas/runner.py`
 
@@ -84,24 +148,32 @@ class RunnerRunResponse(BaseModel):
     run_id: str | None
 ```
 
+### New file: `app/services/runner_service.py`
+
+- Builds task prompt from `TestCase` (see Prompt Format below)
+- Extracts `start_url` from preconditions/steps (first `http(s)://` URL)
+- Calls runner via httpx, maps response to `RunnerRunResponse`
+- Maps `screenshot_paths` from RunResponse to `RunnerScreenshot` list with URLs
+
 ### Config: `app/core/config.py`
 
-Add `RUNNER_URL: str = "http://localhost:8008"` — read from `.env`.  
-Add `RUNNER_TIMEOUT_SEC: int = 180`.  
-Add `RUNNER_RUNS_DIR: str = ""` — absolute path to runner's `runs/` dir on local FS (empty = screenshot serving disabled).
+```python
+RUNNER_URL: str = "http://localhost:8008"
+RUNNER_TIMEOUT_SEC: int = 180
+RUNNER_RUNS_DIR: str = ""  # abs path to runner/runs/ on local FS; empty = screenshots disabled
+```
 
 ### New routes in `app/api/routes.py`
 
 ```
 POST /api/runner/run
-  body: RunnerStartRequest
+  body: RunnerStartRequest { work_item_id }
   → runner_service.run_test_case(work_item_id)
   → RunnerRunResponse
 
-GET /api/runner/screenshot
-  query: path (absolute path on FS)
-  → FileResponse / StreamingResponse with image content-type
-  Security: validate path starts with runner runs dir (no path traversal)
+GET /api/runner/screenshot?path=<abs_path>
+  → validates path starts with RUNNER_RUNS_DIR (path traversal guard)
+  → FileResponse with image content-type
 ```
 
 ---
@@ -110,51 +182,51 @@ GET /api/runner/screenshot
 
 ### New component: `src/components/RunnerView.tsx`
 
-States:
-- **idle**: input field + "Запустить" button
-- **loading**: spinner + `useEffect` timer updating every second, elapsed display `"1:23..."`
-- **result**: result card
+States: idle → loading → result
 
-Result card layout:
 ```
-┌─────────────────────────────────┐
-│  ● PASSED                       │  ← colored badge
-│  "Все шаги выполнены успешно"   │  ← summary
-│  12 шагов · 1м 47с              │  ← steps + duration
-└─────────────────────────────────┘
-│  Скриншоты (6)                  │
-│  [img][img][img][img][img][img]  │  ← thumbnails
-└─────────────────────────────────┘
+[idle]
+  ┌──────────────────────────────┐
+  │ TestIT ID: [_______] [Run]  │
+  └──────────────────────────────┘
+
+[loading]
+  spinner  "Агент работает... 1:23"
+
+[result]
+  ┌─────────────────────────────────┐
+  │  ● PASSED                       │  ← green / red / yellow badge
+  │  "Все шаги выполнены успешно"   │
+  │  12 шагов · 1м 47с              │
+  └─────────────────────────────────┘
+  [errors block — only if errors.length > 0]
+  ┌─────────────────────────────────┐
+  │  Скриншоты (6)                  │
+  │  [img][img][img][img][img][img]  │  thumbnails
+  └─────────────────────────────────┘
+  [click thumbnail → full-size overlay modal]
 ```
-
-Errors block shown only when `errors.length > 0`.
-
-Screenshot modal: click thumbnail → overlay with full-size image.
 
 ### Sidebar: `src/components/Sidebar.tsx`
 
-Add new nav item: icon `Play` (lucide), label "Browser Runner".  
-App-level routing: `tool: 'review' | 'runner'` state in `App.tsx`.
+New nav item: lucide icon `MonitorPlay`, label "Browser Runner".
 
-### API: `src/api.ts`
+### App.tsx
+
+Add `tool: 'review' | 'runner'` state. Render `RunnerView` when `tool === 'runner'`.
+
+### `src/api.ts`
 
 ```typescript
 runTestCase: (work_item_id: string) =>
   post<RunnerRunResponse>('/runner/run', { work_item_id }),
 ```
 
-Screenshot URLs: returned by backend as `/api/runner/screenshot?path=...` — fetched directly as `<img src="...">`.
-
-### Types: `src/types.ts`
+### `src/types.ts`
 
 ```typescript
 export type RunnerStatus = 'passed' | 'failed' | 'blocked'
-
-export interface RunnerScreenshot {
-  path: string
-  url: string
-}
-
+export interface RunnerScreenshot { path: string; url: string }
 export interface RunnerRunResponse {
   status: RunnerStatus
   summary: string
@@ -179,7 +251,7 @@ precondition or environment issue).
 Test case: {title}
 
 Preconditions:
-{preconditions or "None"}
+{preconditions_text or "None"}
 
 Steps:
 1. {action}
@@ -189,22 +261,21 @@ Steps:
 Report: passed / failed / blocked, with a short summary of what you observed.
 ```
 
-`start_url` — first `https?://` match in preconditions text or step actions.  
-If no URL found → `start_url=None` (runner will infer from task text).
+`start_url` — first `https?://` match scanning preconditions then step actions.  
+If none found → `start_url=None` (runner infers from task text).
 
 ---
 
 ## Security
 
-- `GET /api/runner/screenshot?path=` validates path starts with `{RUNNER_RUNS_DIR}` (configurable, e.g. `/home/dmitriy/projects/browser-use-qa/runner/runs`). Reject anything outside.
-- Runner URL is backend-only config — not exposed to frontend.
+- `GET /api/runner/screenshot?path=` rejects any path not starting with `RUNNER_RUNS_DIR`. Returns 403 if outside.
+- `RUNNER_URL` is backend-only config, never sent to frontend.
 
 ---
 
 ## Out of Scope (Phase 2+)
 
-- Live browser stream during run (CDP screenshots polling)
+- Live browser stream during run (CDP screenshot polling)
 - Cancel running test
 - Run history / list of past runs
-- Multi-step progress updates (runner currently has no streaming endpoint)
 - Remote runner authentication
