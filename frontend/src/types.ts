@@ -182,3 +182,20 @@ export interface Section {
   id: string
   name: string
 }
+
+export type RunnerStatus = 'passed' | 'failed' | 'blocked'
+
+export interface RunnerScreenshot {
+  path: string
+  url: string
+}
+
+export interface RunnerRunResponse {
+  status: RunnerStatus
+  summary: string
+  steps_count: number
+  errors: string[]
+  screenshots: RunnerScreenshot[]
+  duration_sec: number
+  run_id: string | null
+}

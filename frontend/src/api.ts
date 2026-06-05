@@ -1,4 +1,4 @@
-import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId } from './types'
+import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId, RunnerRunResponse } from './types'
 
 const BASE = '/api'
 
@@ -58,6 +58,9 @@ export const api = {
     source_work_item_id: string
     source_attributes: Record<string, unknown>
   }) => post<ApplyResult>('/testit/workitem/update-original', body),
+
+  runTestCase: (work_item_id: string) =>
+    post<RunnerRunResponse>('/runner/run', { work_item_id }),
 }
 
 export function parseManualInput(raw: string): { work_item?: unknown; raw_content?: string } {
