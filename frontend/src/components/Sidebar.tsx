@@ -1,11 +1,15 @@
-import { ChevronLeft, ChevronRight, FileCheck2, Sparkles, Zap, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileCheck2, MonitorPlay, Sparkles, Zap, Settings } from 'lucide-react'
+
+type Tool = 'review' | 'runner'
 
 interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
+  activeTool: Tool
+  onToolChange: (tool: Tool) => void
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: SidebarProps) {
   return (
     <aside className={`sidebar${collapsed ? ' sb-collapsed' : ''}`}>
       <div className="sb-logo">
@@ -19,11 +23,26 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         <span className="sb-section-label">Инструменты</span>
       </div>
       <nav className="sb-nav">
-        <div className="sb-item sb-item-active">
+        <div
+          className={`sb-item${activeTool === 'review' ? ' sb-item-active' : ''}`}
+          onClick={() => onToolChange('review')}
+          style={{ cursor: 'pointer' }}
+        >
           <div className="sb-icon"><FileCheck2 size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy">
             <span className="sb-title">Ревью и улучшение</span>
             <span className="sb-sub">тест-кейсов</span>
+          </div>
+        </div>
+        <div
+          className={`sb-item${activeTool === 'runner' ? ' sb-item-active' : ''}`}
+          onClick={() => onToolChange('runner')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="sb-icon"><MonitorPlay size={16} strokeWidth={1.75} /></div>
+          <div className="sb-copy">
+            <span className="sb-title">Browser Runner</span>
+            <span className="sb-sub">запуск тест-кейсов</span>
           </div>
         </div>
         <div className="sb-item sb-item-soon">

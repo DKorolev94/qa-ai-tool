@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, humanizeFetchError } from './api'
 import { Sidebar } from './components/Sidebar'
+import { RunnerView } from './components/RunnerView'
 import { ModeButton } from './components/ModeButton'
 import { SourcePanel } from './components/SourcePanel'
 import { Workbench } from './components/Workbench'
@@ -41,6 +42,7 @@ export default function App() {
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activeTool, setActiveTool] = useState<'review' | 'runner'>('review')
 
   useEffect(() => {
     api.getReviewConfig()
@@ -79,12 +81,36 @@ export default function App() {
     ? 'Свои настройки'
     : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Строгое ревью')
 
+  if (activeTool === 'runner') {
+    return (
+      <>
+        <ProgressBar active={false} />
+        <div className="app">
+          <Sidebar
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(v => !v)}
+            activeTool={activeTool}
+            onToolChange={tool => { setActiveTool(tool); setFetchResult(null); setFetchError(null) }}
+          />
+          <main className="workspace">
+            <RunnerView />
+          </main>
+        </div>
+      </>
+    )
+  }
+
   if (fetchResult) {
     return (
       <>
         <ProgressBar active={false} />
         <div className="app">
-          <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(v => !v)} />
+          <Sidebar
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(v => !v)}
+            activeTool={activeTool}
+            onToolChange={tool => { setActiveTool(tool); setFetchResult(null); setFetchError(null) }}
+          />
           <main className="workspace workspace-wb">
             <Workbench
             fetchResult={fetchResult}
@@ -104,7 +130,12 @@ export default function App() {
     <>
       <ProgressBar active={fetchLoading} />
       <div className="app">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(v => !v)} />
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(v => !v)}
+          activeTool={activeTool}
+          onToolChange={tool => { setActiveTool(tool); setFetchResult(null); setFetchError(null) }}
+        />
       <main className="workspace">
         <div className="workspace-inner">
           <div className="workspace-col">
