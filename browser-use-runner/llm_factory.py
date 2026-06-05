@@ -69,15 +69,15 @@ def create_llm(model: str, llm_timeout_sec: int = 90) -> Any:
         return DeepSeekWithUsage(model=model, api_key=api_key, timeout=llm_timeout_sec + 15)
 
     if provider == 'openai':
-        from langchain_openai import ChatOpenAI
+        from browser_use.llm.openai.chat import ChatOpenAI as BrowserUseOpenAI
         api_key = os.getenv('OPENAI_API_KEY', '')
         if not api_key:
             raise RuntimeError('OPENAI_API_KEY is not set')
-        kwargs: dict[str, Any] = {'model': model, 'api_key': api_key, 'timeout': llm_timeout_sec}
+        kwargs: dict[str, Any] = {'model': model, 'api_key': api_key}
         base_url = os.getenv('OPENAI_BASE_URL')
         if base_url:
             kwargs['base_url'] = base_url
-        return ChatOpenAI(**kwargs)
+        return BrowserUseOpenAI(**kwargs)
 
     if provider == 'claude':
         from langchain_anthropic import ChatAnthropic
