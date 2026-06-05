@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import pathlib
+import httpx
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 from app.integrations.testit_client import (
     TestItApiError,
@@ -34,6 +37,9 @@ from app.services.testcase_improver import improve_testcase
 from app.services.testit_draft_service import create_draft_in_testit
 from app.services.testit_workitem_service import fetch_and_normalize_work_item
 from app.services.testit_update_service import apply_to_original_in_testit
+from app.schemas.runner import RunnerStartRequest, RunnerRunResponse
+from app.services import runner_service
+from app.core.config import settings
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -154,3 +160,37 @@ async def update_testit_original(body: UpdateOriginalRequest) -> UpdateOriginalR
         raise HTTPException(status_code=502, detail=str(exc))
     except TestItApiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/runner/run", response_model=RunnerRunResponse)
+async def runner_run(body: RunnerStartRequest) -> RunnerRunResponse:
+    try:
+        return await runner_service.run_test_case(body)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Runner timeout — test took too long")
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"Runner error: {exc.response.text[:300]}")
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
+    except (TestItNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except TestItConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.get("/runner/screenshot")
+async def runner_screenshot(path: str) -> FileResponse:
+    runs_dir = settings.RUNNER_RUNS_DIR
+    if not runs_dir:
+        raise HTTPException(status_code=503, detail="Screenshot serving not configured (RUNNER_RUNS_DIR not set)")
+
+    runs_root = pathlib.Path(runs_dir).resolve()
+    target = pathlib.Path(path).resolve()
+
+    if not str(target).startswith(str(runs_root)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Screenshot not found")
+
+    return FileResponse(str(target))
