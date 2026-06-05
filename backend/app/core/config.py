@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     TESTIT_PROJECT_UUID: str = ""
     TESTIT_DRAFT_SECTION_UUID: str = ""
 
+    RUNNER_URL: str = "http://localhost:8008"
+    RUNNER_TIMEOUT_SEC: int = 180
+    RUNNER_RUNS_DIR: str = ""
+
     @field_validator("TESTIT_BASE_URL", mode="after")
     @classmethod
     def strip_trailing_slash(cls, v: str) -> str:
