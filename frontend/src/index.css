@@ -1355,3 +1355,15 @@ body { padding: 20px; }
 .action-toast-close:hover { background: var(--bg-hover); color: var(--tx-secondary); }
 .action-toast--partial { border-color: rgba(3,105,161,0.25); }
 .action-toast--partial .action-toast-icon { color: #0369a1; }
+
+/* ── Runner tool ────────────────────────────────────────── */
+.runner-result-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.runner-result-card-err {
+  border-color: var(--bad-border);
+  background: var(--bad-bg);
+}
