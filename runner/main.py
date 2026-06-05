@@ -18,8 +18,6 @@ from fastapi import FastAPI, HTTPException
 
 from browser_use import Agent, Browser
 from browser_use.browser.events import NavigateToUrlEvent as BrowserNavigateToUrlEvent
-from browser_use.llm import ChatDeepSeek
-from browser_use.llm.views import ChatInvokeUsage
 import browser_use.tools.service as browser_tools_service
 from views import (
     ArtifactReport,
@@ -47,59 +45,6 @@ async def _lifespan(_app: FastAPI):
 app = FastAPI(title='Browser-Use Runner', version='0.1.0', lifespan=_lifespan)
 logger = logging.getLogger('browser_use_runner')
 URL_RE = re.compile(r'https?://[^\s)\]}>"\']+')
-
-
-class _DeepSeekCompletionsCapture:
-    """Wraps completions.create to capture the raw API response for usage extraction."""
-
-    def __init__(self, completions: Any, on_response: Any) -> None:
-        self._completions = completions
-        self._on_response = on_response
-
-    async def create(self, *args: Any, **kwargs: Any) -> Any:
-        response = await self._completions.create(*args, **kwargs)
-        self._on_response(response)
-        return response
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._completions, name)
-
-
-class DeepSeekWithUsage(ChatDeepSeek):
-    def _usage_from_response(self, response: Any) -> ChatInvokeUsage | None:
-        usage = getattr(response, 'usage', None)
-        if usage is None:
-            return None
-        prompt_tokens = int(getattr(usage, 'prompt_tokens', 0) or 0)
-        completion_tokens = int(getattr(usage, 'completion_tokens', 0) or 0)
-        total_tokens = int(getattr(usage, 'total_tokens', 0) or 0) or prompt_tokens + completion_tokens
-        prompt_details = getattr(usage, 'prompt_tokens_details', None)
-        cached_tokens = getattr(prompt_details, 'cached_tokens', None) if prompt_details is not None else None
-        return ChatInvokeUsage(
-            prompt_tokens=prompt_tokens,
-            prompt_cached_tokens=cached_tokens,
-            prompt_cache_creation_tokens=None,
-            prompt_image_tokens=None,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-        )
-
-    def _client(self) -> Any:
-        client = super()._client()
-        if not isinstance(client.chat.completions, _DeepSeekCompletionsCapture):
-            client.chat.completions = _DeepSeekCompletionsCapture(
-                client.chat.completions,
-                lambda r: object.__setattr__(self, '_last_raw_response', r),
-            )
-        return client
-
-    async def ainvoke(self, *args: Any, **kwargs: Any) -> Any:
-        object.__setattr__(self, '_last_raw_response', None)
-        result = await super().ainvoke(*args, **kwargs)
-        captured = getattr(self, '_last_raw_response', None)
-        if result.usage is None and captured is not None:
-            result.usage = self._usage_from_response(captured)
-        return result
 
 
 @app.get('/health')
@@ -320,16 +265,14 @@ def _configure_browser_globals() -> None:
     browser_tools_service.NavigateToUrlEvent = _navigate_event
 
 
-def create_llm(request: RunRequest) -> ChatDeepSeek:
-    api_key = os.getenv('DEEPSEEK_API_KEY', '')
-    if not api_key:
-        raise HTTPException(status_code=500, detail='DEEPSEEK_API_KEY is not set for runner service.')
+from llm_factory import create_llm as _create_llm_for_provider
 
-    return DeepSeekWithUsage(
-        model=request.llm.model,
-        api_key=api_key,
-        timeout=request.llm_timeout_sec + 15,
-    )
+
+def create_llm(request: RunRequest) -> Any:
+    try:
+        return _create_llm_for_provider(request.llm.model, request.llm_timeout_sec)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 def create_browser(request: RunRequest) -> Browser:
