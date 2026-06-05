@@ -73,7 +73,7 @@ def create_llm(model: str, llm_timeout_sec: int = 90) -> Any:
         api_key = os.getenv('OPENAI_API_KEY', '')
         if not api_key:
             raise RuntimeError('OPENAI_API_KEY is not set')
-        kwargs: dict[str, Any] = {'model': model, 'api_key': api_key}
+        kwargs: dict[str, Any] = {'model': model, 'api_key': api_key, 'timeout': llm_timeout_sec}
         base_url = os.getenv('OPENAI_BASE_URL')
         if base_url:
             kwargs['base_url'] = base_url
@@ -84,7 +84,7 @@ def create_llm(model: str, llm_timeout_sec: int = 90) -> Any:
         api_key = os.getenv('ANTHROPIC_API_KEY', '')
         if not api_key:
             raise RuntimeError('ANTHROPIC_API_KEY is not set')
-        return ChatAnthropic(model=model, api_key=api_key)
+        return ChatAnthropic(model=model, api_key=api_key, timeout=llm_timeout_sec)
 
     if provider == 'ollama':
         from langchain_ollama import ChatOllama
