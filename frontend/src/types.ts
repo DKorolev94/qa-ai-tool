@@ -184,6 +184,69 @@ export interface Section {
 }
 
 export type RunnerStatus = 'passed' | 'failed' | 'blocked'
+export type RunnerSessionStatus = 'running' | RunnerStatus
+
+// WebSocket streaming events
+export interface WsStepEvent {
+  type: 'step'
+  step: number
+  url: string
+  title: string
+  next_goal: string
+  screenshot_b64?: string
+  elapsed_sec: number
+}
+export interface WsDoneEvent {
+  type: 'done'
+  status: RunnerStatus
+  summary: string
+  duration_sec: number
+  steps_count: number
+  errors: string[]
+  run_id: string | null
+}
+export interface WsErrorEvent {
+  type: 'error'
+  message: string
+}
+export type WsEvent = WsStepEvent | WsDoneEvent | WsErrorEvent
+
+// Historical session from /api/runner/sessions
+export interface SessionListItem {
+  run_id: string
+  test_case_id: string | null
+  status: RunnerStatus
+  duration_sec: number
+  steps_count: number
+  created_at: string
+}
+
+// Step from /api/runner/sessions/{run_id}/steps
+export interface HistoricalStep {
+  step: number
+  status: 'ok' | 'error'
+  summary: string
+  url: string | null
+  duration_sec: number | null
+  screenshot?: {
+    path: string
+    url?: string
+    size_bytes: number
+  } | null
+}
+
+export interface RunnerSession {
+  id: string
+  title: string
+  source: 'manual' | 'testit'
+  task?: string
+  startUrl?: string
+  workItemId?: string
+  status: RunnerSessionStatus
+  result?: RunnerRunResponse
+  startedAt: number
+  endedAt?: number
+}
 
 export interface RunnerScreenshot {
   path: string
@@ -198,4 +261,15 @@ export interface RunnerRunResponse {
   screenshots: RunnerScreenshot[]
   duration_sec: number
   run_id: string | null
+}
+
+export interface AuditSession {
+  id: string
+  title: string
+  task: string
+  startUrl?: string
+  status: RunnerSessionStatus
+  result?: RunnerRunResponse
+  startedAt: number
+  endedAt?: number
 }

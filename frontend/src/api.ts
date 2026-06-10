@@ -1,4 +1,4 @@
-import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId, RunnerRunResponse } from './types'
+import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, HistoricalStep, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId, RunnerRunResponse, SessionListItem } from './types'
 
 const BASE = '/api'
 
@@ -61,6 +61,30 @@ export const api = {
 
   runTestCase: (work_item_id: string) =>
     post<RunnerRunResponse>('/runner/run', { work_item_id }),
+
+  runManual: (body: { task: string; start_url?: string; test_case_id?: string }) =>
+    post<RunnerRunResponse>('/runner/run-manual', body),
+
+  startManualStreaming: (body: { task: string; start_url?: string }) =>
+    post<{ run_id: string }>('/runner/start-manual', body),
+
+  startTestItStreaming: (work_item_id: string) =>
+    post<{ run_id: string }>('/runner/start-testit', { work_item_id }),
+
+  listSessions: () =>
+    get<{ sessions: SessionListItem[] }>('/runner/sessions'),
+
+  getSessionSteps: (runId: string) =>
+    get<{ steps: HistoricalStep[] }>(`/runner/sessions/${runId}/steps`),
+
+  startAuditStreaming: (body: { task: string; start_url?: string }) =>
+    post<{ run_id: string }>('/audit/start', body),
+
+  listAuditSessions: () =>
+    get<{ sessions: SessionListItem[] }>('/audit/sessions'),
+
+  getAuditSessionSteps: (runId: string) =>
+    get<{ steps: HistoricalStep[] }>(`/audit/sessions/${runId}/steps`),
 }
 
 export function parseManualInput(raw: string): { work_item?: unknown; raw_content?: string } {
