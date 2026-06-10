@@ -39,7 +39,7 @@ function AuditListItem({
 // ── Input screen ──────────────────────────────────────────────────────────
 
 interface InputScreenProps {
-  onStart: (session: AuditSession) => void
+  onStart: (session: AuditSession) => Promise<void>
 }
 
 function InputScreen({ onStart }: InputScreenProps) {
@@ -60,7 +60,7 @@ function InputScreen({ onStart }: InputScreenProps) {
     setError(null)
     try {
       const session = mkAudit(task.trim(), startUrl.trim() || undefined)
-      onStart(session)
+      await onStart(session)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -160,17 +160,13 @@ export function AuditView() {
   const [activeSession, setActiveSession] = useState<AuditSession | null>(null)
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
 
-  async function handleStart(session: AuditSession) {
-    try {
-      const { run_id } = await api.startAuditStreaming({
-        task: session.task,
-        start_url: session.startUrl,
-      })
-      setActiveSession({ ...session, id: run_id })
-      setActiveRunId(run_id)
-    } catch (err) {
-      console.error('Audit start failed:', err)
-    }
+  async function handleStart(session: AuditSession): Promise<void> {
+    const { run_id } = await api.startAuditStreaming({
+      task: session.task,
+      start_url: session.startUrl,
+    })
+    setActiveSession({ ...session, id: run_id })
+    setActiveRunId(run_id)
   }
 
   function handleDone(result: RunnerRunResponse) {
