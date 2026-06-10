@@ -65,11 +65,13 @@ export async function runTask(req: RunRequest, onStep: OnStep): Promise<RunResul
       const nextAction = observations[0]
       const actionDesc: string = nextAction.description ?? String(nextAction)
 
+      let actError = false
       try {
         await page.act({ action: actionDesc })
       } catch (err) {
         const msg = `Step ${stepNum}: ${String(err)}`
         errors.push(msg)
+        actError = true
       }
 
       const screenshotBuf = await page.screenshot({ type: 'png' }).catch(() => Buffer.alloc(0))
@@ -78,7 +80,7 @@ export async function runTask(req: RunRequest, onStep: OnStep): Promise<RunResul
 
       const step: StepRecord = {
         step: stepNum,
-        status: 'ok',
+        status: actError ? 'error' : 'ok',
         summary: actionDesc,
         url,
         duration_sec,
