@@ -196,6 +196,7 @@ export function AuditView() {
         session={runnerSession}
         wsPathPrefix="/audit/ws"
         stepsApiPath={`/audit/sessions/${activeRunId}/steps`}
+        externalRunId={activeRunId}
         onBack={() => { setActiveSession(null); setActiveRunId(null) }}
         onRerun={() => { setActiveSession(null); setActiveRunId(null) }}
         onUpdate={(update) => { if (update.result) handleDone(update.result) }}

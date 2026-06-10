@@ -297,9 +297,10 @@ export interface RunnerSessionViewProps {
   onUpdate: (update: Partial<RunnerSession>) => void
   wsPathPrefix?: string    // default: '/runner/ws'
   stepsApiPath?: string    // default: '/runner/sessions/:run_id/steps'
+  externalRunId?: string   // if provided, skip the start fetch and use this run_id directly
 }
 
-export function RunnerSessionView({ session, onBack, onRerun, onUpdate, wsPathPrefix, stepsApiPath }: RunnerSessionViewProps) {
+export function RunnerSessionView({ session, onBack, onRerun, onUpdate, wsPathPrefix, stepsApiPath, externalRunId }: RunnerSessionViewProps) {
   const [liveSteps, setLiveSteps] = useState<WsStepEvent[]>([])
   const [historicalSteps, setHistoricalSteps] = useState<HistoricalStep[] | null>(null)
   const [doneEvent, setDoneEvent] = useState<WsDoneEvent | null>(
@@ -353,20 +354,27 @@ export function RunnerSessionView({ session, onBack, onRerun, onUpdate, wsPathPr
 
     const startAndConnect = async () => {
       try {
-        // Start the run — use fetch with AbortSignal to cancel on Strict Mode unmount
-        const path = session.source === 'manual' ? '/api/runner/start-manual' : '/api/runner/start-testit'
-        const body = session.source === 'manual'
-          ? { task: session.task!, start_url: session.startUrl }
-          : { work_item_id: session.workItemId! }
+        // If externalRunId is provided, skip the start fetch
+        let runId: string
+        if (externalRunId) {
+          runId = externalRunId
+        } else {
+          // Start the run — use fetch with AbortSignal to cancel on Strict Mode unmount
+          const path = session.source === 'manual' ? '/api/runner/start-manual' : '/api/runner/start-testit'
+          const body = session.source === 'manual'
+            ? { task: session.task!, start_url: session.startUrl }
+            : { work_item_id: session.workItemId! }
 
-        const res = await fetch(path, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: abort.signal,
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const { run_id: runId } = await res.json() as { run_id: string }
+          const res = await fetch(path, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: abort.signal,
+          })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = await res.json() as { run_id: string }
+          runId = data.run_id
+        }
 
         if (abort.signal.aborted || !mountedRef.current) return
 
