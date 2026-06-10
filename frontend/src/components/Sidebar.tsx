@@ -1,6 +1,6 @@
-import { ChevronLeft, ChevronRight, FileCheck2, MonitorPlay, Sparkles, Zap, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileCheck2, Globe, MonitorPlay, Sparkles, Zap, Settings } from 'lucide-react'
 
-type Tool = 'review' | 'runner'
+type Tool = 'review' | 'runner' | 'audit'
 
 interface SidebarProps {
   collapsed: boolean
@@ -43,6 +43,17 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
           <div className="sb-copy">
             <span className="sb-title">Browser Runner</span>
             <span className="sb-sub">запуск тест-кейсов</span>
+          </div>
+        </div>
+        <div
+          className={`sb-item${activeTool === 'audit' ? ' sb-item-active' : ''}`}
+          onClick={() => onToolChange('audit')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="sb-icon"><Globe size={16} strokeWidth={1.75} /></div>
+          <div className="sb-copy">
+            <span className="sb-title">Site Audit</span>
+            <span className="sb-sub">аудит сайта</span>
           </div>
         </div>
         <div className="sb-item sb-item-soon">
