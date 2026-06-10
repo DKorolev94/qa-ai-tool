@@ -41,7 +41,7 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
         >
           <div className="sb-icon"><MonitorPlay size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy">
-            <span className="sb-title">Browser Runner</span>
+            <span className="sb-title">Stagehand Runner</span>
             <span className="sb-sub">запуск тест-кейсов</span>
           </div>
         </div>
