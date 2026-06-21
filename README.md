@@ -7,6 +7,38 @@
 - backend: FastAPI API (порт 8000)
 - frontend: Vite + React UI (порт 3000)
 
+## Quick Start (Docker)
+
+**Требования:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Linux/macOS/Windows)
+
+```bash
+# 1. Clone
+git clone <repo-url> && cd qa-ai-tool
+
+# 2. Configure
+cp .env.example .env
+# Edit .env: set LLM_API_KEY, TESTIT_BASE_URL, TESTIT_PRIVATE_TOKEN
+
+# 3. Start (dev mode — hot-reload, bind-mounts)
+docker compose up --build
+
+# 4. Open
+# http://localhost:3000
+```
+
+**Prod mode** (built frontend, no source mounts):
+```bash
+docker compose -f docker-compose.yml up --build
+```
+
+**Stop:**
+```bash
+docker compose down
+```
+
+**Screenshots and run history** persist in Docker named volumes between restarts.
+In dev mode they are also visible at `stagehand-runner/runs/` and `browser-use-runner/runs/`.
+
 ## Быстрый старт
 
 Требования:
