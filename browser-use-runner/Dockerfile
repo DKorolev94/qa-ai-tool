@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir uv
 
 # Install Python dependencies (uses uv.lock for reproducibility)
 COPY pyproject.toml uv.lock ./
-RUN uv sync --all-extras --frozen
+RUN uv sync --extra all --frozen
 
 # Install Chromium + OS-level dependencies for Playwright
 RUN uv run playwright install chromium --with-deps
