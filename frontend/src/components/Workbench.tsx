@@ -415,6 +415,27 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
 
 // ── Editable TestCase components ───────────────────────────────────────────
 
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+function AutoTextarea({ className, placeholder, value, onChange }: {
+  className: string; placeholder: string; value: string; onChange: (v: string) => void
+}) {
+  return (
+    <textarea
+      className={className}
+      placeholder={placeholder}
+      value={value}
+      rows={1}
+      onChange={e => { autoResize(e.target); onChange(e.target.value) }}
+      onFocus={e => autoResize(e.target)}
+      ref={el => { if (el) autoResize(el) }}
+    />
+  )
+}
+
 function EditableStepsTable({ steps, showComments, onUpdate, onRemove, onAdd }: {
   steps: Step[]
   showComments: boolean
@@ -428,34 +449,30 @@ function EditableStepsTable({ steps, showComments, onUpdate, onRemove, onAdd }: 
         <div key={i} className="tc-edit-step-row">
           <div className="tc-edit-step-num">{i + 1}</div>
           <div className="tc-edit-step-fields">
-            <textarea
+            <AutoTextarea
               className="tc-edit-cell"
               placeholder="Действие"
               value={step.action ?? ''}
-              rows={2}
-              onChange={e => onUpdate(i, 'action', e.target.value)}
+              onChange={v => onUpdate(i, 'action', v)}
             />
-            <textarea
+            <AutoTextarea
               className="tc-edit-cell tc-edit-cell-dim"
               placeholder="Ожидаемый результат"
               value={step.expected ?? ''}
-              rows={2}
-              onChange={e => onUpdate(i, 'expected', e.target.value)}
+              onChange={v => onUpdate(i, 'expected', v)}
             />
-            <textarea
-              className="tc-edit-cell tc-edit-cell-mono"
+            <AutoTextarea
+              className="tc-edit-cell"
               placeholder="Тестовые данные"
               value={step.test_data ?? ''}
-              rows={1}
-              onChange={e => onUpdate(i, 'test_data', e.target.value)}
+              onChange={v => onUpdate(i, 'test_data', v)}
             />
             {showComments && (
-              <textarea
+              <AutoTextarea
                 className="tc-edit-cell tc-edit-cell-dim"
                 placeholder="Комментарий"
                 value={step.comments ?? ''}
-                rows={1}
-                onChange={e => onUpdate(i, 'comments', e.target.value)}
+                onChange={v => onUpdate(i, 'comments', v)}
               />
             )}
           </div>
@@ -502,8 +519,10 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         <textarea
           className="tc-edit-textarea"
           value={tc.description ?? ''}
-          rows={3}
-          onChange={e => onChange({ ...tc, description: e.target.value || null })}
+          rows={1}
+          onChange={e => { autoResize(e.target); onChange({ ...tc, description: e.target.value || null }) }}
+          onFocus={e => autoResize(e.target)}
+          ref={el => { if (el) autoResize(el) }}
         />
       </div>
       <div>

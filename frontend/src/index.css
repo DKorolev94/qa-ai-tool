@@ -2093,10 +2093,10 @@ body { padding: 20px; }
 }
 .tc-edit-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.11); }
 .tc-edit-textarea {
-  width: 100%; box-sizing: border-box; resize: vertical;
+  width: 100%; box-sizing: border-box; overflow: hidden;
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--r-sm);
   padding: 8px 12px; font-size: 12px; color: var(--tx-secondary); line-height: 18px;
-  outline: none; font-family: inherit; min-height: 60px;
+  outline: none; font-family: inherit; resize: none;
 }
 .tc-edit-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.11); }
 .tc-edit-steps { display: flex; flex-direction: column; gap: 6px; }
@@ -2111,15 +2111,14 @@ body { padding: 20px; }
 }
 .tc-edit-step-fields { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
 .tc-edit-cell {
-  width: 100%; box-sizing: border-box; resize: vertical;
+  width: 100%; box-sizing: border-box; overflow: hidden; resize: none;
   background: var(--bg-page); border: 1px solid var(--border); border-radius: 4px;
-  padding: 5px 8px; font-size: 12px; color: var(--tx-secondary); line-height: 17px;
+  padding: 4px 8px; font-size: 12px; color: var(--tx-secondary); line-height: 17px;
   outline: none; font-family: inherit;
 }
 .tc-edit-cell:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124,58,237,0.1); }
 .tc-edit-cell::placeholder { color: var(--tx-dim); font-style: italic; }
 .tc-edit-cell-dim { color: var(--tx-muted); }
-.tc-edit-cell-mono { font-family: monospace; font-size: 11px; }
 .tc-edit-step-del {
   flex-shrink: 0; width: 22px; height: 22px; padding: 0;
   display: flex; align-items: center; justify-content: center;
