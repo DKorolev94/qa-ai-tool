@@ -1,0 +1,45 @@
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      RUNNER_URL: http://stagehand-runner:8009
+      AUDIT_RUNNER_URL: http://browser-use-runner:8008
+    ports:
+      - "8000:8000"
+    networks: [qa-net]
+
+  stagehand-runner:
+    build: ./stagehand-runner
+    env_file: .env
+    ports:
+      - "8009:8009"
+    volumes:
+      - stagehand_runs:/app/runs
+    networks: [qa-net]
+
+  browser-use-runner:
+    build: ./browser-use-runner
+    env_file: .env
+    ports:
+      - "8008:8008"
+    volumes:
+      - browser_runs:/app/runs
+    networks: [qa-net]
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks: [qa-net]
+
+networks:
+  qa-net:
+
+volumes:
+  stagehand_runs:
+  browser_runs:
