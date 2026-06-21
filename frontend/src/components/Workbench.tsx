@@ -514,6 +514,38 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
           onChange={e => onChange({ ...tc, title: e.target.value })}
         />
       </div>
+      <div className="tc-edit-row2">
+        <div>
+          <span className="case-sec-label">Приоритет</span>
+          <select
+            className="tc-edit-input"
+            value={tc.priority ?? ''}
+            onChange={e => onChange({ ...tc, priority: e.target.value || null })}
+          >
+            <option value="">— не указан —</option>
+            <option value="Highest">Самый высокий</option>
+            <option value="High">Высокий</option>
+            <option value="Medium">Средний</option>
+            <option value="Low">Низкий</option>
+          </select>
+        </div>
+        <div>
+          <span className="case-sec-label">Статус</span>
+          <select
+            className="tc-edit-input"
+            value={tc.status ?? ''}
+            onChange={e => onChange({ ...tc, status: e.target.value || null })}
+          >
+            <option value="">— не указан —</option>
+            <option value="Ready">Готов</option>
+            <option value="NotReady">Не готов</option>
+            <option value="Draft">Черновик</option>
+            <option value="NeedsWork">Требует доработки</option>
+            <option value="Obsolete">Устарел</option>
+            <option value="InProgress">В работе</option>
+          </select>
+        </div>
+      </div>
       <div>
         <span className="case-sec-label">Теги</span>
         <div className="tc-edit-tags">

@@ -2135,6 +2135,10 @@ body { padding: 20px; }
 }
 .tc-edit-add-step:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Two-column row for priority + status selects */
+.tc-edit-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+select.tc-edit-input { cursor: pointer; }
+
 /* Tags editor */
 .tc-edit-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 25px; }
 .tc-edit-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 4px; font-size: 11px; color: var(--accent); }
