@@ -2088,7 +2088,8 @@ body { padding: 20px; }
 .tc-edit-input {
   width: 100%; box-sizing: border-box;
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--r-sm);
-  padding: 8px 12px; font-size: 14px; font-weight: 500; color: var(--tx-primary);
+  padding: 4px 8px; font-size: 12px; font-weight: 400; color: var(--tx-secondary);
+  line-height: 17px; height: 25px;
   outline: none; font-family: inherit;
 }
 .tc-edit-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.11); }
@@ -2117,8 +2118,9 @@ body { padding: 20px; }
   outline: none; font-family: inherit;
 }
 .tc-edit-cell:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(124,58,237,0.1); }
-.tc-edit-cell::placeholder { color: var(--tx-dim); font-style: italic; }
+.tc-edit-cell::placeholder { color: var(--tx-dim); font-style: italic; font-family: inherit; }
 .tc-edit-cell-dim { color: var(--tx-muted); }
+.tc-edit-cell-dim::placeholder { color: var(--tx-dim); font-style: italic; font-family: inherit; }
 .tc-edit-step-del {
   flex-shrink: 0; width: 22px; height: 22px; padding: 0;
   display: flex; align-items: center; justify-content: center;
