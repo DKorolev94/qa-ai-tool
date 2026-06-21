@@ -2137,7 +2137,7 @@ body { padding: 20px; }
 
 /* Two-column row for priority + status selects */
 .tc-edit-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-select.tc-edit-input { cursor: pointer; }
+select.tc-edit-input { cursor: pointer; height: auto; padding-top: 3px; padding-bottom: 3px; line-height: normal; }
 
 /* Tags editor */
 .tc-edit-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 25px; }
