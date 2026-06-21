@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle, Check, CheckCircle2, EyeOff, FilePlus, Loader2, X,
-  ChevronLeft, ExternalLink, FolderOpen, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
+  ExternalLink, FolderOpen, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
 } from 'lucide-react'
 import { api } from '../api'
 import { ActionBanner } from './ActionBanner'
 import { ModeButton } from './ModeButton'
+import { SectionHeader } from './SectionHeader'
 import { ProgressBar } from './ProgressBar'
 import type {
   ActionNotification, AnalyzeResult, ApplyResult, DraftResult, FetchResult, ImproveResult,
@@ -412,6 +413,133 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
   )
 }
 
+// ── Editable TestCase components ───────────────────────────────────────────
+
+function EditableStepsTable({ steps, showComments, onUpdate, onRemove, onAdd }: {
+  steps: Step[]
+  showComments: boolean
+  onUpdate: (i: number, key: keyof Step, value: string) => void
+  onRemove: (i: number) => void
+  onAdd: () => void
+}) {
+  return (
+    <div className="tc-edit-steps">
+      {steps.map((step, i) => (
+        <div key={i} className="tc-edit-step-row">
+          <div className="tc-edit-step-num">{i + 1}</div>
+          <div className="tc-edit-step-fields">
+            <textarea
+              className="tc-edit-cell"
+              placeholder="Действие"
+              value={step.action ?? ''}
+              rows={2}
+              onChange={e => onUpdate(i, 'action', e.target.value)}
+            />
+            <textarea
+              className="tc-edit-cell tc-edit-cell-dim"
+              placeholder="Ожидаемый результат"
+              value={step.expected ?? ''}
+              rows={2}
+              onChange={e => onUpdate(i, 'expected', e.target.value)}
+            />
+            <textarea
+              className="tc-edit-cell tc-edit-cell-mono"
+              placeholder="Тестовые данные"
+              value={step.test_data ?? ''}
+              rows={1}
+              onChange={e => onUpdate(i, 'test_data', e.target.value)}
+            />
+            {showComments && (
+              <textarea
+                className="tc-edit-cell tc-edit-cell-dim"
+                placeholder="Комментарий"
+                value={step.comments ?? ''}
+                rows={1}
+                onChange={e => onUpdate(i, 'comments', e.target.value)}
+              />
+            )}
+          </div>
+          <button type="button" className="tc-edit-step-del" title="Удалить шаг" onClick={() => onRemove(i)}>
+            ×
+          </button>
+        </div>
+      ))}
+      <button type="button" className="tc-edit-add-step" onClick={onAdd}>
+        + Добавить шаг
+      </button>
+    </div>
+  )
+}
+
+function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updated: TestCase) => void }) {
+  function updateStep(field: 'steps' | 'preconditions' | 'postconditions', index: number, key: keyof Step, value: string) {
+    const steps = [...(tc[field] ?? [])]
+    steps[index] = { ...steps[index], [key]: value || null }
+    onChange({ ...tc, [field]: steps })
+  }
+  function removeStep(field: 'steps' | 'preconditions' | 'postconditions', index: number) {
+    const steps = [...(tc[field] ?? [])]
+    steps.splice(index, 1)
+    onChange({ ...tc, [field]: steps })
+  }
+  function addStep(field: 'steps' | 'preconditions' | 'postconditions') {
+    const steps = [...(tc[field] ?? []), { action: '', expected: null, test_data: null, comments: null }]
+    onChange({ ...tc, [field]: steps })
+  }
+
+  return (
+    <div className="tc-editor">
+      <div>
+        <span className="case-sec-label">Название</span>
+        <input
+          className="tc-edit-input"
+          value={tc.title ?? ''}
+          onChange={e => onChange({ ...tc, title: e.target.value })}
+        />
+      </div>
+      <div>
+        <span className="case-sec-label">Описание</span>
+        <textarea
+          className="tc-edit-textarea"
+          value={tc.description ?? ''}
+          rows={3}
+          onChange={e => onChange({ ...tc, description: e.target.value || null })}
+        />
+      </div>
+      <div>
+        <span className="case-sec-label">Предусловие</span>
+        <EditableStepsTable
+          steps={tc.preconditions ?? []}
+          showComments={false}
+          onUpdate={(i, k, v) => updateStep('preconditions', i, k, v)}
+          onRemove={i => removeStep('preconditions', i)}
+          onAdd={() => addStep('preconditions')}
+        />
+      </div>
+      <div>
+        <span className="case-sec-label">Шаги</span>
+        <EditableStepsTable
+          steps={tc.steps ?? []}
+          showComments
+          onUpdate={(i, k, v) => updateStep('steps', i, k, v)}
+          onRemove={i => removeStep('steps', i)}
+          onAdd={() => addStep('steps')}
+        />
+      </div>
+      <div>
+        <span className="case-sec-label">Постусловие</span>
+        <EditableStepsTable
+          steps={tc.postconditions ?? []}
+          showComments={false}
+          onUpdate={(i, k, v) => updateStep('postconditions', i, k, v)}
+          onRemove={i => removeStep('postconditions', i)}
+          onAdd={() => addStep('postconditions')}
+        />
+      </div>
+    </div>
+  )
+}
+
 const DIFF_SECTION_ORDER = ['steps', 'preconditions', 'postconditions', 'metadata'] as const
 const DIFF_SECTION_LABELS: Record<string, string> = {
   steps: 'Шаги', preconditions: 'Предусловия',
@@ -576,8 +704,10 @@ function issueTitleRu(title: string): string {
   return ISSUE_TITLE_RU[key] ?? title
 }
 
-function issueDescriptionText(description: string): string {
-  return description.replace(/\s*Пример:\s*[\s\S]*$/i, '').trim()
+function parseIssueDescription(description: string): { text: string; evidence: string | null } {
+  const match = description.match(/^([\s\S]*?)\s*Пример:\s*([\s\S]*)$/i)
+  if (!match) return { text: description.trim(), evidence: null }
+  return { text: match[1].trim(), evidence: match[2].trim() || null }
 }
 
 function IssueRow({ issue, resolution, hasImprovement, onDismiss }: {
@@ -590,12 +720,16 @@ function IssueRow({ issue, resolution, hasImprovement, onDismiss }: {
   const borderClass = isResolved ? 'iborder-resolved' :
     issue.severity === 'high' ? 'iborder-h' :
     issue.severity === 'medium' ? 'iborder-m' : 'iborder-l'
-  const description = issueDescriptionText(issue.description)
+  const { text: description, evidence } = parseIssueDescription(issue.description)
   return (
     <div className={`issue-row ${borderClass}${isResolved ? ' issue-row-resolved' : ''}`}>
       <div className="issue-body">
         <div className="issue-title-text">{issueTitleRu(issue.title)}</div>
         {description && <div className="issue-loc">{description}</div>}
+        {evidence && <div className="issue-evidence">{evidence}</div>}
+        {resolution?.status === 'manual_needed' && resolution.reason && (
+          <div className="issue-reason">{resolution.reason}</div>
+        )}
       </div>
       {resolution?.status === 'resolved' && <span className="issue-badge ib-resolved">Решено</span>}
       {resolution?.status === 'manual_needed' && <span className="issue-badge ib-manual">Вручную</span>}
@@ -747,6 +881,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [dismissedIndices, setDismissedIndices] = useState<Set<number>>(new Set())
   const [showDismissed, setShowDismissed] = useState(false)
   const [showResolved, setShowResolved] = useState(false)
+  const [editedTestCase, setEditedTestCase] = useState<TestCase | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
 
   const tc = fetchResult.normalized_testcase
 
@@ -827,6 +963,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         enabled_rules: enabledRules,
       })
       setImproveResult(result)
+      setEditedTestCase(result.improved_testcase)
+      setIsEditing(false)
       setActiveTab('improved')
     } catch (err) {
       setImproveError((err as Error).message)
@@ -842,7 +980,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     setDraftLoading(true)
     try {
       const result = await api.createDraft({
-        improved_testcase: improveResult.improved_testcase,
+        improved_testcase: editedTestCase ?? improveResult.improved_testcase,
         source_work_item_id: fetchResult.work_item_id,
         source_attributes: (fetchResult.raw_work_item.attributes ?? {}) as Record<string, unknown>,
         manual_notes: improveResult.manual_notes ?? [],
@@ -862,7 +1000,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     setApplyResult(null)
     try {
       const result = await api.applyToOriginal({
-        improved_testcase: improveResult.improved_testcase,
+        improved_testcase: editedTestCase ?? improveResult.improved_testcase,
         source_work_item_id: fetchResult.work_item_id,
         source_attributes: (fetchResult.raw_work_item.attributes ?? {}) as Record<string, unknown>,
       })
@@ -1010,6 +1148,18 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     display_duration: improveResult.display_duration ?? tc.display_duration,
   } : null
 
+  // mergedEdited: same as mergedImproved but using user-edited testcase
+  const mergedEdited: TestCase | null = editedTestCase && improveResult ? {
+    ...editedTestCase,
+    description: stripServiceFooter(editedTestCase.description ?? ''),
+    links: tc.links,
+    attachments: tc.attachments,
+    parameter_table: tc.parameter_table,
+    section_name: tc.section_name,
+    attributes: tc.attributes,
+    display_duration: improveResult.display_duration ?? tc.display_duration,
+  } : mergedImproved
+
   const improvedTabAccessible = hasImprove || !!improveError
   const tabs = [
     { id: 'original' as const, label: 'Оригинал', disabled: false, count: null },
@@ -1041,20 +1191,18 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     <div className="workspace-inner-wb">
 
       {/* Page header */}
-      <div className="page-header" style={{ justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="button" className="back-btn" title="Назад" onClick={onBack}>
-            <ChevronLeft size={16} strokeWidth={1.75} />
-          </button>
-          <h1 className="page-title">Ревью и улучшение тест-кейсов</h1>
-        </div>
-        <ModeButton
-          reviewConfig={reviewConfig}
-          selectedPreset={selectedPreset}
-          enabledRules={enabledRules}
-          onApply={onApply}
-        />
-      </div>
+      <SectionHeader
+        title="Ревью и улучшение тест-кейсов"
+        onBack={onBack}
+        actions={
+          <ModeButton
+            reviewConfig={reviewConfig}
+            selectedPreset={selectedPreset}
+            enabledRules={enabledRules}
+            onApply={onApply}
+          />
+        }
+      />
 
       {/* Workbench header card */}
       <div className="wb-card">
@@ -1273,7 +1421,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 </button>
               </div>
             )}
-            {activeTab === 'improved' && improveStatus === 'partial' && mergedImproved && (
+            {activeTab === 'improved' && improveStatus === 'partial' && mergedEdited && (
               <>
                 <div className="improve-partial-banner">
                   <AlertTriangle size={14} />
@@ -1286,18 +1434,46 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     )}
                   </div>
                 </div>
-                <TestCaseView tc={mergedImproved} partialFields={partialFields} />
+                <div className="tc-edit-toolbar">
+                  <button
+                    type="button"
+                    className={`tc-edit-toggle${isEditing ? ' tc-edit-toggle-active' : ''}`}
+                    onClick={() => setIsEditing(v => !v)}
+                  >
+                    <Wrench size={11} />
+                    {isEditing ? 'Готово' : 'Редактировать'}
+                  </button>
+                </div>
+                {isEditing && editedTestCase
+                  ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
+                  : <TestCaseView tc={mergedEdited} partialFields={partialFields} />
+                }
               </>
             )}
-            {activeTab === 'improved' && improveStatus === 'success' && mergedImproved && (
-              <TestCaseView tc={mergedImproved} />
+            {activeTab === 'improved' && improveStatus === 'success' && mergedEdited && (
+              <>
+                <div className="tc-edit-toolbar">
+                  <button
+                    type="button"
+                    className={`tc-edit-toggle${isEditing ? ' tc-edit-toggle-active' : ''}`}
+                    onClick={() => setIsEditing(v => !v)}
+                  >
+                    <Wrench size={11} />
+                    {isEditing ? 'Готово' : 'Редактировать'}
+                  </button>
+                </div>
+                {isEditing && editedTestCase
+                  ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
+                  : <TestCaseView tc={mergedEdited} />
+                }
+              </>
             )}
             {activeTab === 'diff' && (
               <DiffView changes={improveResult?.diff?.changes ?? []} />
             )}
             {activeTab === 'json' && (
               <pre className="wb-json-pre">
-                {JSON.stringify(hasImprove ? improveResult!.improved_testcase : tc, null, 2)}
+                {JSON.stringify(hasImprove ? (editedTestCase ?? improveResult!.improved_testcase) : tc, null, 2)}
               </pre>
             )}
           </div>
@@ -1455,6 +1631,15 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {analyzeResult.issues.length === 0 && (
                   <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--tx-muted)', fontSize: 13 }}>
                     Проблем не найдено
+                  </div>
+                )}
+
+                {/* Parse / LLM warnings */}
+                {((analyzeResult.warnings?.length ?? 0) > 0 || (improveResult?.warnings?.length ?? 0) > 0) && (
+                  <div className="parse-warnings-section">
+                    {[...(analyzeResult.warnings ?? []), ...(improveResult?.warnings ?? [])].map((w, i) => (
+                      <div key={i} className="pw-item">{w}</div>
+                    ))}
                   </div>
                 )}
 
