@@ -544,6 +544,24 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         </div>
       </div>
       <div>
+        <span className="case-sec-label">Длительность</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input
+            className="tc-edit-input"
+            type="number"
+            min={1}
+            style={{ width: 80 }}
+            value={tc.duration != null ? Math.round(parseInt(tc.duration, 10) / 60000) : ''}
+            placeholder="—"
+            onChange={e => {
+              const mins = parseInt(e.target.value, 10)
+              onChange({ ...tc, duration: isNaN(mins) || mins <= 0 ? null : String(mins * 60000) })
+            }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--tx-dim)' }}>мин</span>
+        </div>
+      </div>
+      <div>
         <span className="case-sec-label">Описание</span>
         <textarea
           className="tc-edit-textarea"
