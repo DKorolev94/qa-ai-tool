@@ -2135,6 +2135,13 @@ body { padding: 20px; }
 }
 .tc-edit-add-step:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Tags editor */
+.tc-edit-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 25px; }
+.tc-edit-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: 4px; font-size: 11px; color: var(--accent); }
+.tc-edit-tag-del { background: none; border: none; cursor: pointer; color: var(--accent); font-size: 14px; line-height: 1; padding: 0; opacity: 0.7; }
+.tc-edit-tag-del:hover { opacity: 1; }
+.tc-edit-tag-input { background: none; border: none; outline: none; font-size: 12px; color: var(--tx-secondary); min-width: 80px; font-family: inherit; }
+
 /* TestIT workbench run hint (right panel placeholder) */
 .wb-run-hint {
   background: var(--bg-panel); border: 1px solid var(--border);

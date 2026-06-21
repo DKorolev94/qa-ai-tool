@@ -515,6 +515,35 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
+        <span className="case-sec-label">Теги</span>
+        <div className="tc-edit-tags">
+          {(tc.tags ?? []).map(tag => (
+            <span key={tag} className="tc-edit-tag">
+              {tag}
+              <button
+                type="button"
+                className="tc-edit-tag-del"
+                onClick={() => onChange({ ...tc, tags: (tc.tags ?? []).filter(t => t !== tag) })}
+              >×</button>
+            </span>
+          ))}
+          <input
+            className="tc-edit-tag-input"
+            placeholder="+ тег"
+            onKeyDown={e => {
+              if ((e.key === 'Enter' || e.key === ',') && e.currentTarget.value.trim()) {
+                e.preventDefault()
+                const newTag = e.currentTarget.value.trim().replace(/,$/, '')
+                if (!(tc.tags ?? []).includes(newTag)) {
+                  onChange({ ...tc, tags: [...(tc.tags ?? []), newTag] })
+                }
+                e.currentTarget.value = ''
+              }
+            }}
+          />
+        </div>
+      </div>
+      <div>
         <span className="case-sec-label">Описание</span>
         <textarea
           className="tc-edit-textarea"
