@@ -1405,6 +1405,17 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {tab.count && <span className="wb-tab-count">{tab.count}</span>}
               </button>
             ))}
+            {activeTab === 'improved' && hasImprove && (
+              <button
+                type="button"
+                className={`tc-edit-toggle${isEditing ? ' tc-edit-toggle-active' : ''}`}
+                style={{ marginLeft: 'auto', alignSelf: 'center' }}
+                onClick={() => setIsEditing(v => !v)}
+              >
+                <Wrench size={11} />
+                {isEditing ? 'Готово' : 'Редактировать'}
+              </button>
+            )}
           </div>
           <div className="wb-content">
             {activeTab === 'original' && <TestCaseView tc={tc} />}
@@ -1434,16 +1445,6 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     )}
                   </div>
                 </div>
-                <div className="tc-edit-toolbar">
-                  <button
-                    type="button"
-                    className={`tc-edit-toggle${isEditing ? ' tc-edit-toggle-active' : ''}`}
-                    onClick={() => setIsEditing(v => !v)}
-                  >
-                    <Wrench size={11} />
-                    {isEditing ? 'Готово' : 'Редактировать'}
-                  </button>
-                </div>
                 {isEditing && editedTestCase
                   ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
                   : <TestCaseView tc={mergedEdited} partialFields={partialFields} />
@@ -1451,22 +1452,9 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               </>
             )}
             {activeTab === 'improved' && improveStatus === 'success' && mergedEdited && (
-              <>
-                <div className="tc-edit-toolbar">
-                  <button
-                    type="button"
-                    className={`tc-edit-toggle${isEditing ? ' tc-edit-toggle-active' : ''}`}
-                    onClick={() => setIsEditing(v => !v)}
-                  >
-                    <Wrench size={11} />
-                    {isEditing ? 'Готово' : 'Редактировать'}
-                  </button>
-                </div>
-                {isEditing && editedTestCase
-                  ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
-                  : <TestCaseView tc={mergedEdited} />
-                }
-              </>
+              isEditing && editedTestCase
+                ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
+                : <TestCaseView tc={mergedEdited} />
             )}
             {activeTab === 'diff' && (
               <DiffView changes={improveResult?.diff?.changes ?? []} />
