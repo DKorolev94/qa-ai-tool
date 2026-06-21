@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --extra all --frozen
 
 # Install Chromium + OS-level dependencies for Playwright
-RUN uv run playwright install chromium --with-deps
+RUN uv pip install playwright && uv run python -m playwright install chromium --with-deps
 
 COPY . .
 ENV PYTHONPATH=/app
