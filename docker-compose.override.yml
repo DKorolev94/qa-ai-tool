@@ -3,6 +3,8 @@ services:
     volumes:
       - ./backend:/app
       - ./browser-use-runner/runs:/app/runs
+    environment:
+      RUNNER_RUNS_DIR: /app/runs
     command:
       - uvicorn
       - app.main:app

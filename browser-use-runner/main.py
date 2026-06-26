@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from browser_use import Agent, Browser
 from browser_use.browser.events import NavigateToUrlEvent as BrowserNavigateToUrlEvent
@@ -34,7 +35,11 @@ RUNS_DIR = RUNNER_DIR / 'runs'
 RUN_SCHEMA_VERSION = '2026-05-18.1'
 RUN_FOLDERS = ('raw', 'logs', 'ui', 'metrics', 'media/screenshots')
 
-load_dotenv(RUNNER_DIR / '.env')
+# Live run queues: run_id → asyncio.Queue of WS events
+_live_runs: dict[str, asyncio.Queue] = {}
+
+load_dotenv(RUNNER_DIR.parent / '.env')           # project root (base)
+load_dotenv(RUNNER_DIR / '.env', override=True)   # local override
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
@@ -93,7 +98,7 @@ def runner_env_request(request: RunRequest) -> RunRequest:
             'headless': env_bool('RUNNER_HEADLESS', False),
             'llm': request.llm.model_copy(
                 update={
-                    'model': os.getenv('RUNNER_LLM_MODEL', 'deepseek-chat'),
+                    'model': os.getenv('RUNNER_LLM_MODEL'),
                 }
             ),
         }
@@ -128,7 +133,7 @@ def settings() -> dict[str, Any]:
             'verify_ssl': env_bool('RUNNER_PREFLIGHT_VERIFY_SSL', False),
         },
         'llm': {
-            'model': os.getenv('RUNNER_LLM_MODEL', 'deepseek-chat'),
+            'model': os.getenv('RUNNER_LLM_MODEL'),
             'has_api_key': bool(os.getenv('DEEPSEEK_API_KEY')),
         },
     }
@@ -268,9 +273,21 @@ def _configure_browser_globals() -> None:
 from llm_factory import create_llm as _create_llm_for_provider
 
 
+def _extract_summary(raw: str | None) -> str:
+    if not raw:
+        return ''
+    try:
+        data = json.loads(raw)
+        if isinstance(data, dict):
+            return str(data.get('summary') or data.get('result') or raw)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return raw
+
+
 def create_llm(request: RunRequest) -> Any:
     try:
-        return _create_llm_for_provider(request.llm.model, request.llm_timeout_sec)
+        return _create_llm_for_provider(request.llm.model, request.llm_timeout_sec, request.llm.max_tokens)
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -878,6 +895,10 @@ def save_artifacts(
     steps = build_steps(history, screenshots) if history is not None else []
     verdict = build_evidence_verdict(request, response, steps, history)
     final_response = apply_evidence_verdict(response, verdict)
+    saved_paths = [str(run_dir / s['path']) for s in screenshots]
+    final_response = final_response.model_copy(
+        update={'artifacts': final_response.artifacts.model_copy(update={'screenshot_paths': saved_paths})}
+    )
     verdict['runner_status'] = final_response.status.value
     analysis = build_analysis(final_response, steps, screenshots, verdict)
 
@@ -1071,7 +1092,7 @@ async def run_test_case(request: RunRequest) -> RunResponse:
         response = RunResponse(
             test_case_id=request.test_case_id,
             status=status,
-            summary=history.final_result() or ('Agent finished with errors.' if errors else 'Agent finished without final extracted content.'),
+            summary=_extract_summary(history.final_result()) or ('Agent finished with errors.' if errors else 'Agent finished without final extracted content.'),
             steps_count=len(history.action_history()),
             errors=errors,
             artifacts=ArtifactReport(
@@ -1104,3 +1125,197 @@ async def run_test_case(request: RunRequest) -> RunResponse:
         if browser is not None:
             await browser.stop()
         detach_run_log(log_handler)
+
+
+# ---------------------------------------------------------------------------
+# Streaming run (WebSocket) — /start + /ws/{run_id}
+# ---------------------------------------------------------------------------
+
+@app.post('/start')
+async def start_run_stream(request: RunRequest, background_tasks: BackgroundTasks) -> dict[str, str]:
+    """Start a run in the background and return a run_id for WebSocket streaming."""
+    run_id = uuid.uuid4().hex
+    queue: asyncio.Queue = asyncio.Queue()
+    _live_runs[run_id] = queue
+    background_tasks.add_task(_stream_run, run_id, request, queue)
+    return {'run_id': run_id}
+
+
+@app.websocket('/ws/{run_id}')
+async def ws_run_stream(websocket: WebSocket, run_id: str) -> None:
+    """Stream run events (step/done/error) to the client."""
+    await websocket.accept()
+    queue = _live_runs.get(run_id)
+    if not queue:
+        await websocket.send_json({'type': 'error', 'message': 'Run not found or already completed'})
+        await websocket.close()
+        return
+    try:
+        while True:
+            event = await queue.get()
+            if event is None:
+                await websocket.close()
+                break
+            await websocket.send_json(event)
+    except (WebSocketDisconnect, Exception):
+        pass
+
+
+async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.Queue) -> None:
+    """Background task: run agent and push step/done events to queue."""
+    started_at = time.monotonic()
+    run_dir = create_run_dir(original_request.test_case_id)
+    log_handler = attach_run_log(run_dir)
+    browser: Any = None
+
+    async def push(event: dict) -> None:
+        await queue.put(event)
+
+    try:
+        request = apply_runner_settings(original_request)
+        write_json(run_dir / 'raw' / 'api_request.json', redact_request(original_request))
+        write_json(run_dir / 'raw' / 'request.json', redact_request(request))
+        append_event(run_dir, 'started', {
+            'test_case_id': request.test_case_id,
+            'max_steps': request.max_steps,
+            'headless': request.headless,
+            'llm_model': request.llm.model,
+            'streaming': True,
+        })
+
+        llm = create_llm(request)
+        start_url = get_start_url(request)
+
+        if request.preflight_url and start_url:
+            ok, message, attempts = await preflight_url(
+                start_url, request.preflight_timeout_sec,
+                request.preflight_retries, request.preflight_verify_ssl,
+            )
+            write_json(run_dir / 'raw' / 'preflight.json', {'ok': ok, 'message': message, 'attempts': attempts})
+            append_event(run_dir, 'preflight', {'ok': ok, 'message': message})
+            if not ok:
+                resp = fail_run(run_dir, request.test_case_id, started_at, 'PreflightError', message)
+                await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
+                            'duration_sec': resp.duration_sec, 'steps_count': 0,
+                            'errors': resp.errors, 'run_id': resp.run_id})
+                return
+
+        browser = create_browser(request)
+        task_text = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
+
+        async def on_step(state: Any, output: Any, step_num: int) -> None:
+            event: dict[str, Any] = {
+                'type': 'step',
+                'step': step_num,
+                'url': getattr(state, 'url', '') or '',
+                'title': getattr(state, 'title', '') or '',
+                'next_goal': getattr(output, 'next_goal', '') or '',
+                'elapsed_sec': round(time.monotonic() - started_at, 1),
+            }
+            shot = getattr(state, 'screenshot', None)
+            if shot:
+                event['screenshot_b64'] = shot
+            await push(event)
+
+        agent = Agent(
+            task=task_text,
+            llm=llm,
+            browser=browser,
+            use_vision=request.use_vision,
+            extend_system_message=request.system_instructions,
+            llm_timeout=request.llm_timeout_sec,
+            step_timeout=int(request.action_timeout_sec),
+            register_new_step_callback=on_step,
+        )
+
+        append_event(run_dir, 'agent_started', {'start_url': start_url})
+        history = await agent.run(max_steps=request.max_steps)
+        append_event(run_dir, 'agent_finished', {'history_steps': len(history.history)})
+
+        history.save_to_file(run_dir / 'raw' / 'history.json')
+        usage, llm_usage = collect_usage(agent, history)
+        write_json(run_dir / 'raw' / 'usage.json', {
+            'session': usage.model_dump(mode='json'),
+            'llm_calls': [item.model_dump(mode='json') for item in llm_usage],
+        })
+
+        if history.is_done() and history.is_successful() is True:
+            status = RunStatus.passed
+        elif history.is_done() and history.is_successful() is False:
+            status = RunStatus.failed
+        else:
+            status = RunStatus.blocked
+
+        errors = [e for e in history.errors() if e]
+        response = RunResponse(
+            test_case_id=request.test_case_id,
+            status=status,
+            summary=_extract_summary(history.final_result()) or ('Agent finished with errors.' if errors else 'Agent finished.'),
+            steps_count=len(history.action_history()),
+            errors=errors,
+            artifacts=ArtifactReport(
+                visited_urls=[u for u in history.urls() if u],
+                screenshot_paths=[p for p in history.screenshot_paths(return_none_if_not_screenshot=False) if p],
+            ),
+            duration_sec=round(time.monotonic() - started_at, 2),
+            run_id=run_dir.name,
+            run_dir=str(run_dir),
+            usage=usage,
+            llm_usage=llm_usage,
+        )
+        response = finish_run(run_dir, response, history, request)
+
+        await push({
+            'type': 'done',
+            'status': response.status.value,
+            'summary': response.summary,
+            'duration_sec': response.duration_sec,
+            'steps_count': response.steps_count,
+            'errors': response.errors,
+            'run_id': response.run_id,
+        })
+
+    except HTTPException as exc:
+        append_event(run_dir, 'rejected', {'status_code': exc.status_code, 'reason': exc.detail})
+        resp = fail_run(run_dir, original_request.test_case_id, started_at, 'HTTPException', str(exc.detail), exc.status_code)
+        await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
+                    'duration_sec': resp.duration_sec, 'steps_count': 0,
+                    'errors': resp.errors, 'run_id': resp.run_id})
+    except Exception as exc:
+        logger.exception('Stream run failed')
+        append_event(run_dir, 'error', {'type': type(exc).__name__, 'message': str(exc)})
+        resp = fail_run(run_dir, original_request.test_case_id, started_at, type(exc).__name__, str(exc))
+        await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
+                    'duration_sec': resp.duration_sec, 'steps_count': 0,
+                    'errors': resp.errors, 'run_id': resp.run_id})
+    finally:
+        if browser is not None:
+            await browser.stop()
+        detach_run_log(log_handler)
+        _live_runs.pop(run_id, None)
+        await queue.put(None)  # sentinel → WS close
+
+
+# ---------------------------------------------------------------------------
+# Steps endpoint for completed runs
+# ---------------------------------------------------------------------------
+
+@app.get('/runs/{run_id}/steps')
+def get_run_steps(run_id: str) -> dict[str, Any]:
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+', run_id):
+        raise HTTPException(status_code=400, detail='Invalid run_id')
+
+    run_dir = RUNS_DIR / run_id
+    steps_path = run_dir / 'ui' / 'steps.json'
+    if not steps_path.exists():
+        raise HTTPException(status_code=404, detail='Steps not found for this run')
+
+    steps: list[dict] = json.loads(steps_path.read_text(encoding='utf-8'))
+
+    for step in steps:
+        screenshot = step.get('screenshot')
+        if screenshot and screenshot.get('path'):
+            abs_path = str(run_dir / screenshot['path'])
+            screenshot['url'] = f'/api/runner/screenshot?path={abs_path}'
+
+    return {'steps': steps}
