@@ -39,8 +39,6 @@ from app.services.testit_workitem_service import fetch_and_normalize_work_item
 from app.services.testit_update_service import apply_to_original_in_testit
 from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerStartRequest
 from app.services import runner_service
-from app.schemas.audit import AuditRunResponse, AuditStartRequest
-from app.services import audit_service
 from app.core.config import settings
 from pydantic import BaseModel
 
@@ -99,6 +97,8 @@ async def improve_testcase_endpoint(body: ImproveTestCaseRequest) -> ImproveTest
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.post("/testit/workitem/fetch", response_model=FetchTestItWorkItemResponse)
@@ -205,7 +205,7 @@ async def runner_start_manual(body: RunnerManualStartRequest) -> dict:
 @router.post("/runner/start-testit")
 async def runner_start_testit(body: RunnerStartRequest) -> dict:
     try:
-        return await runner_service.start_testit_streaming(body.work_item_id)
+        return await runner_service.start_testit_streaming(body.work_item_id, body.iteration_index)
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
     except httpx.HTTPStatusError as exc:
@@ -214,6 +214,7 @@ async def runner_start_testit(body: RunnerStartRequest) -> dict:
         raise HTTPException(status_code=404, detail=str(exc))
     except TestItConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
+
 
 
 @router.get("/runner/sessions")
@@ -234,6 +235,8 @@ async def runner_get_session_steps(run_id: str) -> dict:
         raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text[:300])
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
+
+
 
 
 @router.websocket("/runner/ws/{run_id}")
@@ -280,79 +283,30 @@ async def runner_screenshot(path: str) -> FileResponse:
     return FileResponse(str(target))
 
 
-# ── Audit (browser-use-runner, manual-only) ────────────────────────────────
 
-@router.post("/audit/start")
-async def audit_start(body: AuditStartRequest) -> dict:
+@router.post("/runner/write-testit-result")
+async def write_testit_result(body: dict) -> dict:
+    from app.services.testit_run_service import write_run_result
+    from app.integrations.testit_client import TestItConfigError, TestItAuthError, TestItConnectionError, TestItResponseError, TestItApiError
     try:
-        return await audit_service.start_audit_streaming(body)
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=503, detail=f"Audit runner unavailable: {exc}")
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=502, detail=f"Audit runner error: {exc.response.text[:300]}")
+        return await write_run_result(
+            work_item_id=body["work_item_id"],
+            status=body["status"],
+            summary=body.get("summary", ""),
+            run_id=body.get("run_id"),
+            duration_sec=body.get("duration_sec", 0),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except TestItConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except TestItAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except TestItConnectionError as exc:
+        raise HTTPException(status_code=503, detail=f"TestIT unavailable: {exc}")
+    except TestItResponseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except TestItApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
-@router.get("/audit/sessions")
-async def audit_list_sessions() -> dict:
-    try:
-        return await audit_service.list_audit_sessions()
-    except httpx.RequestError:
-        return {"sessions": []}
-    except Exception:
-        return {"sessions": []}
-
-
-@router.get("/audit/sessions/{run_id}/steps")
-async def audit_get_session_steps(run_id: str) -> dict:
-    try:
-        return await audit_service.get_audit_session_steps(run_id)
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text[:300])
-    except httpx.RequestError as exc:
-        raise HTTPException(status_code=503, detail=f"Audit runner unavailable: {exc}")
-
-
-@router.websocket("/audit/ws/{run_id}")
-async def audit_ws_proxy(websocket: WebSocket, run_id: str) -> None:
-    await websocket.accept()
-    audit_ws_url = (
-        settings.AUDIT_RUNNER_URL
-        .replace("http://", "ws://")
-        .replace("https://", "wss://")
-        + f"/ws/{run_id}"
-    )
-    try:
-        from websockets.asyncio.client import connect as ws_connect
-        async with ws_connect(audit_ws_url, max_size=None) as runner_ws:
-            try:
-                async for message in runner_ws:
-                    msg = message if isinstance(message, str) else message.decode()
-                    await websocket.send_text(msg)
-            except WebSocketDisconnect:
-                pass
-    except WebSocketDisconnect:
-        pass
-    except Exception as exc:
-        try:
-            await websocket.send_json({"type": "error", "message": str(exc)})
-        except Exception:
-            pass
-        try:
-            await websocket.close()
-        except Exception:
-            pass
-
-
-@router.get("/audit/screenshot")
-async def audit_screenshot(path: str) -> FileResponse:
-    runs_dir = settings.RUNNER_RUNS_DIR
-    if not runs_dir:
-        raise HTTPException(status_code=503, detail="Screenshot serving not configured (RUNNER_RUNS_DIR not set)")
-    import pathlib
-    runs_root = pathlib.Path(runs_dir).resolve()
-    target = pathlib.Path(path).resolve()
-    if not str(target).startswith(str(runs_root)):
-        raise HTTPException(status_code=403, detail="Access denied")
-    if not target.exists():
-        raise HTTPException(status_code=404, detail="Screenshot not found")
-    return FileResponse(str(target))

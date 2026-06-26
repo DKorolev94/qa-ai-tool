@@ -21,12 +21,9 @@ class Settings(BaseSettings):
     TESTIT_PROJECT_UUID: str = ""
     TESTIT_DRAFT_SECTION_UUID: str = ""
 
-    RUNNER_URL: str = "http://localhost:8009"
+    RUNNER_URL: str = "http://localhost:8008"
     RUNNER_TIMEOUT_SEC: int = 180
     RUNNER_RUNS_DIR: str = ""
-
-    AUDIT_RUNNER_URL: str = "http://localhost:8008"
-    AUDIT_RUNNER_TIMEOUT_SEC: int = 300
 
     @field_validator("TESTIT_BASE_URL", mode="after")
     @classmethod
@@ -34,7 +31,7 @@ class Settings(BaseSettings):
         return v.rstrip("/")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=["../.env", ".env"],
         env_file_encoding="utf-8",
         extra="ignore",
     )
