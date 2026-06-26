@@ -1,14 +1,17 @@
 export type SourceMode = 'testit' | 'manual'
 export type ReviewRuleId =
-  | 'structure'
+  | 'title'
   | 'description'
+  | 'preconditions'
+  | 'steps'
+  | 'postconditions'
+  | 'priority'
   | 'expected_results'
   | 'test_data'
   | 'tags'
-  | 'duration'
   | 'atomicity'
   | 'independence'
-  | 'requirement_traceability'
+  | 'reproducibility'
 export type Severity = 'high' | 'medium' | 'low'
 export type ResolutionStatus = 'resolved' | 'manual_needed' | 'skipped'
 export type StatusType = 'success' | 'error' | 'loading' | ''
@@ -187,14 +190,28 @@ export type RunnerStatus = 'passed' | 'failed' | 'blocked'
 export type RunnerSessionStatus = 'running' | RunnerStatus
 
 // WebSocket streaming events
+export interface ActionDetail {
+  type: string
+  target?: string
+  selector?: string
+  args?: string[]
+  result_success?: boolean
+  result_message?: string
+}
+
 export interface WsStepEvent {
   type: 'step'
   step: number
   url: string
   title: string
   next_goal: string
+  status?: 'ok' | 'error'
   screenshot_b64?: string
   elapsed_sec: number
+  action?: ActionDetail
+  expected?: string
+  actual?: string
+  step_verdict?: 'passed' | 'failed'
 }
 export interface WsDoneEvent {
   type: 'done'
@@ -209,7 +226,14 @@ export interface WsErrorEvent {
   type: 'error'
   message: string
 }
-export type WsEvent = WsStepEvent | WsDoneEvent | WsErrorEvent
+export interface WsLogEvent {
+  type: 'log'
+  level: 'error' | 'info' | 'verbose'
+  category: string
+  message: string
+  elapsed_sec: number
+}
+export type WsEvent = WsStepEvent | WsDoneEvent | WsErrorEvent | WsLogEvent
 
 // Historical session from /api/runner/sessions
 export interface SessionListItem {
@@ -228,11 +252,15 @@ export interface HistoricalStep {
   summary: string
   url: string | null
   duration_sec: number | null
+  action?: ActionDetail
   screenshot?: {
     path: string
     url?: string
     size_bytes: number
   } | null
+  expected?: string
+  actual?: string
+  step_verdict?: 'passed' | 'failed'
 }
 
 export interface RunnerSession {
@@ -242,6 +270,7 @@ export interface RunnerSession {
   task?: string
   startUrl?: string
   workItemId?: string
+  iterationIndex?: number
   status: RunnerSessionStatus
   result?: RunnerRunResponse
   startedAt: number
@@ -261,15 +290,4 @@ export interface RunnerRunResponse {
   screenshots: RunnerScreenshot[]
   duration_sec: number
   run_id: string | null
-}
-
-export interface AuditSession {
-  id: string
-  title: string
-  task: string
-  startUrl?: string
-  status: RunnerSessionStatus
-  result?: RunnerRunResponse
-  startedAt: number
-  endedAt?: number
 }

@@ -77,14 +77,6 @@ export const api = {
   getSessionSteps: (runId: string) =>
     get<{ steps: HistoricalStep[] }>(`/runner/sessions/${runId}/steps`),
 
-  startAuditStreaming: (body: { task: string; start_url?: string }) =>
-    post<{ run_id: string }>('/audit/start', body),
-
-  listAuditSessions: () =>
-    get<{ sessions: SessionListItem[] }>('/audit/sessions'),
-
-  getAuditSessionSteps: (runId: string) =>
-    get<{ steps: HistoricalStep[] }>(`/audit/sessions/${runId}/steps`),
 }
 
 export function parseManualInput(raw: string): { work_item?: unknown; raw_content?: string } {

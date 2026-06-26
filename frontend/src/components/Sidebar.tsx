@@ -1,6 +1,6 @@
-import { ChevronLeft, ChevronRight, FileCheck2, Globe, MonitorPlay, Sparkles, Zap, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileCheck2, MonitorPlay, Sparkles, Zap, Settings } from 'lucide-react'
 
-type Tool = 'review' | 'runner' | 'audit'
+type Tool = 'review' | 'runner'
 
 interface SidebarProps {
   collapsed: boolean
@@ -8,6 +8,7 @@ interface SidebarProps {
   activeTool: Tool
   onToolChange: (tool: Tool) => void
 }
+
 
 export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: SidebarProps) {
   return (
@@ -41,19 +42,8 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
         >
           <div className="sb-icon"><MonitorPlay size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy">
-            <span className="sb-title">Stagehand Runner</span>
-            <span className="sb-sub">запуск тест-кейсов</span>
-          </div>
-        </div>
-        <div
-          className={`sb-item${activeTool === 'audit' ? ' sb-item-active' : ''}`}
-          onClick={() => onToolChange('audit')}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="sb-icon"><Globe size={16} strokeWidth={1.75} /></div>
-          <div className="sb-copy">
-            <span className="sb-title">Site Audit</span>
-            <span className="sb-sub">аудит сайта</span>
+            <span className="sb-title">Test Runner</span>
+            <span className="sb-sub">прогон тест-кейсов в браузере</span>
           </div>
         </div>
         <div className="sb-item sb-item-soon">
