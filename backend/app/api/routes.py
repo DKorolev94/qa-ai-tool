@@ -287,7 +287,6 @@ async def runner_screenshot(path: str) -> FileResponse:
 @router.post("/runner/write-testit-result")
 async def write_testit_result(body: dict) -> dict:
     from app.services.testit_run_service import write_run_result
-    from app.integrations.testit_client import TestItConfigError, TestItAuthError, TestItConnectionError, TestItResponseError, TestItApiError
     try:
         return await write_run_result(
             work_item_id=body["work_item_id"],
