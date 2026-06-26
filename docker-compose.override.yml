@@ -2,6 +2,7 @@ services:
   backend:
     volumes:
       - ./backend:/app
+      - ./browser-use-runner/runs:/app/runs
     command:
       - uvicorn
       - app.main:app
@@ -10,10 +11,6 @@ services:
       - --port
       - "8000"
       - --reload
-
-  stagehand-runner:
-    volumes:
-      - ./stagehand-runner/runs:/app/runs
 
   browser-use-runner:
     volumes:
