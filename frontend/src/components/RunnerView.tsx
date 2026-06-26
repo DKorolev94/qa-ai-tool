@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
-  AlertTriangle, CheckCircle2, ChevronLeft, Clock3, FileInput,
+  AlertTriangle, CheckCircle2, Clock3, FileInput,
   FileText, HardDrive, List, Loader2, Lock, Play,
   Shield, Upload, XCircle,
 } from 'lucide-react'
 import { api, humanizeFetchError } from '../api'
 import { RunnerSessionView, StatusBadge } from './RunnerSessionView'
+import { SectionHeader } from './SectionHeader'
 import type { FetchResult, RunnerRunResponse, RunnerSession, SessionListItem, Step } from '../types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ function fmtElapsed(s: number) {
 
 function mkSession(
   base: Pick<RunnerSession, 'title' | 'source'> &
-    Partial<Pick<RunnerSession, 'task' | 'startUrl' | 'workItemId'>>
+    Partial<Pick<RunnerSession, 'task' | 'startUrl' | 'workItemId' | 'iterationIndex'>>
 ): RunnerSession {
   return {
     id: crypto.randomUUID(),
@@ -33,20 +34,24 @@ function mkSession(
 
 function StepBlock({ label, steps }: { label: string; steps?: Step[] | null }) {
   if (!steps?.length) return null
+  const hasTestData = steps.some(s => s.test_data)
+  const cols = hasTestData ? '28px 1fr 1fr 1fr' : '28px 1fr 1fr'
   return (
     <div>
       <span className="case-sec-label">{label}</span>
       <div className="steps-tbl">
-        <div className="steps-head" style={{ gridTemplateColumns: '28px 1fr 1fr' }}>
+        <div className="steps-head" style={{ gridTemplateColumns: cols }}>
           <div className="steps-th steps-th-num">#</div>
           <div className="steps-th">Действие</div>
           <div className="steps-th">Ожидаемый результат</div>
+          {hasTestData && <div className="steps-th">Тестовые данные</div>}
         </div>
         {steps.map((s, i) => (
-          <div key={i} className="steps-row" style={{ gridTemplateColumns: '28px 1fr 1fr' }}>
+          <div key={i} className="steps-row" style={{ gridTemplateColumns: cols }}>
             <div className="steps-num-cell">{i + 1}</div>
             <div className="steps-cell steps-action">{s.action}</div>
             <div className="steps-cell steps-exp">{s.expected || ''}</div>
+            {hasTestData && <div className="steps-cell">{s.test_data || ''}</div>}
           </div>
         ))}
       </div>
@@ -59,21 +64,43 @@ function StepBlock({ label, steps }: { label: string; steps?: Step[] | null }) {
 interface WorkbenchProps {
   fetchResult: FetchResult
   onBack: () => void
-  onRun: () => void
+  onRun: (iterationIndex: number) => void
+}
+
+function IterationPicker({
+  names, rows, selected, onChange,
+}: {
+  names: string[]
+  rows: string[][]
+  selected: number
+  onChange: (i: number) => void
+}) {
+  return (
+    <div>
+      <label className="source-label">Набор параметров (стенд / итерация)</label>
+      <select
+        className="source-id-input"
+        style={{ width: '100%', cursor: 'pointer' }}
+        value={selected}
+        onChange={e => onChange(Number(e.target.value))}
+      >
+        {rows.map((row, i) => {
+          const label = names.map((n, j) => `${n}: ${row[j] ?? ''}`).join(' | ')
+          return <option key={i} value={i}>{`[${i + 1}] ${label}`}</option>
+        })}
+      </select>
+    </div>
+  )
 }
 
 function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
   const tc = fetchResult.normalized_testcase
+  const pt = tc.parameter_table
+  const hasIterations = pt && pt.rows.length > 1
+  const [selectedIteration, setSelectedIteration] = useState(0)
   return (
     <div className="workspace-inner-wb">
-      <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="button" className="back-btn" onClick={onBack}>
-            <ChevronLeft size={16} strokeWidth={1.75} />
-          </button>
-          <h1 className="page-title">Stagehand Runner</h1>
-        </div>
-      </div>
+      <SectionHeader title="Test Runner" onBack={onBack} />
 
       <div className="wb-card">
         <div className="wb-card-left">
@@ -84,7 +111,7 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
           </div>
         </div>
         <div className="wb-actions">
-          <button type="button" className="source-fetch-btn" onClick={onRun}>
+          <button type="button" className="source-fetch-btn" onClick={() => onRun(selectedIteration)}>
             <Play size={13} /> Запустить
           </button>
         </div>
@@ -99,26 +126,40 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
             <StepBlock label="Предусловие" steps={tc.preconditions} />
             <div>
               <span className="case-sec-label">Шаги</span>
-              {tc.steps?.length ? (
-                <div className="steps-tbl">
-                  <div className="steps-head" style={{ gridTemplateColumns: '28px 1fr 1fr' }}>
-                    <div className="steps-th steps-th-num">#</div>
-                    <div className="steps-th">Действие</div>
-                    <div className="steps-th">Ожидаемый результат</div>
-                  </div>
-                  {tc.steps.map((s, i) => (
-                    <div key={i} className="steps-row" style={{ gridTemplateColumns: '28px 1fr 1fr' }}>
-                      <div className="steps-num-cell">{i + 1}</div>
-                      <div className="steps-cell steps-action">{s.action}</div>
-                      <div className="steps-cell steps-exp">{s.expected || ''}</div>
+              {tc.steps?.length ? (() => {
+                const hasTestData = tc.steps.some(s => s.test_data)
+                const cols = hasTestData ? '28px 1fr 1fr 1fr' : '28px 1fr 1fr'
+                return (
+                  <div className="steps-tbl">
+                    <div className="steps-head" style={{ gridTemplateColumns: cols }}>
+                      <div className="steps-th steps-th-num">#</div>
+                      <div className="steps-th">Действие</div>
+                      <div className="steps-th">Ожидаемый результат</div>
+                      {hasTestData && <div className="steps-th">Тестовые данные</div>}
                     </div>
-                  ))}
-                </div>
-              ) : (
+                    {tc.steps.map((s, i) => (
+                      <div key={i} className="steps-row" style={{ gridTemplateColumns: cols }}>
+                        <div className="steps-num-cell">{i + 1}</div>
+                        <div className="steps-cell steps-action">{s.action}</div>
+                        <div className="steps-cell steps-exp">{s.expected || ''}</div>
+                        {hasTestData && <div className="steps-cell">{s.test_data || ''}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })() : (
                 <div className="case-text-box case-text-empty">не указано</div>
               )}
             </div>
             <StepBlock label="Постусловие" steps={tc.postconditions} />
+            {hasIterations && pt && (
+              <IterationPicker
+                names={pt.names}
+                rows={pt.rows}
+                selected={selectedIteration}
+                onChange={setSelectedIteration}
+              />
+            )}
           </div>
         </div>
 
@@ -220,9 +261,7 @@ function InputScreen({
   return (
     <div className="workspace-inner">
       <div className="workspace-col">
-        <div className="page-header">
-          <span className="page-title">Stagehand Runner</span>
-        </div>
+        <SectionHeader title="Test Runner" />
         <div className="source-panel">
 
           {/* Hero */}
@@ -333,11 +372,12 @@ function InputScreen({
                 <div className="status-chip">
                   <span className="status-chip-icon"><Clock3 size={14} strokeWidth={1.75} /></span>
                   <span className="status-chip-label">Движок</span>
-                  <span className="status-chip-value">Browser Use</span>
+                  <span className="status-chip-value">browser-use</span>
                 </div>
                 <div className="status-chip">
                   <span className="status-chip-icon"><Play size={14} strokeWidth={1.75} /></span>
-                  <span className="status-chip-value">Автопрогон</span>
+                  <span className="status-chip-label">Режим</span>
+                  <span className="status-chip-value">Авто (без пауз)</span>
                 </div>
               </div>
 
@@ -514,11 +554,11 @@ export function RunnerView() {
     startSession(mkSession({ title, source: 'manual', task, startUrl }))
   }
 
-  function handleRunTestIt() {
+  function handleRunTestIt(iterationIndex = 0) {
     if (!fetchResult) return
     const tc = fetchResult.normalized_testcase
     const title = tc.title ? `${tc.title} #${fetchResult.work_item_id}` : `Тест-кейс #${fetchResult.work_item_id}`
-    startSession(mkSession({ title, source: 'testit', workItemId: fetchResult.work_item_id }))
+    startSession(mkSession({ title, source: 'testit', workItemId: fetchResult.work_item_id, iterationIndex }))
   }
 
   function handleRerun(prev: RunnerSession) {
@@ -528,6 +568,7 @@ export function RunnerView() {
       task: prev.task,
       startUrl: prev.startUrl,
       workItemId: prev.workItemId,
+      iterationIndex: prev.iterationIndex,
     }))
   }
 
