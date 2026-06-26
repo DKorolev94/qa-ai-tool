@@ -597,7 +597,6 @@ export function RunnerSessionView({ session, onBack, onRerun, onUpdate, wsPathPr
   const [viewTab, setViewTab] = useState<ViewTab>('browser')
   const [highlightedStep, setHighlightedStep] = useState<number | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const activeRunIdRef = useRef<string | null>(null)
   const onUpdateRef = useRef(onUpdate)
   const mountedRef = useRef(true)
   const stepRefs = useRef<Map<number, HTMLDivElement>>(new Map())
@@ -666,7 +665,6 @@ export function RunnerSessionView({ session, onBack, onRerun, onUpdate, wsPathPr
 
         if (abort.signal.aborted || !mountedRef.current) return
 
-        activeRunIdRef.current = runId
         const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
         const wsPrefix = wsPathPrefix ?? '/runner/ws'
         const ws = new WebSocket(`${proto}://${window.location.host}/api${wsPrefix}/${runId}`)
