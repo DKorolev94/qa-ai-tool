@@ -1,132 +1,116 @@
 # QA AI Tool
 
-Локальный инструмент для QA
+AI-powered test case review and improvement tool. Integrates with TestIT, uses any OpenAI-compatible LLM endpoint.
 
-## Структура
+## Architecture
 
-- backend: FastAPI API (порт 8000)
-- frontend: Vite + React UI (порт 3000)
+| Service | Port | Description |
+|---|---|---|
+| `backend` | 8000 | FastAPI — TestIT proxy, LLM review/improve pipeline |
+| `browser-use-runner` | 8008 | FastAPI — AI browser agent runner |
+| `frontend` | 3000 | Vite + React UI |
+
+---
 
 ## Quick Start (Docker)
 
-**Требования:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Linux/macOS/Windows)
+**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Linux / macOS / Windows)
 
 ```bash
 # 1. Clone
-git clone <repo-url> && cd qa-ai-tool
+git clone git@github.com:DKorolev94/qa-ai-tool.git && cd qa-ai-tool
 
 # 2. Configure
 cp .env.example .env
-# Edit .env: set LLM_API_KEY, TESTIT_BASE_URL, TESTIT_PRIVATE_TOKEN
+# Edit .env — set at minimum: LLM_API_KEY, LLM_MODEL, TESTIT_BASE_URL, TESTIT_PRIVATE_TOKEN
 
-# 3. Start (dev mode — hot-reload, bind-mounts)
+# 3. Start dev (hot-reload, bind mounts — works on Linux + macOS incl. Apple Silicon)
 docker compose up --build
 
 # 4. Open
-# http://localhost:3000
+open http://localhost:3000
 ```
 
-**Prod mode** (built frontend, no source mounts):
 ```bash
-docker compose -f docker-compose.yml up --build
-```
+# Prod mode (built frontend, named volumes)
+docker compose -f docker-compose.prod.yml up --build
 
-**Stop:**
-```bash
+# Stop
 docker compose down
 ```
 
-**Screenshots and run history** persist in Docker named volumes between restarts.
-In dev mode they are also visible at `stagehand-runner/runs/` and `browser-use-runner/runs/`.
+> **Apple Silicon note:** `platform: linux/amd64` is already set for `browser-use-runner` in both compose files — Rosetta handles the emulation automatically.
 
-## Быстрый старт
+---
 
-Требования:
-- Python 3.10+
-- Node.js 18+
-- npm 9+
+## Quick Start (local, no Docker)
 
-1. Склонировать репозиторий и перейти в корень проекта.
-2. Настроить backend-переменные окружения (см. раздел "Переменные окружения").
-3. Запустить backend.
-4. Запустить frontend.
-5. Открыть UI в браузере: http://localhost:3000
+**Requirements:** Python 3.10+, Node.js 18+, uv (`pip install uv`)
 
-## Запуск backend
+```bash
+# All services at once (uses Makefile)
+make dev
 
-Из корня проекта:
+# Or individually:
 
-- cd backend
-- python -m venv .venv
-- source .venv/bin/activate (Linux/macOS) или .venv\\Scripts\\activate (Windows)
-- pip install -r requirements.txt
-- uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Backend
+cd backend && python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-Проверка backend:
-- http://localhost:8000/health
-- Ожидаемый ответ: {"status":"ok"}
+# browser-use-runner
+cd browser-use-runner && uv sync
+uv run uvicorn main:app --host 0.0.0.0 --port 8008 --reload
 
-Примечание:
-- В некоторых Linux/WSL окружениях Python может быть "externally managed" (PEP 668).
-- Если установка через pip блокируется, используйте виртуальное окружение (рекомендуется) или установку в user-site/с флагом вашей платформы.
+# Frontend
+cd frontend && npm install && npm run dev
+```
 
-## Запуск frontend
+```bash
+make stop      # kill all local services
+make restart   # stop + start
+make status    # check ports
+```
 
-Из корня проекта:
+---
 
-- cd frontend
-- npm install
-- npm run dev
+## Environment Variables
 
-Открыть:
-- http://localhost:3000
+Copy `.env.example` to `.env` in the project root and fill in the values.
 
-Важно:
-- Во frontend API-запросы идут на путь /api.
-- В dev-режиме Vite проксирует /api на backend: http://localhost:8000.
+### Required
 
-## Переменные окружения
+| Variable | Example | Description |
+|---|---|---|
+| `LLM_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoint |
+| `LLM_API_KEY` | `sk-...` | API key (`ollama` for local Ollama) |
+| `LLM_MODEL` | `gpt-4o-mini` | Model for review/improve (needs structured JSON output) |
+| `RUNNER_LLM_MODEL` | `gpt-4o` | Model for browser agent (strong reasoning recommended) |
+| `TESTIT_BASE_URL` | `https://testit.example.com` | TestIT instance URL |
+| `TESTIT_PRIVATE_TOKEN` | `your_token` | TestIT private token |
+| `TESTIT_PROJECT_UUID` | `uuid` | Default project UUID |
 
-Переменные читаются backend из файла backend/.env.
+### LLM provider examples
 
-1. Создайте backend/.env на основе шаблона:
-- cp backend/.env.example backend/.env
-- или в PowerShell: Copy-Item backend/.env.example backend/.env
+```bash
+# OpenAI
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=sk-...
+LLM_MODEL=gpt-4o-mini
 
-2. Заполните значения в backend/.env.
+# DeepSeek
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
 
-### Обязательные для LLM
-
-- LLM_BASE_URL
-- LLM_MODEL
-- LLM_API_KEY
-
-### Основные для TestIT
-
-- TESTIT_BASE_URL
-- TESTIT_PRIVATE_TOKEN
-- TESTIT_AUTH_SCHEME (обычно PrivateToken)
-- TESTIT_PROJECT_UUID
-
-### Дополнительные
-
-- LLM_TEMPERATURE
-- LLM_TEMPERATURE_REVIEW
-- LLM_TEMPERATURE_IMPROVE
-- LLM_TIMEOUT_SECONDS
-- TESTIT_TIMEOUT_SECONDS
-- TESTIT_VERIFY_SSL
-
-## Пример минимального backend/.env
-
+# Ollama (local, outside Docker)
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=gemma3:4b
 LLM_API_KEY=ollama
-TESTIT_BASE_URL=https://testit.example.com
-TESTIT_PRIVATE_TOKEN=your_private_token_here
-TESTIT_AUTH_SCHEME=PrivateToken
-TESTIT_PROJECT_UUID=your_project_uuid_here
+LLM_MODEL=gemma3:4b
 
-## Где смотреть полный шаблон
+# Ollama inside Docker (Linux)
+LLM_BASE_URL=http://host.docker.internal:11434/v1
+# Also add to docker-compose.yml under browser-use-runner:
+#   extra_hosts: ["host.docker.internal:host-gateway"]
+```
 
-- backend/.env.example
+See `.env.example` for the full list of optional variables.
