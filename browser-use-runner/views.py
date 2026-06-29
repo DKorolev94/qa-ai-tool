@@ -10,12 +10,26 @@ class RunStatus(str, Enum):
 	passed = 'passed'
 	failed = 'failed'
 	blocked = 'blocked'
+	stopped = 'stopped'
 
 
 class LLMConfig(BaseModel):
 	model_config = ConfigDict(extra='forbid')
 
 	model: str = Field(default='deepseek-chat')
+	max_tokens: int | None = Field(default=None, ge=1, description='Max completion tokens; use to fit models with small context windows')
+
+
+class BrowserProfileConfig(BaseModel):
+	model_config = ConfigDict(extra='forbid')
+
+	is_mobile: bool = Field(default=False, description='Use mobile viewport + UA (iPhone 14 preset)')
+	viewport_width: int | None = Field(default=None, ge=320, le=7680)
+	viewport_height: int | None = Field(default=None, ge=200, le=4320)
+	device_scale_factor: float | None = Field(default=None, ge=0.5, le=5.0, description='DPR, e.g. 2.0 for retina')
+	user_agent: str | None = Field(default=None, description='Custom User-Agent string')
+	locale: str | None = Field(default=None, description='Browser locale, e.g. ru-RU, en-US')
+	timezone_id: str | None = Field(default=None, description='IANA timezone, e.g. Europe/Moscow, UTC')
 
 
 class RunRequest(BaseModel):
@@ -37,6 +51,11 @@ class RunRequest(BaseModel):
 	use_vision: bool = False
 	headless: bool = True
 	llm: LLMConfig = Field(default_factory=LLMConfig)
+	sensitive_data: dict[str, str] | None = Field(
+		default=None,
+		description='Placeholder → real value. Use {placeholder} in task. Values are redacted from logs/screenshots by browser-use.',
+	)
+	browser_profile: BrowserProfileConfig = Field(default_factory=BrowserProfileConfig)
 
 
 class TokenUsageReport(BaseModel):
@@ -75,6 +94,8 @@ class RunResponse(BaseModel):
 	status: RunStatus
 	summary: str
 	steps_count: int = 0
+	instability_step_count: int = 0
+	retry_step_count: int = 0
 	errors: list[str] = Field(default_factory=list)
 	artifacts: ArtifactReport
 	duration_sec: float

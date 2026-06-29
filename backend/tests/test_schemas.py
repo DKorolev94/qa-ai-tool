@@ -29,9 +29,9 @@ def test_improve_request_default_source_type():
 def test_analyze_request_accepts_enabled_rules():
     req = AnalyzeTestCaseRequest(
         raw_content="test",
-        enabled_rules=["title", "requirement_traceability"],
+        enabled_rules=["title", "reproducibility"],
     )
-    assert req.enabled_rules == ["title", "requirement_traceability"]
+    assert req.enabled_rules == ["title", "reproducibility"]
 
 
 def test_review_result_model():

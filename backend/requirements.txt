@@ -5,6 +5,7 @@ pydantic-settings
 python-dotenv
 httpx
 beautifulsoup4
+websockets>=13.0
 pytest
 instructor>=1.0.0
 openai>=1.40.0

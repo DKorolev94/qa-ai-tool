@@ -86,16 +86,14 @@ def test_improve_returns_improve_result():
     assert result.improved_testcase.title == "Improved"
 
 
-def test_improve_fallback_on_llm_error():
+def test_improve_raises_on_llm_error():
+    import pytest
     from app.core.llm_client import improve_testcase_with_llm
 
     with patch("app.core.llm_client._client") as mock_client:
         mock_client.chat.completions.create.side_effect = Exception("Connection refused")
-        result = improve_testcase_with_llm(SAMPLE_TESTCASE, SAMPLE_ISSUES)
-
-    assert isinstance(result, ImproveResult)
-    assert len(result.warnings) > 0
-    assert "unavailable" in result.warnings[0].lower()
+        with pytest.raises(RuntimeError, match="LLM improve"):
+            improve_testcase_with_llm(SAMPLE_TESTCASE, SAMPLE_ISSUES)
 
 
 def test_improve_passes_issues_in_user_message():

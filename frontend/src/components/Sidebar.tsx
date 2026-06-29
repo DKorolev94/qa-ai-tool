@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, FileCheck2, MonitorPlay, Sparkles, Zap, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileCheck2, MonitorPlay, Sparkles, Settings } from 'lucide-react'
 
 type Tool = 'review' | 'runner'
 
@@ -21,7 +21,7 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
         </div>
       </div>
       <div className="sb-section">
-        <span className="sb-section-label">Инструменты</span>
+        <span className="sb-section-label">Tools</span>
       </div>
       <nav className="sb-nav">
         <div
@@ -31,8 +31,8 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
         >
           <div className="sb-icon"><FileCheck2 size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy">
-            <span className="sb-title">Ревью и улучшение</span>
-            <span className="sb-sub">тест-кейсов</span>
+            <span className="sb-title">Review & Improve</span>
+            <span className="sb-sub">test cases</span>
           </div>
         </div>
         <div
@@ -43,32 +43,25 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
           <div className="sb-icon"><MonitorPlay size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy">
             <span className="sb-title">Test Runner</span>
-            <span className="sb-sub">прогон тест-кейсов в браузере</span>
+            <span className="sb-sub">run test cases in browser</span>
           </div>
         </div>
         <div className="sb-item sb-item-soon">
           <div className="sb-icon"><Sparkles size={16} strokeWidth={1.75} /></div>
           <div className="sb-copy">
-            <span className="sb-title">Генерация</span>
-            <span className="sb-sub">тест-кейсов</span>
+            <span className="sb-title">Generate</span>
+            <span className="sb-sub">test cases</span>
           </div>
-          <span className="sb-badge">Скоро</span>
+          <span className="sb-badge">Soon</span>
         </div>
-        <div className="sb-item sb-item-soon">
-          <div className="sb-icon"><Zap size={16} strokeWidth={1.75} /></div>
-          <div className="sb-copy">
-            <span className="sb-title">Генерация</span>
-            <span className="sb-sub">api-тестов</span>
-          </div>
-          <span className="sb-badge">Скоро</span>
-        </div>
+
       </nav>
       <div className="sb-divider" />
       <div className="sb-bottom">
         <div className="sb-item sb-item-soon">
           <div className="sb-icon"><Settings size={16} strokeWidth={1.75} /></div>
-          <div className="sb-copy"><span className="sb-title">Настройки</span></div>
-          <span className="sb-badge">Скоро</span>
+          <div className="sb-copy"><span className="sb-title">Settings</span></div>
+          <span className="sb-badge">Soon</span>
         </div>
         <button type="button" className="sb-item" onClick={onToggle}>
           <div className="sb-icon">
@@ -77,7 +70,7 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
               : <ChevronLeft size={16} strokeWidth={1.75} />
             }
           </div>
-          <div className="sb-copy"><span className="sb-title">Свернуть</span></div>
+          <div className="sb-copy"><span className="sb-title">Collapse</span></div>
         </button>
       </div>
     </aside>

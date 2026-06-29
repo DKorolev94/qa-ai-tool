@@ -57,7 +57,7 @@ export function RulesModal({ reviewConfig, selectedPreset, enabledRules, onApply
     const style: React.CSSProperties = showAbove
       ? { bottom: window.innerHeight - rect.top + 6, left: x }
       : { top: rect.bottom + 6, left: x }
-    const text = reviewConfig.rules.find(r => r.id === ruleId)?.description ?? 'Описание недоступно.'
+    const text = reviewConfig.rules.find(r => r.id === ruleId)?.description ?? 'Description not available.'
     setTooltip({ ruleId, text, style })
   }
 
@@ -81,7 +81,7 @@ export function RulesModal({ reviewConfig, selectedPreset, enabledRules, onApply
       <div className="rules-modal">
         {/* Header */}
         <div className="rules-modal-header">
-          <span className="rules-modal-title">Правила ревью</span>
+          <span className="rules-modal-title">Review rules</span>
           <button type="button" className="rules-modal-close" onClick={onClose}>
             <X size={15} strokeWidth={1.75} />
           </button>
@@ -112,9 +112,9 @@ export function RulesModal({ reviewConfig, selectedPreset, enabledRules, onApply
               {allChecked && <Check size={11} strokeWidth={2.5} />}
               {someChecked && <Minus size={11} strokeWidth={2.5} />}
             </span>
-            <span className="rules-select-all-text">Выбрать все</span>
+            <span className="rules-select-all-text">Select all</span>
           </button>
-          <span className="rules-select-all-counter">{checkedCount} из {allRuleIds.length}</span>
+          <span className="rules-select-all-counter">{checkedCount} of {allRuleIds.length}</span>
         </div>
 
         {/* Rules grid — two columns */}
@@ -150,7 +150,7 @@ export function RulesModal({ reviewConfig, selectedPreset, enabledRules, onApply
 
         {/* Footer */}
         <div className="rules-modal-footer">
-          <span className="rules-footer-count">Выбрано {localRules.length} правил</span>
+          <span className="rules-footer-count">{localRules.length} rules selected</span>
           <div className="rules-footer-actions">
             <button
               type="button"
@@ -158,10 +158,10 @@ export function RulesModal({ reviewConfig, selectedPreset, enabledRules, onApply
               disabled={!hasChanges}
               onClick={handleReset}
             >
-              Сбросить изменения
+              Reset
             </button>
             <button type="button" className="rules-btn-apply" onClick={() => onApply(localPreset, localRules)}>
-              Применить
+              Apply
             </button>
           </div>
         </div>

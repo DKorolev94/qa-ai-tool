@@ -146,13 +146,14 @@ async def _call_runner(payload: dict, timeout: float) -> RunnerRunResponse:
 
 def _build_manual_task_prompt(task: str) -> str:
     return (
-        "You are a QA engineer executing a browser task.\n"
-        "Complete the task below exactly as described. Be efficient — do not explore beyond what is needed.\n"
-        "Once you have verified the result, immediately call the 'done' action with plain text:\n"
-        "start with passed/failed/blocked, then one sentence describing what you observed.\n"
-        "Do not use JSON, code blocks, or any structured format in the done() call.\n"
+        "You are a QA engineer executing a browser test.\n"
+        "Execute ONLY the steps listed below — nothing more, nothing less.\n"
+        "Do NOT navigate, click, scroll, or explore anything not explicitly required by the steps.\n"
+        "After completing the last step, call done() IMMEDIATELY.\n"
+        "In done(), write plain text: start with passed/failed/blocked, then one sentence describing what you observed.\n"
+        "Do not use JSON, code blocks, or structured format in done().\n"
         "\n"
-        f"Task:\n{task}"
+        f"Steps:\n{task}"
     )
 
 
@@ -168,6 +169,12 @@ async def start_manual_streaming(body: RunnerManualStartRequest) -> dict:
             start_url = m.group(0)
     if start_url:
         payload['start_url'] = start_url
+    if body.sensitive_data:
+        payload['sensitive_data'] = body.sensitive_data
+    if body.browser_profile:
+        profile = body.browser_profile.model_dump(exclude_none=True, exclude_defaults=True)
+        if profile:
+            payload['browser_profile'] = profile
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f'{settings.RUNNER_URL}/start',
@@ -215,6 +222,26 @@ async def get_session_steps(run_id: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f'{settings.RUNNER_URL}/runs/{run_id}/steps',
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def get_session_logs(run_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f'{settings.RUNNER_URL}/runs/{run_id}/logs',
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+async def stop_session(run_id: str) -> dict:
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f'{settings.RUNNER_URL}/runs/{run_id}/stop',
             timeout=10.0,
         )
         response.raise_for_status()

@@ -90,25 +90,25 @@ export function parseManualInput(raw: string): { work_item?: unknown; raw_conten
 export function humanizeFetchError(msg: string): string {
   const m = msg.toLowerCase()
   if (m.includes('401') || m.includes('403'))
-    return 'TestIT: ошибка авторизации. Проверьте TESTIT_PRIVATE_TOKEN в .env'
+    return 'TestIT: authorization error. Check TESTIT_PRIVATE_TOKEN in .env'
   if (m.includes('404') || m.includes('not found'))
-    return 'Тест-кейс не найден. Проверьте ID'
+    return 'Test case not found. Check the ID'
   if (m.includes('503') || m.includes('unavailable') || m.includes('configured'))
-    return 'TestIT недоступен или TESTIT_BASE_URL/TOKEN не настроены в .env'
+    return 'TestIT unavailable or TESTIT_BASE_URL/TOKEN not configured in .env'
   if (m.includes('could not extract'))
-    return 'Неверный ввод. Используйте числовой ID, например: 6109'
+    return 'Invalid input. Use a numeric ID, e.g.: 6109'
   return msg
 }
 
 export function humanizeDraftError(msg: string): string {
   const m = msg.toLowerCase()
   if (m.includes('testit_project'))
-    return 'TESTIT_PROJECT_UUID не задан в backend .env'
+    return 'TESTIT_PROJECT_UUID not set in backend .env'
   if (m.includes('testit_draft_section'))
-    return 'TESTIT_DRAFT_SECTION_UUID не задан в backend .env'
+    return 'TESTIT_DRAFT_SECTION_UUID not set in backend .env'
   if (m.includes('401') || m.includes('403'))
-    return 'TestIT: ошибка авторизации'
+    return 'TestIT: authorization error'
   if (m.includes('503') || m.includes('configured'))
-    return 'TestIT недоступен или не настроен'
+    return 'TestIT unavailable or not configured'
   return msg
 }

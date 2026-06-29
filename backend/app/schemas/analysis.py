@@ -14,32 +14,19 @@ ReviewRuleId = Literal[
     "expected_results",
     "test_data",
     "tags",
-    "duration",
     "atomicity",
     "independence",
-    "requirement_traceability",
     "reproducibility",
-    "stability",
-    "access_control",
-    "api_db",
-    "data_security",
     "structure",  # deprecated: kept for backward compat, use title/preconditions/steps/postconditions/priority
 ]
-
-
-class ParsedStep(BaseModel):
-    action: str
-    expected: str | None = None
-    test_data: str | None = None
-    comments: str | None = None
 
 
 class TextParseResult(BaseModel):
     title: str = ""
     description: str = ""
-    preconditions: list[ParsedStep] = []
-    steps: list[ParsedStep] = []
-    postconditions: list[ParsedStep] = []
+    preconditions: list["AnalysisStep"] = []
+    steps: list["AnalysisStep"] = []
+    postconditions: list["AnalysisStep"] = []
     tags: list[str] = []
     priority: str | None = None
     status: str | None = None
@@ -62,7 +49,6 @@ _RULE_ALIASES: dict[str, str] = {
     "steps": "steps",
     "postconditions": "postconditions",
     "priority": "priority",
-    "links": "requirement_traceability",
     "expected": "expected_results",
     "expected_result": "expected_results",
     "test_data_field": "test_data",
@@ -81,15 +67,9 @@ _RULE_LABELS: dict[str, str] = {
     "expected_results": "Ожидаемые результаты",
     "test_data": "Тестовые данные",
     "tags": "Теги",
-    "duration": "Длительность",
     "atomicity": "Атомарность",
     "independence": "Независимость",
-    "requirement_traceability": "Связь с требованиями",
     "reproducibility": "Воспроизводимость",
-    "stability": "Стабильность",
-    "access_control": "Роли и права доступа",
-    "api_db": "API / DB проверки",
-    "data_security": "Безопасность данных",
     "structure": "Структура",  # deprecated
 }
 
@@ -128,7 +108,6 @@ class _LLMIssue(BaseModel):
     """Internal model matching prompt output. rule is constrained to valid ReviewRuleId values."""
     rule: ReviewRuleId
     severity: Literal["low", "medium", "high"]
-    field: str | None = None
     problem: str
     evidence: str | None = None
     recommendation: str
@@ -168,6 +147,9 @@ class AnalysisStep(BaseModel):
     comments: str | None = None
 
 
+TextParseResult.model_rebuild()
+
+
 class AnalyzedTestCase(BaseModel):
     title: str = ""
     description: str = ""
@@ -185,7 +167,6 @@ class IssueResolution(BaseModel):
     issue_index: int
     issue_title: str
     status: Literal["resolved", "manual_needed", "skipped"]
-    action_taken: str | None = None
     reason: str | None = None
 
 

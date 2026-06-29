@@ -37,7 +37,7 @@ from app.services.testcase_improver import improve_testcase
 from app.services.testit_draft_service import create_draft_in_testit
 from app.services.testit_workitem_service import fetch_and_normalize_work_item
 from app.services.testit_update_service import apply_to_original_in_testit
-from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerStartRequest
+from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerStartRequest, WriteTestItResultRequest
 from app.services import runner_service
 from app.core.config import settings
 from pydantic import BaseModel
@@ -196,6 +196,8 @@ async def runner_run_manual(body: RunnerManualStartRequest) -> RunnerRunResponse
 async def runner_start_manual(body: RunnerManualStartRequest) -> dict:
     try:
         return await runner_service.start_manual_streaming(body)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Runner timeout — could not start test")
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
     except httpx.HTTPStatusError as exc:
@@ -206,6 +208,8 @@ async def runner_start_manual(body: RunnerManualStartRequest) -> dict:
 async def runner_start_testit(body: RunnerStartRequest) -> dict:
     try:
         return await runner_service.start_testit_streaming(body.work_item_id, body.iteration_index)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Runner timeout — could not start test")
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
     except httpx.HTTPStatusError as exc:
@@ -221,6 +225,8 @@ async def runner_start_testit(body: RunnerStartRequest) -> dict:
 async def runner_list_sessions() -> dict:
     try:
         return await runner_service.list_sessions()
+    except httpx.TimeoutException:
+        return {"sessions": []}
     except httpx.RequestError:
         return {"sessions": []}
     except Exception:
@@ -231,6 +237,32 @@ async def runner_list_sessions() -> dict:
 async def runner_get_session_steps(run_id: str) -> dict:
     try:
         return await runner_service.get_session_steps(run_id)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Runner timeout — could not fetch steps")
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text[:300])
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
+
+
+@router.get("/runner/sessions/{run_id}/logs")
+async def runner_get_session_logs(run_id: str) -> dict:
+    try:
+        return await runner_service.get_session_logs(run_id)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Runner timeout — could not fetch logs")
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text[:300])
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
+
+
+@router.post("/runner/sessions/{run_id}/stop")
+async def runner_stop_session(run_id: str) -> dict:
+    try:
+        return await runner_service.stop_session(run_id)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Runner timeout — could not stop session")
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text[:300])
     except httpx.RequestError as exc:
@@ -265,6 +297,32 @@ async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
             pass
 
 
+def _resolve_video_path(run_id: str) -> tuple[pathlib.Path, str]:
+    import re
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+', run_id):
+        raise HTTPException(status_code=400, detail="Invalid run_id")
+    runs_dir = settings.RUNNER_RUNS_DIR
+    if not runs_dir:
+        raise HTTPException(status_code=503, detail="Video serving not configured (RUNNER_RUNS_DIR not set)")
+    for ext, mime in [('mp4', 'video/mp4'), ('webm', 'video/webm')]:
+        video_path = pathlib.Path(runs_dir) / run_id / 'media' / f'recording.{ext}'
+        if video_path.exists():
+            return video_path, mime
+    raise HTTPException(status_code=404, detail="No video recording for this run")
+
+
+@router.get("/runner/sessions/{run_id}/video")
+async def get_session_video(run_id: str) -> FileResponse:
+    video_path, mime = _resolve_video_path(run_id)
+    ext = video_path.suffix.lstrip('.')
+    return FileResponse(str(video_path), media_type=mime, filename=f'{run_id}.{ext}')
+
+
+@router.head("/runner/sessions/{run_id}/video")
+async def head_session_video(run_id: str):
+    _resolve_video_path(run_id)  # raises 404 if not found; returns (path, mime) but unused here
+
+
 @router.get("/runner/screenshot")
 async def runner_screenshot(path: str) -> FileResponse:
     runs_dir = settings.RUNNER_RUNS_DIR
@@ -285,15 +343,15 @@ async def runner_screenshot(path: str) -> FileResponse:
 
 
 @router.post("/runner/write-testit-result")
-async def write_testit_result(body: dict) -> dict:
+async def write_testit_result(body: WriteTestItResultRequest) -> dict:
     from app.services.testit_run_service import write_run_result
     try:
         return await write_run_result(
-            work_item_id=body["work_item_id"],
-            status=body["status"],
-            summary=body.get("summary", ""),
-            run_id=body.get("run_id"),
-            duration_sec=body.get("duration_sec", 0),
+            work_item_id=body.work_item_id,
+            status=body.status,
+            summary=body.summary,
+            run_id=body.run_id,
+            duration_sec=body.duration_sec,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

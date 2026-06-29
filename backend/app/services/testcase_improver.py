@@ -12,8 +12,18 @@ logger = logging.getLogger(__name__)
 
 # Rules that require external context and cannot be auto-resolved:
 # maps issue_title → field that must be non-empty to count as resolved
-_FIELD_REQUIRED_FOR_RESOLVED: dict[str, str] = {
-    "Связь с требованиями": "links",
+_FIELD_REQUIRED_FOR_RESOLVED: dict[str, str] = {}
+
+_VERIFIABLE_RULE_FIELDS: dict[str, list[str]] = {
+    "title": ["title"],
+    "description": ["description"],
+    "tags": ["tags"],
+    "priority": ["priority"],
+    "preconditions": ["preconditions"],
+    "postconditions": ["postconditions"],
+    "steps": ["steps"],
+    "expected_results": ["steps"],
+    "test_data": ["steps"],
 }
 
 _LINKED_DOC_PLACEHOLDERS = (
@@ -61,6 +71,12 @@ def _uses_linked_docs_without_links(improved: dict, original: dict) -> bool:
     )
 
 
+def _rule_field_changed(rule: str | None, original: dict, improved: dict) -> bool:
+    if not rule or rule not in _VERIFIABLE_RULE_FIELDS:
+        return True
+    return any(original.get(f) != improved.get(f) for f in _VERIFIABLE_RULE_FIELDS[rule])
+
+
 def _issue_rule(issue: dict | None) -> str | None:
     if not isinstance(issue, dict):
         return None
@@ -95,6 +111,11 @@ def _validate_resolutions(
                     r = r.model_copy(update={
                         "status": "manual_needed",
                         "reason": "Улучшение ссылается на связанные документы, но links пустой — нужен реальный источник данных",
+                    })
+                elif not _rule_field_changed(issue_rule, original, improved):
+                    r = r.model_copy(update={
+                        "status": "skipped",
+                        "reason": "Поле не изменилось — улучшение не применено",
                     })
         result.append(r)
     return result

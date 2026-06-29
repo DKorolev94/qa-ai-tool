@@ -1,8 +1,5 @@
-import { useState } from 'react'
 import {
-  AlignLeft, CheckCircle2, ChevronDown, Clock3, FileInput,
-  FileText, HardDrive, List, Loader2, Lock, Shield, ShieldCheck,
-  Upload, XCircle,
+  CheckCircle2, Clock3, FileText, List, Lock, Loader2, Shield, ShieldCheck, Upload, XCircle,
 } from 'lucide-react'
 import type { FetchResult } from '../types'
 
@@ -21,68 +18,30 @@ export function SourcePanel({
   testItId, onTestItIdChange, fetchLoading, fetchResult, fetchError,
   onFetch, presetLabel, enabledRulesCount,
 }: SourcePanelProps) {
-  const [manualOpen, setManualOpen] = useState(false)
   const canFetch = testItId.trim().length > 0 && !fetchLoading
 
   return (
     <div className="source-panel">
-      {/* Hero */}
-      <div className="source-hero">
-        <div className="source-hero-icon">
-          <FileInput size={20} strokeWidth={1.75} />
-        </div>
-        <div className="source-hero-copy">
-          <h2 className="source-hero-title">Загрузите тест-кейс для ревью</h2>
-          <p className="source-hero-desc">Импортируйте тест-кейс из TestIT по ID — остальные TMS будут доступны позже.</p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="source-tabs">
-        <button type="button" className="source-tab source-tab-active">Из TMS</button>
-        <button type="button" className="source-tab source-tab-disabled" disabled>
-          Вручную <span className="tab-badge">Скоро</span>
-        </button>
-      </div>
-
       <div className="source-body">
-        {/* TMS grid */}
+        {/* TMS card */}
         <div className="tms-grid">
           <div className="tms-card tms-card-active">
             <div className="tms-icon">
-              <img
-                src="/icons/testit.png"
-                width={20} height={20} alt="TestIT"
-                style={{ objectFit: 'contain' }}
-              />
+              <img src="/icons/testit.png" width={20} height={20} alt="TestIT" style={{ objectFit: 'contain' }} />
             </div>
             <div className="tms-copy"><div className="tms-name">TestIT</div></div>
-            <span className="tms-state tms-state-ok">Доступно</span>
           </div>
-          {([
-            { name: 'TestRail', src: '/icons/testrail.png' },
-            { name: 'Allure TestOps', src: '/icons/allure.png' },
-            { name: 'Zephyr', src: '/icons/zephyr.png' },
-          ] as const).map(tms => (
-            <div key={tms.name} className="tms-card tms-card-disabled">
-              <div className="tms-icon">
-                <img src={tms.src} width={20} height={20} alt={tms.name} style={{ objectFit: 'contain', borderRadius: 4 }} />
-              </div>
-              <div className="tms-copy"><div className="tms-name">{tms.name}</div></div>
-              <span className="tms-state tms-state-soon">Скоро</span>
-            </div>
-          ))}
         </div>
 
         {/* Input */}
         <div>
-          <label className="source-label" htmlFor="testit-id">ID тест-кейса в TestIT</label>
+          <label className="source-label" htmlFor="testit-id">Test case ID in TestIT</label>
           <div className="source-input-row">
             <input
               id="testit-id"
               className="source-id-input"
               type="text"
-              placeholder="Например: 6110"
+              placeholder="e.g. 6110"
               value={testItId}
               onChange={e => onTestItIdChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && canFetch && onFetch()}
@@ -96,8 +55,8 @@ export function SourcePanel({
               disabled={!canFetch}
             >
               {fetchLoading
-                ? <><Loader2 size={15} className="spinner" />Загружаю...</>
-                : <><Upload size={15} />Загрузить из TestIT</>
+                ? <><Loader2 size={15} className="spinner" />Loading...</>
+                : <><Upload size={15} />Load</>
               }
             </button>
           </div>
@@ -107,7 +66,7 @@ export function SourcePanel({
         {fetchError && (
           <div className="alert alert-error">
             <span className="alert-icon-err"><XCircle size={16} strokeWidth={1.75} /></span>
-            <span className="alert-text"><strong>Ошибка: </strong>{fetchError}</span>
+            <span className="alert-text"><strong>Error: </strong>{fetchError}</span>
           </div>
         )}
 
@@ -115,26 +74,21 @@ export function SourcePanel({
         {fetchResult && (
           <div className="alert alert-success">
             <span className="alert-icon-ok"><CheckCircle2 size={16} strokeWidth={1.75} /></span>
-            <span className="alert-text"><strong>Загружено: </strong>{fetchResult.normalized_testcase.title}</span>
+            <span className="alert-text"><strong>Loaded: </strong>{fetchResult.normalized_testcase.title}</span>
             <span className="alert-id">{fetchResult.work_item_id}</span>
           </div>
         )}
 
-        {/* Status bar */}
+        {/* Status chips */}
         <div className="status-bar">
           <div className="status-chip">
-            <span className="status-chip-icon"><HardDrive size={14} strokeWidth={1.75} /></span>
-            <span className="status-chip-label">Источник</span>
-            <span className="status-chip-value">TestIT</span>
-          </div>
-          <div className="status-chip">
             <span className="status-chip-icon"><Clock3 size={14} strokeWidth={1.75} /></span>
-            <span className="status-chip-label">Режим</span>
+            <span className="status-chip-label">Mode</span>
             <span className="status-chip-value">{presetLabel}</span>
           </div>
           <div className="status-chip">
             <span className="status-chip-icon"><ShieldCheck size={14} strokeWidth={1.75} /></span>
-            <span className="status-chip-value">{enabledRulesCount} правил</span>
+            <span className="status-chip-value">{enabledRulesCount} rules</span>
           </div>
         </div>
 
@@ -143,55 +97,36 @@ export function SourcePanel({
           <div className="info-card">
             <div className="info-card-title">
               <span className="info-card-title-icon"><List size={14} strokeWidth={1.75} /></span>
-              Как это работает
+              How it works
             </div>
             <div className="info-steps">
-              <div className="info-step"><span className="info-step-num">1</span>Выберите источник</div>
-              <div className="info-step"><span className="info-step-num">2</span>Загрузите тест-кейс</div>
-              <div className="info-step"><span className="info-step-num">3</span>Получите ревью и улучшения</div>
+              <div className="info-step"><span className="info-step-num">1</span>Load test case by ID</div>
+              <div className="info-step"><span className="info-step-num">2</span>Review issues found by AI</div>
+              <div className="info-step"><span className="info-step-num">3</span>Apply improvements</div>
             </div>
           </div>
           <div className="info-card">
             <div className="info-card-title">
               <span className="info-card-title-icon"><FileText size={14} strokeWidth={1.75} /></span>
-              Что будет загружено
+              What gets loaded
             </div>
             <div className="info-card-body">
-              Название, описание, предусловия, шаги, постусловия и метаданные TestIT.
+              Title, description, preconditions, steps, postconditions and metadata.
             </div>
             <div className="info-tag">
               <Lock size={10} strokeWidth={2} />
-              Только для чтения
+              Read only
             </div>
           </div>
           <div className="info-card">
             <div className="info-card-title">
               <span className="info-card-title-icon"><Shield size={14} strokeWidth={1.75} /></span>
-              Режим ревью
+              Review mode
             </div>
             <div className="info-card-body">
-              Проверки настраиваются через режим ревью и кастомные правила.
+              Checks are configured via review mode and custom rules.
             </div>
           </div>
-        </div>
-
-        {/* Manual accordion */}
-        <div className="manual-panel">
-          <button type="button" className="manual-panel-btn" onClick={() => setManualOpen(v => !v)}>
-            <span className="manual-panel-icon"><AlignLeft size={16} strokeWidth={1.75} /></span>
-            <span className="manual-panel-copy">
-              <span className="manual-panel-title">Ручной ввод</span>
-              <span className="manual-panel-desc">При выборе «Вручную» будет доступно поле ввода тест-кейса.</span>
-            </span>
-            <span className={`manual-panel-chevron${manualOpen ? ' open' : ''}`}>
-              <ChevronDown size={16} strokeWidth={1.75} />
-            </span>
-          </button>
-          {manualOpen && (
-            <div className="manual-panel-content">
-              Нажмите <b>«Вручную»</b> в переключателе выше, чтобы вставить тест-кейс в формате JSON или plain text.
-            </div>
-          )}
         </div>
       </div>
     </div>

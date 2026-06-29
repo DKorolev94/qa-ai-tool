@@ -23,18 +23,18 @@ interface Props {
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
-  Highest: 'Самый высокий', High: 'Высокий', Medium: 'Средний', Low: 'Низкий',
-  highest: 'Самый высокий', high: 'Высокий', medium: 'Средний', low: 'Низкий',
+  Highest: 'Highest', High: 'High', Medium: 'Medium', Low: 'Low',
+  highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low',
 }
 
 // TestIT returns status values in English; map to Russian and badge class
 const STATUS_LABELS: Record<string, string> = {
-  Ready: 'Готов',
-  NotReady: 'Не готов',
-  Draft: 'Черновик',
-  NeedsWork: 'Требует доработки',
-  Obsolete: 'Устарел',
-  InProgress: 'В работе',
+  Ready: 'Ready',
+  NotReady: 'Not ready',
+  Draft: 'Draft',
+  NeedsWork: 'Needs work',
+  Obsolete: 'Obsolete',
+  InProgress: 'In progress',
 }
 const STATUS_PILL: Record<string, string> = {
   Ready: 'pill-ok',
@@ -46,18 +46,18 @@ const STATUS_PILL: Record<string, string> = {
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  title: 'Название', description: 'Описание',
-  preconditions: 'Предусловие', postconditions: 'Постусловие',
-  tags: 'Теги', priority: 'Приоритет', status: 'Статус', duration: 'Длительность',
-  expected: 'Ожидаемый результат', action: 'Действие', test_data: 'Тестовые данные',
+  title: 'Title', description: 'Description',
+  preconditions: 'Precondition', postconditions: 'Postcondition',
+  tags: 'Tags', priority: 'Priority', status: 'Status', duration: 'Duration',
+  expected: 'Expected result', action: 'Action', test_data: 'Test data',
 }
 
 function fieldLabel(field: string): string {
   if (FIELD_LABELS[field]) return FIELD_LABELS[field]
   const m = field.match(/^steps\.(\d+)\.(.+)$/)
-  if (m) return `Шаг ${parseInt(m[1]) + 1} — ${FIELD_LABELS[m[2]] ?? m[2]}`
+  if (m) return `Step ${parseInt(m[1]) + 1} — ${FIELD_LABELS[m[2]] ?? m[2]}`
   const p = field.match(/^preconditions\.(\d+)\.(.+)$/)
-  if (p) return `Предусловие ${parseInt(p[1]) + 1} — ${FIELD_LABELS[p[2]] ?? p[2]}`
+  if (p) return `Precondition ${parseInt(p[1]) + 1} — ${FIELD_LABELS[p[2]] ?? p[2]}`
   return field
 }
 
@@ -95,10 +95,10 @@ function StepsTable({
     <div className="steps-tbl">
       <div className="steps-head" style={{ gridTemplateColumns: cols }}>
         <div className="steps-th steps-th-num">#</div>
-        <div className="steps-th">Действие</div>
-        <div className="steps-th">Ожидаемый результат</div>
-        {showTestData && <div className="steps-th">Тестовые данные</div>}
-        {showComments && <div className="steps-th">Комментарии</div>}
+        <div className="steps-th">Action</div>
+        <div className="steps-th">Expected result</div>
+        {showTestData && <div className="steps-th">Test data</div>}
+        {showComments && <div className="steps-th">Comments</div>}
       </div>
       {steps.map((step, i) => (
         <div key={i} className="steps-row" style={{ gridTemplateColumns: cols }}>
@@ -158,9 +158,9 @@ function ParamTableView({ table }: { table: ParameterTable }) {
 
 // Link type → Russian label
 const LINK_TYPE_LABELS: Record<string, string> = {
-  Issue: 'Задача', Defect: 'Дефект', Requirement: 'Требование',
-  BlockedBy: 'Блокирует', Related: 'Связано', Clones: 'Клон',
-  Repository: 'Репозиторий',
+  Issue: 'Issue', Defect: 'Defect', Requirement: 'Requirement',
+  BlockedBy: 'Blocks', Related: 'Related', Clones: 'Clone',
+  Repository: 'Repository',
 }
 
 // Derive short readable label from a link (strip URL if title == url)
@@ -194,7 +194,7 @@ function PartialFieldWarning() {
   return (
     <span className="partial-field-missing">
       <AlertTriangle size={11} />
-      не обработано
+      not processed
     </span>
   )
 }
@@ -219,14 +219,14 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
   const globalId = tc.attributes?.['globalId']
   const versionNumber = tc.attributes?.['versionNumber']
   const metaItems: Array<{ label: string; value: string }> = [
-    { label: 'Секция', value: tc.section_name ?? '—' },
-    { label: 'Длительность', value: dur ?? '—' },
+    { label: 'Section', value: tc.section_name ?? '—' },
+    { label: 'Duration', value: dur ?? '—' },
     { label: 'ID', value: globalId != null ? String(globalId) : '—' },
-    { label: 'Версия', value: versionNumber != null ? String(versionNumber) : '—' },
+    { label: 'Version', value: versionNumber != null ? String(versionNumber) : '—' },
   ]
-  // Optional: Автор only when present in attributes
-  const author = tc.attributes?.['Автор'] ?? tc.attributes?.['author'] ?? tc.attributes?.['createdBy']
-  if (author != null) metaItems.push({ label: 'Автор', value: String(author) })
+  // Optional: Author only when present in attributes
+  const author = tc.attributes?.['Author'] ?? tc.attributes?.['Автор'] ?? tc.attributes?.['author'] ?? tc.attributes?.['createdBy']
+  if (author != null) metaItems.push({ label: 'Author', value: String(author) })
   const hasAnyMeta = metaItems.some(m => m.value !== '—')
 
   const hasPost = (tc.postconditions?.length ?? 0) > 0
@@ -260,7 +260,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       {/* Metadata grid */}
       {hasAnyMeta && (
         <div>
-          <span className="case-sec-label">Метаданные</span>
+          <span className="case-sec-label">Metadata</span>
           <div className="meta-grid">
             {metaItems.map(item => (
               <div key={item.label} className="meta-card">
@@ -285,10 +285,10 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
 
         return (
           <div>
-            <span className="case-sec-label">Теги</span>
+            <span className="case-sec-label">Tags</span>
             {sourceId && (
               <div className="source-id-badge">
-                Исходный кейс: <span style={{ color: 'var(--accent)' }}>#{sourceId}</span>
+                Source case: <span style={{ color: 'var(--accent)' }}>#{sourceId}</span>
               </div>
             )}
             {hasAny ? (
@@ -300,7 +300,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
                 ))}
               </div>
             ) : (
-              <div className="case-text-box case-text-empty">не указано</div>
+              <div className="case-text-box case-text-empty">not specified</div>
             )}
           </div>
         )
@@ -308,7 +308,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
 
       {/* Linked issues / requirements — always show */}
       <div>
-        <span className="case-sec-label">Связанные задачи</span>
+        <span className="case-sec-label">Related issues</span>
         {(tc.links?.length ?? 0) > 0 ? (
           <div className="links-list">
             {tc.links!.map((link, i) => (
@@ -320,7 +320,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
                 rel="noopener noreferrer"
               >
                 <span className={`link-type-badge link-type-${(link.type ?? 'default').toLowerCase()}`}>
-                  {LINK_TYPE_LABELS[link.type ?? ''] ?? link.type ?? 'Ссылка'}
+                  {LINK_TYPE_LABELS[link.type ?? ''] ?? link.type ?? 'Link'}
                 </span>
                 <span className="link-label">{linkLabel(link)}</span>
                 <ExternalLink size={11} className="link-ext-icon" />
@@ -328,35 +328,35 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
             ))}
           </div>
         ) : (
-          <div className="case-text-box case-text-empty">не указано</div>
+          <div className="case-text-box case-text-empty">not specified</div>
         )}
       </div>
 
       {/* Description — always show */}
       <div>
-        <span className="case-sec-label">Описание</span>
+        <span className="case-sec-label">Description</span>
         {tc.description?.trim()
           ? <div className="case-text-box" style={{ whiteSpace: 'pre-line' }}>{tc.description.trim()}</div>
           : partialFields?.has('description')
             ? <div className="case-text-box case-text-empty"><PartialFieldWarning /></div>
-            : <div className="case-text-box case-text-empty">не указано</div>
+            : <div className="case-text-box case-text-empty">not specified</div>
         }
       </div>
 
       {/* Attachments — show list when any exist */}
       {(tc.attachments?.length ?? 0) > 0 && (
         <div>
-          <span className="case-sec-label">Вложения</span>
+          <span className="case-sec-label">Attachments</span>
           <div className="links-list">
             {tc.attachments!.map((att, i) => (
               att.url
                 ? <a key={i} className="link-row" href={att.url} target="_blank" rel="noopener noreferrer">
-                    <span className="link-type-badge link-type-default">{att.type ?? 'файл'}</span>
+                    <span className="link-type-badge link-type-default">{att.type ?? 'file'}</span>
                     <span className="link-label">{att.name ?? att.file_id ?? att.url}</span>
                     <ExternalLink size={11} className="link-ext-icon" />
                   </a>
                 : <div key={i} className="link-row" style={{ cursor: 'default' }}>
-                    <span className="link-type-badge link-type-default">{att.type ?? 'файл'}</span>
+                    <span className="link-type-badge link-type-default">{att.type ?? 'file'}</span>
                     <span className="link-label">{att.name ?? att.file_id ?? '—'}</span>
                   </div>
             ))}
@@ -367,7 +367,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       {/* Product versions */}
       {(tc.product_versions?.length ?? 0) > 0 && (
         <div>
-          <span className="case-sec-label">Версии продукта</span>
+          <span className="case-sec-label">Product versions</span>
           <div className="tag-chips">
             {tc.product_versions!.map((v, i) => (
               <span key={i} className="tag-chip" style={{ fontFamily: 'monospace' }}>{v}</span>
@@ -377,35 +377,35 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       )}
 
       {/* Preconditions */}
-      <StepBlock label="Предусловие" steps={tc.preconditions} />
+      <StepBlock label="Precondition" steps={tc.preconditions} />
 
       {/* Steps — always show; warn on missing test_data */}
       <div>
         <span className="case-sec-label">
-          Шаги
+          Steps
         </span>
         {(tc.steps?.length ?? 0) > 0 ? (
           <StepsTable steps={tc.steps!} warnMissingTestData />
         ) : partialFields?.has('steps') ? (
           <div className="case-text-box case-text-empty"><PartialFieldWarning /></div>
         ) : (
-          <div className="case-text-box case-text-empty">не указано</div>
+          <div className="case-text-box case-text-empty">not specified</div>
         )}
       </div>
 
       {/* Postconditions — always shown */}
       <div>
-        <span className="case-sec-label">Постусловие</span>
+        <span className="case-sec-label">Postcondition</span>
         {hasPost
           ? <StepsTable steps={tc.postconditions!} />
-          : <div className="case-text-box case-text-empty">не указано</div>
+          : <div className="case-text-box case-text-empty">not specified</div>
         }
       </div>
 
       {/* Parameters table — shown only when data present */}
       {tc.parameter_table && tc.parameter_table.names.length > 0 && (
         <div>
-          <span className="case-sec-label">Параметры</span>
+          <span className="case-sec-label">Parameters</span>
           <ParamTableView table={tc.parameter_table} />
         </div>
       )}
@@ -451,38 +451,38 @@ function EditableStepsTable({ steps, showComments, onUpdate, onRemove, onAdd }: 
           <div className="tc-edit-step-fields">
             <AutoTextarea
               className="tc-edit-cell"
-              placeholder="Действие"
+              placeholder="Action"
               value={step.action ?? ''}
               onChange={v => onUpdate(i, 'action', v)}
             />
             <AutoTextarea
               className="tc-edit-cell tc-edit-cell-dim"
-              placeholder="Ожидаемый результат"
+              placeholder="Expected result"
               value={step.expected ?? ''}
               onChange={v => onUpdate(i, 'expected', v)}
             />
             <AutoTextarea
               className="tc-edit-cell"
-              placeholder="Тестовые данные"
+              placeholder="Test data"
               value={step.test_data ?? ''}
               onChange={v => onUpdate(i, 'test_data', v)}
             />
             {showComments && (
               <AutoTextarea
                 className="tc-edit-cell tc-edit-cell-dim"
-                placeholder="Комментарий"
+                placeholder="Comment"
                 value={step.comments ?? ''}
                 onChange={v => onUpdate(i, 'comments', v)}
               />
             )}
           </div>
-          <button type="button" className="tc-edit-step-del" title="Удалить шаг" onClick={() => onRemove(i)}>
+          <button type="button" className="tc-edit-step-del" title="Remove step" onClick={() => onRemove(i)}>
             ×
           </button>
         </div>
       ))}
       <button type="button" className="tc-edit-add-step" onClick={onAdd}>
-        + Добавить шаг
+        + Add step
       </button>
     </div>
   )
@@ -507,7 +507,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
   return (
     <div className="tc-editor">
       <div>
-        <span className="case-sec-label">Название</span>
+        <span className="case-sec-label">Title</span>
         <input
           className="tc-edit-input"
           value={tc.title ?? ''}
@@ -516,38 +516,38 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
       </div>
       <div className="tc-edit-row2">
         <div>
-          <span className="case-sec-label">Приоритет</span>
+          <span className="case-sec-label">Priority</span>
           <select
             className="tc-edit-input"
             value={tc.priority ?? ''}
             onChange={e => onChange({ ...tc, priority: e.target.value || null })}
           >
-            <option value="">— не указан —</option>
-            <option value="Highest">Самый высокий</option>
-            <option value="High">Высокий</option>
-            <option value="Medium">Средний</option>
-            <option value="Low">Низкий</option>
+            <option value="">— not set —</option>
+            <option value="Highest">Highest</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
           </select>
         </div>
         <div>
-          <span className="case-sec-label">Статус</span>
+          <span className="case-sec-label">Status</span>
           <select
             className="tc-edit-input"
             value={tc.status ?? ''}
             onChange={e => onChange({ ...tc, status: e.target.value || null })}
           >
-            <option value="">— не указан —</option>
-            <option value="Ready">Готов</option>
-            <option value="NotReady">Не готов</option>
-            <option value="Draft">Черновик</option>
-            <option value="NeedsWork">Требует доработки</option>
-            <option value="Obsolete">Устарел</option>
-            <option value="InProgress">В работе</option>
+            <option value="">— not set —</option>
+            <option value="Ready">Ready</option>
+            <option value="NotReady">Not ready</option>
+            <option value="Draft">Draft</option>
+            <option value="NeedsWork">Needs work</option>
+            <option value="Obsolete">Obsolete</option>
+            <option value="InProgress">In progress</option>
           </select>
         </div>
       </div>
       <div>
-        <span className="case-sec-label">Теги</span>
+        <span className="case-sec-label">Tags</span>
         <div className="tc-edit-tags">
           {(tc.tags ?? []).map(tag => (
             <span key={tag} className="tc-edit-tag">
@@ -561,7 +561,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
           ))}
           <input
             className="tc-edit-tag-input"
-            placeholder="+ тег"
+            placeholder="+ tag"
             onKeyDown={e => {
               if ((e.key === 'Enter' || e.key === ',') && e.currentTarget.value.trim()) {
                 e.preventDefault()
@@ -576,7 +576,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         </div>
       </div>
       <div>
-        <span className="case-sec-label">Длительность</span>
+        <span className="case-sec-label">Duration</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <input
             className="tc-edit-input"
@@ -590,11 +590,11 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
               onChange({ ...tc, duration: isNaN(mins) || mins <= 0 ? null : String(mins * 60000) })
             }}
           />
-          <span style={{ fontSize: 11, color: 'var(--tx-dim)' }}>мин</span>
+          <span style={{ fontSize: 11, color: 'var(--tx-dim)' }}>min</span>
         </div>
       </div>
       <div>
-        <span className="case-sec-label">Описание</span>
+        <span className="case-sec-label">Description</span>
         <textarea
           className="tc-edit-textarea"
           value={tc.description ?? ''}
@@ -605,7 +605,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
-        <span className="case-sec-label">Предусловие</span>
+        <span className="case-sec-label">Precondition</span>
         <EditableStepsTable
           steps={tc.preconditions ?? []}
           showComments={false}
@@ -615,7 +615,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
-        <span className="case-sec-label">Шаги</span>
+        <span className="case-sec-label">Steps</span>
         <EditableStepsTable
           steps={tc.steps ?? []}
           showComments
@@ -625,7 +625,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
-        <span className="case-sec-label">Постусловие</span>
+        <span className="case-sec-label">Postcondition</span>
         <EditableStepsTable
           steps={tc.postconditions ?? []}
           showComments={false}
@@ -640,8 +640,8 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
 
 const DIFF_SECTION_ORDER = ['steps', 'preconditions', 'postconditions', 'metadata'] as const
 const DIFF_SECTION_LABELS: Record<string, string> = {
-  steps: 'Шаги', preconditions: 'Предусловия',
-  postconditions: 'Постусловия', metadata: 'Метаданные',
+  steps: 'Steps', preconditions: 'Preconditions',
+  postconditions: 'Postconditions', metadata: 'Metadata',
 }
 
 function diffSectionKey(field: string): string {
@@ -660,9 +660,9 @@ function diffItemLabel(itemKey: string): string {
   const m = itemKey.match(/^(steps|preconditions|postconditions)\.(\d+)$/)
   if (m) {
     const n = parseInt(m[2]) + 1
-    if (m[1] === 'steps') return `Шаг ${n}`
-    if (m[1] === 'preconditions') return `Предусловие ${n}`
-    return `Постусловие ${n}`
+    if (m[1] === 'steps') return `Step ${n}`
+    if (m[1] === 'preconditions') return `Precondition ${n}`
+    return `Postcondition ${n}`
   }
   return FIELD_LABELS[itemKey] ?? itemKey
 }
@@ -677,7 +677,7 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
   if (!changes.length) {
     return (
       <div style={{ color: 'var(--tx-dim)', fontSize: 13, padding: '16px 0', textAlign: 'center' }}>
-        Нет изменений
+        No changes
       </div>
     )
   }
@@ -701,11 +701,11 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
     <>
       {/* Header */}
       <div className="diff-header">
-        <span className="diff-header-title">История изменений</span>
+        <span className="diff-header-title">Change history</span>
         <div style={{ display: 'flex', gap: 5 }}>
-          {addedCount   > 0 && <span className="diff-pill diff-pill-add">+{addedCount} добавлено</span>}
-          {changedCount > 0 && <span className="diff-pill diff-pill-chg">✎ {changedCount} изменено</span>}
-          {removedCount > 0 && <span className="diff-pill diff-pill-del">−{removedCount} удалено</span>}
+          {addedCount   > 0 && <span className="diff-pill diff-pill-add">+{addedCount} added</span>}
+          {changedCount > 0 && <span className="diff-pill diff-pill-chg">✎ {changedCount} changed</span>}
+          {removedCount > 0 && <span className="diff-pill diff-pill-del">−{removedCount} removed</span>}
         </div>
       </div>
 
@@ -721,7 +721,7 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
             <div className="diff-section-header">
               <span className="diff-section-label">{DIFF_SECTION_LABELS[sk]}</span>
               {sAdd > 0 && <span className="diff-count diff-count-add">+{sAdd}</span>}
-              {sChg > 0 && <span className="diff-count diff-count-chg">{sChg} изм</span>}
+              {sChg > 0 && <span className="diff-count diff-count-chg">{sChg} chg</span>}
               {sDel > 0 && <span className="diff-count diff-count-del">−{sDel}</span>}
             </div>
 
@@ -783,18 +783,18 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
 }
 
 const ISSUE_TITLE_RU: Record<string, string> = {
-  'test_data': 'Тестовые данные',
-  'steps': 'Шаги',
-  'preconditions': 'Предусловия',
-  'postconditions': 'Постусловия',
-  'duration': 'Длительность',
-  'tags': 'Теги',
-  'links': 'Ссылки',
-  'title': 'Название',
-  'description': 'Описание',
-  'priority': 'Приоритет',
-  'status': 'Статус',
-  'expected_result': 'Ожидаемый результат',
+  'test_data': 'Test data',
+  'steps': 'Steps',
+  'preconditions': 'Preconditions',
+  'postconditions': 'Postconditions',
+  'duration': 'Duration',
+  'tags': 'Tags',
+  'links': 'Links',
+  'title': 'Title',
+  'description': 'Description',
+  'priority': 'Priority',
+  'status': 'Status',
+  'expected_result': 'Expected result',
 }
 
 function issueTitleRu(title: string): string {
@@ -803,7 +803,7 @@ function issueTitleRu(title: string): string {
 }
 
 function parseIssueDescription(description: string): { text: string; evidence: string | null } {
-  const match = description.match(/^([\s\S]*?)\s*Пример:\s*([\s\S]*)$/i)
+  const match = description.match(/^([\s\S]*?)\s*Example:\s*([\s\S]*)$/i)
   if (!match) return { text: description.trim(), evidence: null }
   return { text: match[1].trim(), evidence: match[2].trim() || null }
 }
@@ -829,12 +829,12 @@ function IssueRow({ issue, resolution, hasImprovement, onDismiss }: {
           <div className="issue-reason">{resolution.reason}</div>
         )}
       </div>
-      {resolution?.status === 'resolved' && <span className="issue-badge ib-resolved">Решено</span>}
-      {resolution?.status === 'manual_needed' && <span className="issue-badge ib-manual">Вручную</span>}
-      {resolution?.status === 'skipped' && <span className="issue-badge ib-skipped">Пропущено</span>}
-      {hasImprovement && !resolution && <span className="issue-badge ib-skipped">Не обработано</span>}
+      {resolution?.status === 'resolved' && <span className="issue-badge ib-resolved">Resolved</span>}
+      {resolution?.status === 'manual_needed' && <span className="issue-badge ib-manual">Manual</span>}
+      {resolution?.status === 'skipped' && <span className="issue-badge ib-skipped">Skipped</span>}
+      {hasImprovement && !resolution && <span className="issue-badge ib-skipped">Not processed</span>}
       {onDismiss && (
-        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title="Отклонить замечание">
+        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title="Dismiss issue">
           <X size={11} />
         </button>
       )}
@@ -847,7 +847,7 @@ function RailLoading() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--accent)', fontSize: 12, fontWeight: 500 }}>
         <span className="spinner"><Sparkles size={13} /></span>
-        Анализирую тест-кейс...
+        Analyzing test case...
       </div>
       {[75, 55, 65, 45, 60].map((w, i) => (
         <div key={i} style={{ height: 11, borderRadius: 4, width: `${w}%` }} className="skel" />
@@ -875,10 +875,10 @@ function SectionPickerModal({
       <div className="action-modal" onClick={e => e.stopPropagation()}>
         <div className="action-modal-header">
           <span className="action-modal-icon"><FolderOpen size={16} strokeWidth={1.75} /></span>
-          <span className="action-modal-title">Создать черновик</span>
+          <span className="action-modal-title">Create draft</span>
         </div>
         <div className="action-modal-body">
-          <label className="action-modal-label">Сохранить в секцию</label>
+          <label className="action-modal-label">Save to section</label>
           <div className="action-modal-options">
             {MOCK_SECTIONS.map(s => (
               <button
@@ -895,7 +895,7 @@ function SectionPickerModal({
         </div>
         <div className="action-modal-footer">
           <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel}>
-            Отмена
+            Cancel
           </button>
           <button
             type="button"
@@ -906,7 +906,7 @@ function SectionPickerModal({
             }}
           >
             <CheckCircle2 size={13} />
-            Создать
+            Create
           </button>
         </div>
       </div>
@@ -933,25 +933,25 @@ function ConfirmApplyModal({
             <AlertTriangle size={18} strokeWidth={1.75} />
           </span>
           <div>
-            <div className="action-modal-title">Заменить оригинал?</div>
+            <div className="action-modal-title">Replace original?</div>
             <div className="action-modal-subtitle">#{workItemId}</div>
           </div>
         </div>
         <div className="action-modal-body">
-          Улучшенная версия полностью заменит исходный тест-кейс в TestIT.
+          The improved version will fully replace the original test case in TestIT.
           <div className="action-modal-warn-text">
             <span className="action-modal-warn-dot" />
-            Действие необратимо
+            This action cannot be undone
           </div>
         </div>
         <div className="action-modal-footer">
           <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel} disabled={loading}>
-            Отмена
+            Cancel
           </button>
           <button type="button" className="wb-btn-danger" onClick={onConfirm} disabled={loading}>
             {loading
-              ? <><Loader2 size={13} className="spin-icon" /> Применяется…</>
-              : <><AlertTriangle size={13} /> Заменить</>
+              ? <><Loader2 size={13} className="spin-icon" /> Applying…</>
+              : <><AlertTriangle size={13} /> Replace</>
             }
           </button>
         </div>
@@ -1156,10 +1156,10 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const manualCount = improveResult?.issue_resolutions?.filter(r => r.status === 'manual_needed').length ?? 0
 
   function scoreBadge(s: number) {
-    if (s >= 85) return 'Отлично'
-    if (s >= 70) return 'Хорошо'
-    if (s >= 50) return 'Удовл.'
-    return 'Слабо'
+    if (s >= 85) return 'Excellent'
+    if (s >= 70) return 'Good'
+    if (s >= 50) return 'Fair'
+    return 'Poor'
   }
 
   const hasImprove = !!improveResult
@@ -1191,11 +1191,11 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   // Humanize improve errors for display
   function humanizeImproveError(msg: string): string {
     const m = msg.toLowerCase()
-    if (m.includes('timeout') || m.includes('timed out')) return 'Превышено время ожидания ответа AI'
-    if (m.includes('500') || m.includes('internal')) return 'Внутренняя ошибка сервера AI'
-    if (m.includes('429') || m.includes('rate')) return 'Слишком много запросов — попробуйте позже'
-    if (m.includes('503') || m.includes('unavailable')) return 'AI-сервис временно недоступен'
-    return 'Ошибка обработки запроса'
+    if (m.includes('timeout') || m.includes('timed out')) return 'AI response timed out'
+    if (m.includes('500') || m.includes('internal')) return 'Internal AI server error'
+    if (m.includes('429') || m.includes('rate')) return 'Too many requests — try again later'
+    if (m.includes('503') || m.includes('unavailable')) return 'AI service temporarily unavailable'
+    return 'Request processing error'
   }
 
   const improveStatus: 'success' | 'partial' | 'error' | null = improveError
@@ -1215,13 +1215,13 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const canDraft = (improveStatus === 'success' || improveStatus === 'partial') && !applyResult
   const canApply = improveStatus === 'success' && openCriticalCount === 0 && manualCount === 0 && !applyResult
   const applyBlockReason = improveStatus === 'partial'
-    ? 'Кейс улучшен частично, необходима доработка'
+    ? 'Case partially improved, manual review needed'
     : openCriticalCount > 0 && manualCount > 0
-      ? `Нерешённые критичные замечания (${openCriticalCount}) и требующие ручной правки (${manualCount})`
+      ? `Unresolved critical issues (${openCriticalCount}) and requiring manual fix (${manualCount})`
       : openCriticalCount > 0
-        ? `Нерешённые критичные замечания: ${openCriticalCount}`
+        ? `Unresolved critical issues: ${openCriticalCount}`
         : manualCount > 0
-          ? `${manualCount} ${manualCount === 1 ? 'замечание требует' : 'замечания требуют'} ручной правки в TestIT`
+          ? `${manualCount} ${manualCount === 1 ? 'issue requires' : 'issues require'} manual fix in TestIT`
           : null
 
   // Fields empty in improved result when AI partially processed — shown as ⚠ не обработано
@@ -1260,10 +1260,10 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   const improvedTabAccessible = hasImprove || !!improveError
   const tabs = [
-    { id: 'original' as const, label: 'Оригинал', disabled: false, count: null },
-    { id: 'improved' as const, label: 'Улучшенный', disabled: !improvedTabAccessible,
+    { id: 'original' as const, label: 'Original', disabled: false, count: null },
+    { id: 'improved' as const, label: 'Improved', disabled: !improvedTabAccessible,
       count: improveStatus === 'success' ? '✓' : improveStatus === 'partial' ? '!' : improveStatus === 'error' ? '✕' : null },
-    { id: 'diff' as const, label: 'Изменения', disabled: !hasImprove, count: diffCount ? String(diffCount) : null },
+    { id: 'diff' as const, label: 'Changes', disabled: !hasImprove, count: diffCount ? String(diffCount) : null },
     { id: 'json' as const, label: 'JSON', disabled: false, count: null },
   ]
 
@@ -1290,7 +1290,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
       {/* Page header */}
       <SectionHeader
-        title="Ревью и улучшение тест-кейсов"
+        title="Review & Improve test cases"
         onBack={onBack}
         actions={
           <ModeButton
@@ -1312,43 +1312,43 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             {analyzeLoading && (
               <span className="wb-status-analyzed">
                 <span className="spinner" style={{ display: 'inline-flex' }}><Sparkles size={12} /></span>
-                Анализируется...
+                Analyzing...
               </span>
             )}
             {analyzeResult && !improveStatus && (
               <span className="wb-status-analyzed">
                 <Sparkles size={12} />
-                {analyzeResult.issues.length} замечаний
+                {analyzeResult.issues.length} issues
               </span>
             )}
             {improveStatus === 'success' && (
               <span className="wb-status-ok">
                 <CheckCircle2 size={13} />
-                Улучшен
+                Improved
               </span>
             )}
             {improveStatus === 'partial' && (
               <span className="wb-status-partial">
                 <AlertTriangle size={13} />
-                Требует доработки
+                Needs review
               </span>
             )}
             {improveStatus === 'error' && (
               <span className="wb-status-err">
                 <AlertTriangle size={13} />
-                Ошибка улучшения
+                Improve error
               </span>
             )}
             {improveStatus === 'success' && resolvedCount > 0 && (
               <span className="wb-metric wb-metric-ok">
                 <Check size={11} strokeWidth={2.5} />
-                {resolvedCount} решено
+                {resolvedCount} resolved
               </span>
             )}
             {improveStatus && improveStatus !== 'error' && manualCount > 0 && (
               <span className="wb-metric wb-metric-warn">
                 <AlertTriangle size={11} />
-                {manualCount} вручную
+                {manualCount} manual
               </span>
             )}
           </div>
@@ -1358,7 +1358,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
           {analyzeLoading && !analyzeResult && (
             <button type="button" className="wb-btn wb-btn-sec" disabled>
               <span className="spinner" style={{ display: 'inline-flex' }}><Sparkles size={13} /></span>
-              Анализирую...
+              Analyzing...
             </button>
           )}
           {/* Re-run analyze */}
@@ -1369,7 +1369,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               disabled={analyzeLoading || improveLoading}
             >
               <RotateCcw size={13} />
-              Повторить ревью
+              Re-run review
             </button>
           )}
           {/* Improve / retry */}
@@ -1377,23 +1377,23 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             improveLoading ? (
               <button type="button" className="wb-btn wb-btn-sec" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><Wand2 size={13} /></span>
-                Улучшаю...
+                Improving...
               </button>
             ) : improveStatus === 'error' ? (
               <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}>
                 <RotateCcw size={13} />
-                Повторить
+                Retry
               </button>
             ) : hasImprove ? (
               <button type="button" className="wb-btn wb-btn-sec" onClick={runImprove}
                 disabled={improveLoading || analyzeLoading}>
                 <Wand2 size={13} />
-                Улучшить ещё
+                Improve again
               </button>
             ) : (
               <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}>
                 <Wand2 size={13} />
-                Улучшить
+                Improve
               </button>
             )
           )}
@@ -1402,22 +1402,22 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             hasDraft ? (
               <button type="button" className="wb-btn wb-btn-done" disabled>
                 <CheckCircle2 size={13} />
-                Черновик создан
+                Draft created
               </button>
             ) : draftLoading ? (
               <button type="button" className="wb-btn wb-btn-sec" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><CheckCircle2 size={13} /></span>
-                Создаю...
+                Creating...
               </button>
             ) : canDraft ? (
               <button
                 type="button"
                 className={`wb-btn ${improveStatus === 'partial' ? 'wb-btn-sec-warn' : 'wb-btn-sec'}`}
-                title={improveStatus === 'partial' ? 'Кейс улучшен частично, рекомендуется доработка' : undefined}
+                title={improveStatus === 'partial' ? 'Case partially improved, manual review recommended' : undefined}
                 onClick={() => setShowSectionPicker(true)}
               >
                 <CheckCircle2 size={13} />
-                Создать черновик
+                Create draft
               </button>
             ) : null
           )}
@@ -1426,12 +1426,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             hasApply ? (
               <button type="button" className="wb-btn wb-btn-done" disabled>
                 <CheckCircle2 size={13} />
-                Применено
+                Applied
               </button>
             ) : applyLoading ? (
               <button type="button" className="wb-btn-apply" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><Wand2 size={13} /></span>
-                Применяю...
+                Applying...
               </button>
             ) : (
               <div className="wb-btn-wrap">
@@ -1442,7 +1442,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   onClick={() => canApply && setShowConfirmApply(true)}
                 >
                   <CheckCircle2 size={13} />
-                  Применить к оригиналу
+                  Apply to original
                 </button>
                 {!canApply && applyBlockReason && (
                   <span className="wb-btn-tip">{applyBlockReason}</span>
@@ -1478,7 +1478,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       {/* Apply error */}
       {applyError && (
         <div className="alert alert-error" style={{ margin: '0 0 8px' }}>
-          <span className="alert-text">Ошибка применения: {applyError}</span>
+          <span className="alert-text">Apply error: {applyError}</span>
         </div>
       )}
 
@@ -1511,7 +1511,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 onClick={() => setIsEditing(v => !v)}
               >
                 <Wrench size={11} />
-                {isEditing ? 'Готово' : 'Редактировать'}
+                {isEditing ? 'Done' : 'Edit'}
               </button>
             )}
           </div>
@@ -1521,12 +1521,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               <div className="improve-error-block">
                 <AlertTriangle size={24} className="improve-error-icon" />
                 <div className="improve-error-body">
-                  <div className="improve-error-title">Не удалось выполнить улучшение</div>
+                  <div className="improve-error-title">Failed to improve</div>
                   <div className="improve-error-msg">{humanizeImproveError(improveError ?? '')}</div>
                 </div>
                 <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}>
                   <RotateCcw size={13} />
-                  Повторить
+                  Retry
                 </button>
               </div>
             )}
@@ -1535,7 +1535,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 <div className="improve-partial-banner">
                   <AlertTriangle size={14} />
                   <div>
-                    <span>Улучшение выполнено частично. Часть полей требует проверки.</span>
+                    <span>Improvement partially completed. Some fields require review.</span>
                     {(improveResult?.validation_warnings?.length ?? 0) > 0 && (
                       <span className="improve-partial-detail">
                         {improveResult!.validation_warnings!.join('; ')}
@@ -1568,7 +1568,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         {/* Right: AI Review rail */}
         <div className="rail-panel">
           <div className="rail-head">
-            <span className="rail-title">AI Ревью</span>
+            <span className="rail-title">AI Review</span>
             {analyzeResult && <span className="rail-count">{analyzeResult.issues.length}</span>}
           </div>
           <div className="rail-scroll">
@@ -1583,7 +1583,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {/* Score card */}
                 {score !== null && (
                   <div className="score-card">
-                    <div className="score-head">Оценка качества</div>
+                    <div className="score-head">Quality score</div>
                     <div className="score-main">
                       <div className="score-ring">
                         <svg viewBox="0 0 56 56" width="56" height="56">
@@ -1605,17 +1605,17 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                         <div className="score-ctrs">
                           {hasImprove && resolvedCount > 0 && (
                             <span className="score-ctr sctr-ok">
-                              <Check size={11} strokeWidth={2.5} />{resolvedCount} решено
+                              <Check size={11} strokeWidth={2.5} />{resolvedCount} resolved
                             </span>
                           )}
                           {hasImprove && manualCount > 0 && (
                             <span className="score-ctr sctr-warn">
-                              <AlertTriangle size={11} />{manualCount} вручную
+                              <AlertTriangle size={11} />{manualCount} manual
                             </span>
                           )}
                           {!hasImprove && (
                             <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                              {analyzeResult.issues.length} замечаний
+                              {analyzeResult.issues.length} issues
                             </span>
                           )}
                         </div>
@@ -1628,7 +1628,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 <div className="ai-summary">
                   <div className="ai-label">
                     <Sparkles size={11} />
-                    AI Ревью
+                    AI Review
                   </div>
                   <div className="ai-text">{analyzeResult.summary}</div>
                 </div>
@@ -1638,7 +1638,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="manual-banner">
                     <div className="mb-head">
                       <Wrench size={13} />
-                      Требует ручной работы
+                      Requires manual work
                     </div>
                     {improveResult!.manual_notes!.map((note, i) => (
                       <div key={i} className="mb-item">
@@ -1651,7 +1651,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {/* Unresolved issues by severity */}
                 {highIssues.length > 0 && (
                   <div>
-                    <div className="issues-section-label isl-high">Критичные · {highIssues.length}</div>
+                    <div className="issues-section-label isl-high">Critical · {highIssues.length}</div>
                     {highIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
@@ -1660,7 +1660,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 )}
                 {medIssues.length > 0 && (
                   <div>
-                    <div className="issues-section-label isl-medium">Средние · {medIssues.length}</div>
+                    <div className="issues-section-label isl-medium">Medium · {medIssues.length}</div>
                     {medIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
@@ -1669,7 +1669,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 )}
                 {lowIssues.length > 0 && (
                   <div>
-                    <div className="issues-section-label isl-low">Низкие · {lowIssues.length}</div>
+                    <div className="issues-section-label isl-low">Low · {lowIssues.length}</div>
                     {lowIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
@@ -1682,7 +1682,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="resolved-section">
                     <button type="button" className="resolved-toggle" onClick={() => setShowResolved(v => !v)}>
                       <Check size={11} strokeWidth={2.5} />
-                      Решено
+                      Resolved
                       <span className="resolved-toggle-count">{resolvedVisible.length}</span>
                       <span className="resolved-toggle-hint">{showResolved ? '▲' : '▼'}</span>
                     </button>
@@ -1697,7 +1697,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="dismissed-section">
                     <button type="button" className="dismissed-toggle" onClick={() => setShowDismissed(v => !v)}>
                       <EyeOff size={11} />
-                      Исключено · {dismissedIssuesList.length}
+                      Excluded · {dismissedIssuesList.length}
                       <span className="dismissed-toggle-hint">{showDismissed ? '▲' : '▼'}</span>
                     </button>
                     {showDismissed && dismissedIssuesList.map(({ issue, idx }) => (
@@ -1707,7 +1707,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                         </div>
                         <button type="button" className="issue-restore-btn"
                           onClick={() => setDismissedIndices(prev => { const s = new Set(prev); s.delete(idx); return s })}
-                          title="Восстановить">
+                          title="Restore">
                           <RotateCcw size={11} />
                         </button>
                       </div>
@@ -1716,7 +1716,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 )}
                 {analyzeResult.issues.length === 0 && (
                   <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--tx-muted)', fontSize: 13 }}>
-                    Проблем не найдено
+                    No issues found
                   </div>
                 )}
 

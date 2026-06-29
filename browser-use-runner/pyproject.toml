@@ -4,12 +4,13 @@ version = "0.1.0"
 description = "Browser-use test runner for QA AI Tools"
 requires-python = ">=3.11"
 dependencies = [
-    "browser-use @ git+https://github.com/browser-use/browser-use.git@main",
+    "browser-use[video] @ git+https://github.com/browser-use/browser-use.git@main",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "pydantic>=2.7",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]

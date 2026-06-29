@@ -18,9 +18,9 @@ export function ActionBanner({ notifications }: Props) {
           </span>
           <span className="action-banner-text">
             {n.type === 'apply'
-              ? <>Применено к оригиналу · <strong>#{n.id}</strong></>
-              : <>Создан черновик в секции «{n.sectionName}» · <strong>#{n.id}</strong></>}
-            {n.isPartial && <span className="action-banner-partial"> · кейс ещё требует доработки</span>}
+              ? <>Applied to original · <strong>#{n.id}</strong></>
+              : <>Draft created in section "{n.sectionName}" · <strong>#{n.id}</strong></>}
+            {n.isPartial && <span className="action-banner-partial"> · case still needs work</span>}
           </span>
           {n.testit_url && (
             <a
@@ -29,7 +29,7 @@ export function ActionBanner({ notifications }: Props) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Открыть в TestIT
+              Open in TestIT
               <ExternalLink size={11} strokeWidth={2} style={{ marginLeft: 3 }} />
             </a>
           )}

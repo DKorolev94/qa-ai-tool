@@ -26,8 +26,8 @@ export function ActionToast({ notification, onClose }: Props) {
       </span>
       <span className="action-toast-text">
         {n.type === 'apply'
-          ? <>Применено к оригиналу · <strong>#{n.id}</strong></>
-          : <>Черновик создан в «{n.sectionName}» · <strong>#{n.id}</strong></>}
+          ? <>Applied to original · <strong>#{n.id}</strong></>
+          : <>Draft created in "{n.sectionName}" · <strong>#{n.id}</strong></>}
         {n.testit_url && (
           <>
             {' · '}
@@ -37,13 +37,13 @@ export function ActionToast({ notification, onClose }: Props) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Открыть в TestIT
+              Open in TestIT
               <ExternalLink size={10} strokeWidth={2} style={{ marginLeft: 2 }} />
             </a>
           </>
         )}
       </span>
-      <button type="button" className="action-toast-close" onClick={onClose} aria-label="Закрыть">
+      <button type="button" className="action-toast-close" onClick={onClose} aria-label="Close">
         <X size={13} strokeWidth={2} />
       </button>
     </div>

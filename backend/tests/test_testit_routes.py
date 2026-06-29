@@ -43,8 +43,8 @@ def test_review_config_returns_sources_profiles_and_rules():
     assert any(source["id"] == "testit" and source["enabled"] for source in data["sources"])
     assert any(source["id"] == "testops" and not source["enabled"] for source in data["sources"])
     assert any(profile["id"] == "strict" for profile in data["profiles"])
-    assert any(rule["id"] == "requirement_traceability" for rule in data["rules"])
-    assert "requirement_traceability" in data["defaults"]["testit"]
+    assert any(rule["id"] == "reproducibility" for rule in data["rules"])
+    assert "reproducibility" in data["defaults"]["testit"]
 
 
 def test_fetch_invalid_input_returns_400():

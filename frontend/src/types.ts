@@ -186,7 +186,7 @@ export interface Section {
   name: string
 }
 
-export type RunnerStatus = 'passed' | 'failed' | 'blocked'
+export type RunnerStatus = 'passed' | 'failed' | 'blocked' | 'stopped'
 export type RunnerSessionStatus = 'running' | RunnerStatus
 
 // WebSocket streaming events
@@ -205,13 +205,15 @@ export interface WsStepEvent {
   url: string
   title: string
   next_goal: string
+  summary?: string
   status?: 'ok' | 'error'
   screenshot_b64?: string
   elapsed_sec: number
   action?: ActionDetail
-  expected?: string
-  actual?: string
-  step_verdict?: 'passed' | 'failed'
+  actions?: Array<{
+    name: string
+    input: Record<string, unknown>
+  }>
 }
 export interface WsDoneEvent {
   type: 'done'
@@ -219,6 +221,8 @@ export interface WsDoneEvent {
   summary: string
   duration_sec: number
   steps_count: number
+  instability_step_count?: number
+  retry_step_count?: number
   errors: string[]
   run_id: string | null
 }
@@ -232,16 +236,37 @@ export interface WsLogEvent {
   category: string
   message: string
   elapsed_sec: number
+  source?: 'agent' | 'session'
 }
-export type WsEvent = WsStepEvent | WsDoneEvent | WsErrorEvent | WsLogEvent
+export interface WsFrameEvent {
+  type: 'frame'
+  data: string  // base64 JPEG
+}
+export interface WsStepUpdateEvent {
+  type: 'step_update'
+  step: number
+  summary: string
+  status?: 'ok' | 'error'
+  elapsed_sec: number
+}
+export interface WsStepPendingEvent {
+  type: 'step_pending'
+  step: number
+  elapsed_sec: number
+}
+export type WsEvent = WsStepEvent | WsDoneEvent | WsErrorEvent | WsLogEvent | WsFrameEvent | WsStepUpdateEvent | WsStepPendingEvent
 
 // Historical session from /api/runner/sessions
 export interface SessionListItem {
   run_id: string
   test_case_id: string | null
   status: RunnerStatus
+  summary?: string
+  errors?: string[]
   duration_sec: number
   steps_count: number
+  instability_step_count?: number
+  retry_step_count?: number
   created_at: string
 }
 
@@ -250,17 +275,30 @@ export interface HistoricalStep {
   step: number
   status: 'ok' | 'error'
   summary: string
+  next_goal?: string
+  instability_flags?: string[]
+  is_retry?: boolean
+  retry_error_msg?: string
   url: string | null
   duration_sec: number | null
   action?: ActionDetail
+  actions?: Array<{ name: string; input: Record<string, unknown> }>
+  results?: Array<{ error?: string | null; content?: string | null }>
   screenshot?: {
     path: string
     url?: string
     size_bytes: number
   } | null
-  expected?: string
-  actual?: string
-  step_verdict?: 'passed' | 'failed'
+}
+
+export interface BrowserProfileSettings {
+  is_mobile?: boolean
+  viewport_width?: number | null
+  viewport_height?: number | null
+  device_scale_factor?: number | null
+  user_agent?: string | null
+  locale?: string | null
+  timezone_id?: string | null
 }
 
 export interface RunnerSession {
@@ -275,6 +313,8 @@ export interface RunnerSession {
   result?: RunnerRunResponse
   startedAt: number
   endedAt?: number
+  sensitiveData?: Record<string, string>
+  browserProfile?: BrowserProfileSettings
 }
 
 export interface RunnerScreenshot {
@@ -286,6 +326,8 @@ export interface RunnerRunResponse {
   status: RunnerStatus
   summary: string
   steps_count: number
+  instability_step_count?: number
+  retry_step_count?: number
   errors: string[]
   screenshots: RunnerScreenshot[]
   duration_sec: number

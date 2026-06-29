@@ -7,9 +7,12 @@ PORT_RUNNER      := 8008
 PORT_STAGEHAND   := 8009
 PORT_FRONTEND    := 3000
 
+NODE_BIN         := $(shell command -v node 2>/dev/null || find "$(HOME)/.vscode-server/bin" -mindepth 2 -maxdepth 2 -type f -name node -print -quit)
+
 kill_port = lsof -t -i :$(1) 2>/dev/null | xargs -r kill 2>/dev/null || true
 
-.PHONY: dev stop restart status logs-backend logs-runner logs-stagehand help
+.PHONY: dev stop restart status logs-backend logs-runner logs-stagehand help \
+        docker-dev docker-prod docker-stop docker-restart
 
 ## Start all services
 dev:
@@ -59,6 +62,21 @@ logs-runner:
 logs-stagehand:
 	tail -f $(STAGEHAND_LOG)
 
+## Docker dev: hot-reload, bind mounts (Linux + macOS)
+docker-dev:
+	docker compose up --build
+
+## Docker prod: built frontend via nginx, named volumes
+docker-prod:
+	docker compose -f docker-compose.prod.yml up --build
+
+## Docker: stop all containers
+docker-stop:
+	docker compose down
+
+## Docker: restart dev
+docker-restart: docker-stop docker-dev
+
 ## Show this help
 help:
 	@grep -E '^## ' Makefile | sed 's/^## /  /'
@@ -70,18 +88,20 @@ _start_backend:
 	  echo "Backend        already running"; \
 	else \
 	  mkdir -p backend/logs; \
-	  (cd backend && . venv/bin/activate && \
-	    uvicorn app.main:app --host 0.0.0.0 --port $(PORT_BACKEND) \
-	    >> logs/uvicorn.log 2>&1) & \
+	  setsid sh -c 'cd backend && . venv/bin/activate && \
+	    exec uvicorn app.main:app --host 0.0.0.0 --port $(PORT_BACKEND)' \
+	    >> $(BACKEND_LOG) 2>&1 & \
 	  echo "Backend        started → http://localhost:$(PORT_BACKEND)"; \
 	fi
 
 _start_stagehand:
 	@if lsof -t -i :$(PORT_STAGEHAND) > /dev/null 2>&1; then \
 	  echo "Stagehand      already running"; \
+	elif [ -z "$(NODE_BIN)" ]; then \
+	  echo "Stagehand      failed: Linux node not found"; \
 	else \
 	  mkdir -p stagehand-runner/logs; \
-	  nohup sh -c 'cd stagehand-runner && node dist/index.js' \
+	  setsid sh -c 'cd stagehand-runner && exec "$(NODE_BIN)" dist/index.js' \
 	    > stagehand-runner/logs/runner.log 2>&1 & \
 	  echo "Stagehand      started → http://localhost:$(PORT_STAGEHAND)"; \
 	fi
@@ -91,15 +111,18 @@ _start_runner:
 	  echo "Audit runner   already running"; \
 	else \
 	  mkdir -p browser-use-runner/logs; \
-	  nohup browser-use-runner/start.sh >> browser-use-runner/logs/runner.log 2>&1 & \
+	  setsid browser-use-runner/start.sh >> browser-use-runner/logs/runner.log 2>&1 & \
 	  echo "Audit runner   started → http://localhost:$(PORT_RUNNER)"; \
 	fi
 
 _start_frontend:
 	@if lsof -t -i :$(PORT_FRONTEND) > /dev/null 2>&1; then \
 	  echo "Frontend       already running"; \
+	elif [ -z "$(NODE_BIN)" ]; then \
+	  echo "Frontend       failed: Linux node not found"; \
 	else \
 	  mkdir -p frontend/logs; \
-	  nohup sh -c 'cd frontend && npm run dev' > frontend/logs/npm.log 2>&1 & \
+	  setsid sh -c 'cd frontend && exec "$(NODE_BIN)" node_modules/vite/bin/vite.js --host 0.0.0.0 --port $(PORT_FRONTEND)' \
+	    > frontend/logs/npm.log 2>&1 & \
 	  echo "Frontend       started → http://localhost:$(PORT_FRONTEND)"; \
 	fi

@@ -20,15 +20,9 @@ _RULE_FIX_LABELS: dict[str, str] = {
     "expected_results": "Ожидаемые результаты",
     "test_data": "Тестовые данные",
     "tags": "Теги",
-    "duration": "Длительность",
     "atomicity": "Атомарность",
     "independence": "Независимость",
-    "requirement_traceability": "Связь с требованиями",
     "reproducibility": "Воспроизводимость",
-    "stability": "Стабильность",
-    "access_control": "Роли и права доступа",
-    "api_db": "API / DB проверки",
-    "data_security": "Безопасность данных",
 }
 
 

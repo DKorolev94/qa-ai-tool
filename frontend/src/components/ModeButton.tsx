@@ -50,8 +50,8 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
   }
 
   const currentLabel = selectedPreset === 'custom'
-    ? 'Свои настройки'
-    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Строгое ревью')
+    ? 'Custom'
+    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Strict review')
 
   const total = reviewConfig.rules.length
 
@@ -68,7 +68,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
           </span>
           <span>{currentLabel}</span>
           <span className="mode-btn-sep" />
-          <span className="mode-btn-pill">{enabledRules.length} правил</span>
+          <span className="mode-btn-pill">{enabledRules.length} rules</span>
           <span className={`mode-btn-chevron${open ? ' open' : ''}`}>
             <ChevronDown size={16} strokeWidth={1.75} />
           </span>
@@ -76,7 +76,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
 
         {open && (
           <div className="review-dropdown">
-            <div className="rd-header">Режим ревью</div>
+            <div className="rd-header">Review mode</div>
 
             <div className="rd-presets">
               {reviewConfig.profiles.map(profile => (
@@ -93,7 +93,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
                     )}
                   </div>
                   {profile.rules.length > 0 && (
-                    <span className="rd-preset-count">{profile.rules.length} правил</span>
+                    <span className="rd-preset-count">{profile.rules.length} rules</span>
                   )}
                 </div>
               ))}
@@ -101,7 +101,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
 
             <div className="rd-summary">
               <div className="rd-summary-line">
-                Активно <strong>{localRules.length}</strong> из {total} правил
+                Active <strong>{localRules.length}</strong> of {total} rules
               </div>
             </div>
 
@@ -111,9 +111,9 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
                 className="rd-link"
                 onClick={() => { setOpen(false); setRulesModalOpen(true) }}
               >
-                Все правила →
+                All rules →
               </button>
-              <button type="button" className="rd-apply" onClick={handleApply}>Применить</button>
+              <button type="button" className="rd-apply" onClick={handleApply}>Apply</button>
             </div>
           </div>
         )}

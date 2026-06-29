@@ -11,7 +11,6 @@ from app.core.config import settings
 from app.core.prompt_builder import build_improve_prompt, build_review_prompt
 from app.schemas.analysis import (
     AnalysisIssue,
-    AnalyzedTestCase,
     ImproveResult,
     ReviewResult,
     TextParseResult,
@@ -47,12 +46,6 @@ _FALLBACK_REVIEW = ReviewResult(
             recommendation="Проверь настройки LLM_BASE_URL и LLM_MODEL в .env.",
         )
     ],
-    warnings=["LLM is unavailable, fallback response returned"],
-)
-
-_FALLBACK_IMPROVE = ImproveResult(
-    improved_testcase=AnalyzedTestCase(),
-    issue_resolutions=[],
     warnings=["LLM is unavailable, fallback response returned"],
 )
 
@@ -131,7 +124,7 @@ def improve_testcase_with_llm(
         return result
     except Exception as exc:
         logger.error("LLM improve failed (%.1fs): %s", time.perf_counter() - t0, _root_cause(exc))
-        return _FALLBACK_IMPROVE
+        raise RuntimeError(f"LLM improve недоступен: {_root_cause(exc)}") from exc
 
 
 def parse_testcase_with_llm(raw_text: str) -> TextParseResult | None:

@@ -67,7 +67,6 @@ def _process_duration(improved: dict) -> tuple[str | None, int | None]:
 def postprocess_improved_testcase(
     original: dict,
     improved: dict,
-    review: dict | None = None,
 ) -> dict:
     result = dict(improved)
     validation_warnings: list[str] = []
@@ -103,15 +102,17 @@ def postprocess_improved_testcase(
                 orig_expected = original_steps[i].get("expected") if i < len(original_steps) else None
                 if not step.get("expected") and orig_expected:
                     step["expected"] = orig_expected
+                    validation_warnings.append(f"Шаг {i + 1}: ожидаемый результат восстановлен из оригинала")
 
-    # Duration — discard LLM value if suspiciously small (LLM confused ms with seconds/minutes)
+    # Duration — discard LLM value if suspiciously small (LLM confused ms with seconds/minutes).
+    # Floor is 60 000 ms (1 min) — any test shorter than that is likely a unit confusion.
     orig_duration = original.get("duration")
     improved_duration = result.get("duration")
     if (
         isinstance(improved_duration, int)
-        and improved_duration < 5000
+        and improved_duration < 60_000
         and isinstance(orig_duration, int)
-        and orig_duration >= 5000
+        and orig_duration >= 60_000
     ):
         result["duration"] = orig_duration
 
