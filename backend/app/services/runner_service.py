@@ -4,12 +4,6 @@ import re
 
 import httpx
 
-_EXAMPLE_RE = re.compile(
-    r'^(например|пример|формат|образец|пр\.|e\.g\.|eg\.|example|like|тип)[:\s]',
-    re.IGNORECASE,
-)
-_PLACEHOLDER_RE = re.compile(r'^<.+>$')
-
 # Strips navigation verbs to detect pure-navigation actions
 _NAV_STRIP_RE = re.compile(
     r'\b(?:перейти|перейдите|открыть|открой|navigate|go\s+to|open|visit)\b'
@@ -24,15 +18,6 @@ def _is_pure_nav(action: str, url: str) -> bool:
     remaining = _NAV_STRIP_RE.sub('', remaining).strip(' .,;:-\n')
     return len(remaining) < 15
 
-
-def _annotate_test_data(td: str) -> str:
-    """Wrap test data with an explicit label so the agent knows how to use it."""
-    s = td.strip()
-    if _EXAMPLE_RE.match(s):
-        return f"[EXAMPLE — generate your own valid value of this type/format] {s}"
-    if _PLACEHOLDER_RE.match(s):
-        return f"[MISSING DATA — cannot proceed without real value, mark step blocked] {s}"
-    return f"[USE EXACTLY] {s}"
 
 from app.core.config import settings
 from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerScreenshot, RunnerStartRequest

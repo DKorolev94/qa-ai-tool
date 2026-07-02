@@ -145,3 +145,45 @@ def test_step_without_action_adds_validation_warning():
     improved = _base_improved(steps=[{"action": "", "expected": "Something"}])
     result = postprocess_improved_testcase({}, improved)
     assert any("действие" in w.lower() for w in result["validation_warnings"])
+
+
+def test_literal_value_stripped_from_action_when_duplicated_in_test_data():
+    improved = _base_improved(steps=[
+        {"action": "Заполнить поле Фамилия значением Иванов", "expected": "OK", "test_data": "Иванов"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["action"] == "Заполнить поле Фамилия"
+    assert result["steps"][0]["test_data"] == "Иванов"
+
+
+def test_literal_substring_not_stripped_from_unrelated_word():
+    improved = _base_improved(steps=[
+        {"action": "Заполнить поле Фамилия значением Иванов", "expected": "OK", "test_data": "Иван"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert "Иванов" in result["steps"][0]["action"]
+
+
+def test_example_marker_literal_stripped_from_action():
+    improved = _base_improved(steps=[
+        {"action": "Ввести email test@mail.com", "expected": "OK", "test_data": "например: test@mail.com"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert "test@mail.com" not in result["steps"][0]["action"]
+    assert result["steps"][0]["test_data"] == "например: test@mail.com"
+
+
+def test_no_duplication_action_left_untouched():
+    improved = _base_improved(steps=[
+        {"action": "Заполнить поле Фамилия", "expected": "OK", "test_data": "Иванов"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["action"] == "Заполнить поле Фамилия"
+
+
+def test_dangling_empty_quotes_after_llm_removed_value_itself():
+    improved = _base_improved(steps=[
+        {"action": 'Заполнить поле "Фамилия" значением ""', "expected": "OK", "test_data": "Иванов"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["action"] == 'Заполнить поле "Фамилия"'

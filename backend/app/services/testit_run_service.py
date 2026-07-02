@@ -72,7 +72,9 @@ async def write_run_result(
             msg = run_data.get("message") or run_data.get("detail") or "TestIT API error"
             raise TestItApiError(str(msg), status_code=resp.status_code)
 
-        run_id_testit = run_data["id"]
+        run_id_testit = run_data.get("id")
+        if not run_id_testit:
+            raise TestItResponseError(f"TestIT create test run returned no id: {run_data}")
         logger.info("Created TestIT test run id=%s for work_item=%s", run_id_testit, work_item_id)
 
         # Add test result

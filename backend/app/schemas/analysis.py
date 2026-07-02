@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 import re
 from typing import Literal
 from pydantic import BaseModel, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 ReviewRuleId = Literal[
@@ -116,7 +119,12 @@ class _LLMIssue(BaseModel):
     @classmethod
     def normalize_rule(cls, v: object) -> object:
         if isinstance(v, str):
-            return _RULE_ALIASES.get(v, v)
+            aliased = _RULE_ALIASES.get(v)
+            if aliased is not None:
+                if aliased != v:
+                    logger.warning("LLM returned aliased rule '%s' → '%s'", v, aliased)
+                return aliased
+            return v
         return v
 
     def to_issue(self) -> AnalysisIssue:
@@ -189,7 +197,6 @@ class ImproveResult(BaseModel):
 class AnalyzeTestCaseRequest(BaseModel):
     raw_content: str | None = None
     work_item: dict | None = None
-    source_type: Literal["testit", "manual"] = "testit"
     enabled_rules: list[ReviewRuleId] | None = None
 
 
@@ -204,7 +211,6 @@ class ImproveTestCaseRequest(BaseModel):
     raw_content: str | None = None
     work_item: dict | None = None
     selected_issues: list[dict] = []
-    source_type: Literal["testit", "manual"] = "testit"
 
 
 class ImproveTestCaseResponse(BaseModel):

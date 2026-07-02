@@ -1,5 +1,29 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Scrollbars ────────────────────────────────────────── */
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: rgba(15,17,23,0.18) transparent; }
+.sb-nav { scrollbar-color: rgba(255,255,255,0.24) transparent; }
+
+/* WebKit: a thin floating pill that swells and tints accent on interaction */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(15,17,23,0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color .16s ease, border-width .16s ease;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(124,58,237,0.55); border-width: 1px; }
+*::-webkit-scrollbar-thumb:active { background-color: rgba(124,58,237,0.75); }
+
+/* dark sidebar rail gets a light-on-dark thumb instead */
+.sb-nav::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); }
+.sb-nav::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.4); border-width: 1px; }
+.sb-nav::-webkit-scrollbar-thumb:active { background-color: rgba(255,255,255,0.55); }
+
 :root {
   --sb-bg: #1E1B4B;
   --sb-active-bg: rgba(255,255,255,0.09);
@@ -1372,7 +1396,7 @@ body { padding: 20px; }
 }
 .action-banner-text strong { font-weight: 600; color: var(--tx-primary); }
 .action-banner-link {
-  display: inline-flex; align-items: center; flex-shrink: 0;
+  display: inline-flex; align-items: center; vertical-align: middle;
   font-size: 11px; color: var(--accent); text-decoration: none; white-space: nowrap;
 }
 .action-banner-link:hover { text-decoration: underline; }

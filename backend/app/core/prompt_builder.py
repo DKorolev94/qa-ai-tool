@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 _RULES_DIR = _PROMPTS_DIR / "rules"
@@ -29,7 +32,8 @@ _RULE_FIX_LABELS: dict[str, str] = {
 def _load(path: Path) -> str:
     try:
         return path.read_text(encoding="utf-8").strip()
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to load prompt file %s: %s", path, exc)
         return ""
 
 

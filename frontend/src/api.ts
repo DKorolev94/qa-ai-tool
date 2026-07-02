@@ -34,14 +34,12 @@ export const api = {
     work_item?: unknown
     raw_content?: string
     selected_issues: ReviewIssue[]
-    source_type?: 'testit' | 'manual'
     enabled_rules?: ReviewRuleId[]
   }) => post<ImproveResult>('/improve-testcase', body),
 
   analyzeTestCase: (body: {
     work_item?: unknown
     raw_content?: string
-    source_type?: 'testit' | 'manual'
     enabled_rules?: ReviewRuleId[]
   }) =>
     post<AnalyzeResult>('/analyze-testcase', body),

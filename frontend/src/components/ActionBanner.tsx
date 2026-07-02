@@ -21,18 +21,18 @@ export function ActionBanner({ notifications }: Props) {
               ? <>Applied to original · <strong>#{n.id}</strong></>
               : <>Draft created in section "{n.sectionName}" · <strong>#{n.id}</strong></>}
             {n.isPartial && <span className="action-banner-partial"> · case still needs work</span>}
+            {n.testit_url && (
+              <a
+                className="action-banner-link"
+                href={n.testit_url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {' · '}Open in TestIT
+                <ExternalLink size={11} strokeWidth={2} style={{ marginLeft: 3, verticalAlign: 'middle' }} />
+              </a>
+            )}
           </span>
-          {n.testit_url && (
-            <a
-              className="action-banner-link"
-              href={n.testit_url}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open in TestIT
-              <ExternalLink size={11} strokeWidth={2} style={{ marginLeft: 3 }} />
-            </a>
-          )}
         </div>
       ))}
     </div>

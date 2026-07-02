@@ -14,8 +14,8 @@ def _compare_field(
     after: object,
     changes: list[dict],
 ) -> bool:
-    bv = str(before or "")
-    av = str(after or "")
+    bv = "" if before is None else str(before)
+    av = "" if after is None else str(after)
     if bv == av:
         return False
     change_type = "added" if not bv and av else ("removed" if bv and not av else "changed")

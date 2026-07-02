@@ -4,11 +4,21 @@ from __future__ import annotations
 import re
 
 _PRIORITY_MAP = {
+    "highest": "Highest",
     "high": "High",
     "medium": "Medium",
     "low": "Low",
     "critical": "Critical",
 }
+
+
+def _safe_duration(value: object, fallback: int = 60000) -> int:
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.isdigit():
+        ms = int(value)
+        return ms if ms > 0 else fallback
+    return fallback
 _VALID_STATES = {"Ready", "NotReady", "NeedsWork"}
 _SERVICE_FOOTER_SEP = "\n\n---\n"
 _DROP_TAGS = {"needs-review"}
@@ -53,7 +63,7 @@ def build_update_payload(
     improved: dict,
     source_work_item_id: str,
 ) -> dict:
-    original_tag_names = {t["name"] for t in (original_raw.get("tags") or [])}
+    original_tag_names = {t.get("name") for t in (original_raw.get("tags") or []) if t.get("name")}
     improved_tag_names = set(improved.get("tags") or [])
 
     merged = (original_tag_names | improved_tag_names)
@@ -69,7 +79,7 @@ def build_update_payload(
         "description": _strip_service_footer(improved.get("description")),
         "state": _map_state(improved.get("status")),
         "priority": _map_priority(improved.get("priority")),
-        "duration": int(improved.get("duration") or original_raw.get("duration") or 60000),
+        "duration": _safe_duration(improved.get("duration") if improved.get("duration") is not None else original_raw.get("duration")),
         "steps": [_map_step(s) for s in (improved.get("steps") or [])],
         "preconditionSteps": [_map_step(s) for s in (improved.get("preconditions") or [])],
         "postconditionSteps": [_map_step(s) for s in (improved.get("postconditions") or [])],

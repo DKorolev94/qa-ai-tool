@@ -155,6 +155,34 @@ class TestItClient:
 
         return data if isinstance(data, list) else data.get("items", [])
 
+    async def list_attributes(self, project_id: str) -> list[dict]:
+        self._check_config()
+        url = f"{self._base_url}/api/v2/projects/{project_id}/attributes"
+        try:
+            async with httpx.AsyncClient(
+                verify=self._verify_ssl,
+                timeout=float(self._timeout),
+            ) as client:
+                resp = await client.get(url, headers=self._headers())
+        except httpx.TimeoutException:
+            raise TestItConnectionError("Connection to TestIT timed out")
+        except httpx.RequestError as exc:
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+
+        if resp.status_code in (401, 403):
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+
+        try:
+            data = resp.json()
+        except Exception:
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})")
+
+        if not resp.is_success:
+            msg = data.get("message") or data.get("detail") or "TestIT API error"
+            raise TestItApiError(str(msg), status_code=resp.status_code)
+
+        return data if isinstance(data, list) else data.get("items", [])
+
     async def get_section(self, section_id: str) -> dict:
         self._check_config()
         url = f"{self._base_url}/api/v2/sections/{section_id}"

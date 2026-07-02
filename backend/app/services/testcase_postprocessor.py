@@ -1,9 +1,51 @@
 from __future__ import annotations
 
+import re
+
+from app.core.time_utils import format_duration_ms as _format_duration_ms
+
+# LLM often confuses ms/s/min; discard improved duration if suspiciously small
+_MIN_DURATION_MS = 60_000
+
 _STALE_TEST_DATA_KEYWORDS = [
     "вынести", "перенести", "добавить в test_data", "стоит добавить",
     "move to test_data", "add to test_data", "put in test_data", "use test_data",
 ]
+
+_EXAMPLE_MARKER_RE = re.compile(r'^\s*(?:например|пример)\s*:\s*(.+)$', re.IGNORECASE)
+
+_QUOTE_CHARS = '«"“”\''
+
+# Connector words (+ optionally now-empty quote pair) left dangling in action
+# after the literal value they referred to is stripped, e.g. 'значением ""'
+_DANGLING_CONNECTOR_RE = re.compile(
+    r'[\s,]*\b(?:значением|значение|равным|равное)\s*[:\-]?\s*'
+    rf'(?:[{_QUOTE_CHARS}]{{1,2}}\s*[{_QUOTE_CHARS}]{{0,2}})?\s*$',
+    re.IGNORECASE,
+)
+
+
+def _dedupe_action_test_data(step: dict) -> None:
+    """If test_data already holds a value, strip that same literal out of action
+    text so it isn't duplicated in both fields; also clean up connector words
+    left dangling when the LLM already removed the value itself."""
+    action = step.get("action")
+    test_data = step.get("test_data")
+    if not isinstance(action, str) or not action:
+        return
+
+    cleaned = action
+    if isinstance(test_data, str) and test_data:
+        marker = _EXAMPLE_MARKER_RE.match(test_data)
+        literal = marker.group(1).strip() if marker else test_data.strip()
+        if len(literal) >= 2:
+            pattern = re.compile(r'(?<!\w)' + re.escape(literal) + r'(?!\w)', re.IGNORECASE)
+            cleaned = pattern.sub('', cleaned)
+
+    cleaned = _DANGLING_CONNECTOR_RE.sub('', cleaned)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip(' ,.:;()')
+    if cleaned and cleaned != action:
+        step["action"] = cleaned
 
 
 def _deduplicate(items: list[str]) -> list[str]:
@@ -34,21 +76,6 @@ def _filter_stale_notes(notes: list[str], improved: dict) -> list[str]:
     return result
 
 
-def _format_duration_ms(ms: int) -> str:
-    if ms >= 3600000:
-        h = ms // 3600000
-        rem = ms % 3600000
-        m = rem // 60000
-        return f"{h}h {m}m" if m else f"{h}h"
-    if ms >= 60000:
-        m = ms // 60000
-        rem = ms % 60000
-        s = rem // 1000
-        return f"{m}m {s}s" if s else f"{m}m"
-    if ms >= 1000:
-        return f"{ms // 1000}s"
-    return f"{ms}ms"
-
 
 def _process_duration(improved: dict) -> tuple[str | None, int | None]:
     duration = improved.get("duration")
@@ -69,6 +96,9 @@ def postprocess_improved_testcase(
     improved: dict,
 ) -> dict:
     result = dict(improved)
+    for _section in ("steps", "preconditions", "postconditions"):
+        if isinstance(result.get(_section), list):
+            result[_section] = [dict(s) if isinstance(s, dict) else s for s in result[_section]]
     validation_warnings: list[str] = []
 
     # Deduplicate
@@ -83,6 +113,11 @@ def postprocess_improved_testcase(
     # Remove stale notes
     result["improvement_notes"] = _filter_stale_notes(result["improvement_notes"], result)
 
+    for _section in ("preconditions", "postconditions"):
+        for step in result.get(_section) or []:
+            if isinstance(step, dict):
+                _dedupe_action_test_data(step)
+
     # Validate steps
     steps = result.get("steps") or []
     original_steps = original.get("steps") or []
@@ -93,6 +128,7 @@ def postprocess_improved_testcase(
         for i, step in enumerate(steps):
             if not isinstance(step, dict):
                 continue
+            _dedupe_action_test_data(step)
             if not step.get("action"):
                 validation_warnings.append(f"Шаг {i + 1}: отсутствует действие")
             # Only warn if original had expected result but improved lost it.
@@ -110,9 +146,9 @@ def postprocess_improved_testcase(
     improved_duration = result.get("duration")
     if (
         isinstance(improved_duration, int)
-        and improved_duration < 60_000
+        and improved_duration < _MIN_DURATION_MS
         and isinstance(orig_duration, int)
-        and orig_duration >= 60_000
+        and orig_duration >= _MIN_DURATION_MS
     ):
         result["duration"] = orig_duration
 

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import pathlib
 import httpx
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
+from urllib.parse import urlparse, urlunparse
+
+logger = logging.getLogger(__name__)
 
 from app.integrations.testit_client import (
     TestItApiError,
@@ -77,7 +81,6 @@ async def analyze_testcase(body: AnalyzeTestCaseRequest) -> AnalyzeTestCaseRespo
             analyze_raw_testcase,
             raw_content=body.raw_content,
             work_item=body.work_item,
-            source_type=body.source_type,
             enabled_rules=body.enabled_rules,
         )
     except ValueError as exc:
@@ -274,7 +277,9 @@ async def runner_stop_session(run_id: str) -> dict:
 @router.websocket("/runner/ws/{run_id}")
 async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
     await websocket.accept()
-    runner_ws_url = settings.RUNNER_URL.replace('http://', 'ws://').replace('https://', 'wss://') + f'/ws/{run_id}'
+    _parsed = urlparse(settings.RUNNER_URL)
+    _ws_scheme = 'wss' if _parsed.scheme == 'https' else 'ws'
+    runner_ws_url = urlunparse(_parsed._replace(scheme=_ws_scheme)) + f'/ws/{run_id}'
     try:
         from websockets.asyncio.client import connect as ws_connect
         async with ws_connect(runner_ws_url, max_size=None) as runner_ws:
@@ -287,6 +292,7 @@ async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
     except WebSocketDisconnect:
         pass
     except Exception as exc:
+        logger.warning("Runner WS proxy error (run_id=%s) [%s]: %s", run_id, type(exc).__name__, exc)
         try:
             await websocket.send_json({'type': 'error', 'message': str(exc)})
         except Exception:
@@ -299,7 +305,7 @@ async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
 
 def _resolve_video_path(run_id: str) -> tuple[pathlib.Path, str]:
     import re
-    if not re.fullmatch(r'[A-Za-z0-9_.-]+', run_id):
+    if not re.fullmatch(r'[A-Za-z0-9_-]+', run_id):
         raise HTTPException(status_code=400, detail="Invalid run_id")
     runs_dir = settings.RUNNER_RUNS_DIR
     if not runs_dir:
@@ -335,7 +341,7 @@ async def runner_screenshot(path: str) -> FileResponse:
     if not str(target).startswith(str(runs_root)):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    if not target.exists():
+    if not target.exists() or not target.is_file():
         raise HTTPException(status_code=404, detail="Screenshot not found")
 
     return FileResponse(str(target))

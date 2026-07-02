@@ -10,20 +10,9 @@ from app.schemas.analysis import (
 )
 
 
-def test_analyze_request_default_source_type():
+def test_analyze_request_default_enabled_rules():
     req = AnalyzeTestCaseRequest(raw_content="test")
-    assert req.source_type == "testit"
     assert req.enabled_rules is None
-
-
-def test_analyze_request_manual_source_type():
-    req = AnalyzeTestCaseRequest(raw_content="test", source_type="manual")
-    assert req.source_type == "manual"
-
-
-def test_improve_request_default_source_type():
-    req = ImproveTestCaseRequest(raw_content="test")
-    assert req.source_type == "testit"
 
 
 def test_analyze_request_accepts_enabled_rules():

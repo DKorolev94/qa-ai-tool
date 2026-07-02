@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 _PRIORITY_MAP = {
+    "highest": "Highest",
     "high": "High",
     "medium": "Medium",
     "low": "Low",
     "critical": "Critical",
 }
+
+
+def _safe_duration(value: object, fallback: int = 60000) -> int:
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str) and value.isdigit():
+        ms = int(value)
+        return ms if ms > 0 else fallback
+    return fallback
 
 _STATUS_MAP = {
     "ready": "Ready",
@@ -77,7 +87,7 @@ def build_draft_payload(
         "state": _map_status(status),
         "priority": _map_priority(improved.get("priority")),
         "tags": [{"name": t} for t in draft_tags],
-        "duration": int(improved.get("duration") or 60000),
+        "duration": _safe_duration(improved.get("duration")),
         "steps": [_map_step(s) for s in (improved.get("steps") or [])],
         "preconditionSteps": [_map_step(s) for s in (improved.get("preconditions") or [])],
         "postconditionSteps": [_map_step(s) for s in (improved.get("postconditions") or [])],

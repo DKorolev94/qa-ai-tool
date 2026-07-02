@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, Check, CheckCircle2, EyeOff, FilePlus, Loader2, X,
   ExternalLink, FolderOpen, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
 } from 'lucide-react'
-import { api } from '../api'
+import { api, humanizeDraftError } from '../api'
 import { ActionBanner } from './ActionBanner'
 import { ModeButton } from './ModeButton'
 import { SectionHeader } from './SectionHeader'
@@ -583,7 +583,9 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
             type="number"
             min={1}
             style={{ width: 80 }}
-            value={tc.duration != null ? Math.round(parseInt(tc.duration, 10) / 60000) : ''}
+            value={tc.duration != null && /^\d+$/.test(String(tc.duration))
+              ? Math.round(parseInt(String(tc.duration), 10) / 60000)
+              : ''}
             placeholder="—"
             onChange={e => {
               const mins = parseInt(e.target.value, 10)
@@ -969,8 +971,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [improveError, setImproveError] = useState<string | null>(null)
   const [draftResult, setDraftResult] = useState<DraftResult | null>(null)
   const [draftLoading, setDraftLoading] = useState(false)
-  const [draftSectionName, setDraftSectionName] = useState<string>(MOCK_SECTIONS[0].name)
-  const [showSectionPicker, setShowSectionPicker] = useState(false)
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [draftSectionName] = useState<string>(MOCK_SECTIONS[0].name)
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null)
   const [applyLoading, setApplyLoading] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
@@ -981,8 +983,11 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [showResolved, setShowResolved] = useState(false)
   const [editedTestCase, setEditedTestCase] = useState<TestCase | null>(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [editSnapshot, setEditSnapshot] = useState<TestCase | null>(null)
+  const [manualOverride, setManualOverride] = useState(false)
 
   const tc = fetchResult.normalized_testcase
+  const initialEnabledRules = useRef(enabledRules)
 
   useEffect(() => {
     let cancelled = false
@@ -999,8 +1004,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       try {
         const result = await api.analyzeTestCase({
           work_item: fetchResult.raw_work_item,
-          source_type: 'testit',
-          enabled_rules: enabledRules,
+          enabled_rules: initialEnabledRules.current,
         })
         if (!cancelled) setAnalyzeResult(result)
       } catch (err) {
@@ -1012,7 +1016,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
     doAnalyze()
     return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // initial mount only; rule changes handled by runAnalyze
 
   async function runAnalyze() {
     setAnalyzeLoading(true)
@@ -1027,7 +1031,6 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     try {
       const result = await api.analyzeTestCase({
         work_item: fetchResult.raw_work_item,
-        source_type: 'testit',
         enabled_rules: enabledRules,
       })
       setAnalyzeResult(result)
@@ -1047,17 +1050,15 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     setImproveResult(null)
     setDraftResult(null)
     setApplyResult(null)
+    setManualOverride(false)
     try {
-      const enabledLabels = new Set(
-        reviewConfig.rules.filter(r => enabledRules.includes(r.id)).map(r => r.label)
-      )
+      const enabledRuleSet = new Set<string>(enabledRules)
       const issuesToFix = analyzeResult.issues.filter((i, idx) =>
-        enabledLabels.has(i.title) && !dismissedIndices.has(idx)
+        (i.rule ? enabledRuleSet.has(i.rule) : true) && !dismissedIndices.has(idx)
       )
       const result = await api.improveTestCase({
         work_item: fetchResult.raw_work_item,
         selected_issues: issuesToFix,
-        source_type: 'testit',
         enabled_rules: enabledRules,
       })
       setImproveResult(result)
@@ -1072,10 +1073,10 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     }
   }
 
-  async function runCreateDraft(sectionNameOverride?: string) {
+  async function runCreateDraft() {
     if (!improveResult) return
-    const effectiveSectionName = sectionNameOverride ?? draftSectionName
     setDraftLoading(true)
+    setDraftError(null)
     try {
       const result = await api.createDraft({
         improved_testcase: editedTestCase ?? improveResult.improved_testcase,
@@ -1084,8 +1085,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         manual_notes: improveResult.manual_notes ?? [],
       })
       setDraftResult(result)
-    } catch {
-      // TODO: show error
+    } catch (err) {
+      setDraftError(humanizeDraftError((err as Error).message))
     } finally {
       setDraftLoading(false)
     }
@@ -1119,11 +1120,9 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   // Reconstruct the same filter used in runImprove so resolution indices match.
   // Backend numbers issues 0..N from selected_issues, not from analyzeResult.issues.
-  const _enabledLabels = new Set(
-    reviewConfig.rules.filter(r => enabledRules.includes(r.id)).map(r => r.label)
-  )
+  const _enabledRuleSet = new Set<string>(enabledRules)
   const selectedIssuesForImprove = (analyzeResult?.issues ?? []).filter((i, idx) =>
-    _enabledLabels.has(i.title) && !dismissedIndices.has(idx)
+    (i.rule ? _enabledRuleSet.has(i.rule) : true) && !dismissedIndices.has(idx)
   )
 
   function getResolution(issue: ReviewIssue): IssueResolution | undefined {
@@ -1154,6 +1153,8 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   const resolvedCount = improveResult?.issue_resolutions?.filter(r => r.status === 'resolved').length ?? 0
   const manualCount = improveResult?.issue_resolutions?.filter(r => r.status === 'manual_needed').length ?? 0
+  // After the user manually edits and saves, treat manual-review items as addressed.
+  const effectiveManualCount = manualOverride ? 0 : manualCount
 
   function scoreBadge(s: number) {
     if (s >= 85) return 'Excellent'
@@ -1177,14 +1178,23 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   // TODO: result_status — placeholder until backend provides explicit field.
   // Detects partial: validation errors, empty critical fields, or unprocessed service footer.
-  function computeImproveStatus(r: ImproveResult): 'success' | 'partial' {
-    if ((r.manual_notes?.length ?? 0) > 0) return 'partial'
-    if ((r.validation_warnings?.length ?? 0) > 0) return 'partial'
-    if (!r.improved_testcase.title?.trim()) return 'partial'
-    if (!r.improved_testcase.steps?.length) return 'partial'
-    const desc = r.improved_testcase.description ?? ''
-    const origDesc = String((r.original_normalized_testcase as Record<string, unknown>)?.description ?? '')
-    if (SERVICE_FOOTER_MARKERS.some(m => desc.includes(m) && !origDesc.includes(m))) return 'partial'
+  // suppressManual: user manually edited and saved the test case — the AI-computed
+  // call-outs (manual_notes, validation_warnings, service footer) are now stale and
+  // no longer block completion. Title/steps are re-checked against the CURRENT
+  // (possibly edited) test case, since those are trivial to verify live and editing
+  // them is exactly what the user just did.
+  function computeImproveStatus(r: ImproveResult, current: TestCase, suppressManual: boolean): 'success' | 'partial' {
+    if (!suppressManual) {
+      if ((r.manual_notes?.length ?? 0) > 0) return 'partial'
+      if ((r.validation_warnings?.length ?? 0) > 0) return 'partial'
+    }
+    if (!current.title?.trim()) return 'partial'
+    if (!current.steps?.length) return 'partial'
+    if (!suppressManual) {
+      const desc = current.description ?? ''
+      const origDesc = String((r.original_normalized_testcase as Record<string, unknown>)?.description ?? '')
+      if (SERVICE_FOOTER_MARKERS.some(m => desc.includes(m) && !origDesc.includes(m))) return 'partial'
+    }
     return 'success'
   }
 
@@ -1201,7 +1211,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const improveStatus: 'success' | 'partial' | 'error' | null = improveError
     ? 'error'
     : improveResult
-    ? computeImproveStatus(improveResult)
+    ? computeImproveStatus(improveResult, editedTestCase ?? improveResult.improved_testcase, manualOverride)
     : null
 
   const openCriticalCount = analyzeResult?.issues.filter((issue, absIdx) => {
@@ -1213,21 +1223,21 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   }).length ?? 0
 
   const canDraft = (improveStatus === 'success' || improveStatus === 'partial') && !applyResult
-  const canApply = improveStatus === 'success' && openCriticalCount === 0 && manualCount === 0 && !applyResult
+  const canApply = improveStatus === 'success' && openCriticalCount === 0 && effectiveManualCount === 0 && !applyResult
   const applyBlockReason = improveStatus === 'partial'
     ? 'Case partially improved, manual review needed'
-    : openCriticalCount > 0 && manualCount > 0
-      ? `Unresolved critical issues (${openCriticalCount}) and requiring manual fix (${manualCount})`
+    : openCriticalCount > 0 && effectiveManualCount > 0
+      ? `Unresolved critical issues (${openCriticalCount}) and requiring manual fix (${effectiveManualCount})`
       : openCriticalCount > 0
         ? `Unresolved critical issues: ${openCriticalCount}`
-        : manualCount > 0
-          ? `${manualCount} ${manualCount === 1 ? 'issue requires' : 'issues require'} manual fix in TestIT`
+        : effectiveManualCount > 0
+          ? `${effectiveManualCount} ${effectiveManualCount === 1 ? 'issue requires' : 'issues require'} manual fix in TestIT`
           : null
 
   // Fields empty in improved result when AI partially processed — shown as ⚠ не обработано
   const partialFields = new Set<string>()
   if (improveStatus === 'partial' && improveResult) {
-    const it = improveResult.improved_testcase
+    const it = editedTestCase ?? improveResult.improved_testcase
     if (!it.title?.trim()) partialFields.add('title')
     if (!it.description?.trim() && tc.description?.trim()) partialFields.add('description')
     if (!it.steps?.length) partialFields.add('steps')
@@ -1274,7 +1284,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       id: draftResult.global_id != null ? String(draftResult.global_id) : draftResult.work_item_id,
       testit_url: draftResult.testit_url,
       sectionName: draftSectionName,
-      isPartial: improveStatus === 'partial' || manualCount > 0,
+      isPartial: improveStatus === 'partial' || effectiveManualCount > 0,
     }] : []),
     ...(applyResult ? [{
       type: 'apply' as const,
@@ -1345,10 +1355,10 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {resolvedCount} resolved
               </span>
             )}
-            {improveStatus && improveStatus !== 'error' && manualCount > 0 && (
+            {improveStatus && improveStatus !== 'error' && effectiveManualCount > 0 && (
               <span className="wb-metric wb-metric-warn">
                 <AlertTriangle size={11} />
-                {manualCount} manual
+                {effectiveManualCount} manual
               </span>
             )}
           </div>
@@ -1414,7 +1424,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 type="button"
                 className={`wb-btn ${improveStatus === 'partial' ? 'wb-btn-sec-warn' : 'wb-btn-sec'}`}
                 title={improveStatus === 'partial' ? 'Case partially improved, manual review recommended' : undefined}
-                onClick={() => setShowSectionPicker(true)}
+                onClick={() => runCreateDraft()}
               >
                 <CheckCircle2 size={13} />
                 Create draft
@@ -1453,18 +1463,6 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         </div>
       </div>
 
-      {/* Section picker modal */}
-      {showSectionPicker && (
-        <SectionPickerModal
-          onConfirm={(sectionName) => {
-            setDraftSectionName(sectionName)
-            setShowSectionPicker(false)
-            runCreateDraft(sectionName)
-          }}
-          onCancel={() => setShowSectionPicker(false)}
-        />
-      )}
-
       {/* Confirm apply modal */}
       {showConfirmApply && (
         <ConfirmApplyModal
@@ -1473,6 +1471,13 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
           onConfirm={runApplyToOriginal}
           onCancel={() => setShowConfirmApply(false)}
         />
+      )}
+
+      {/* Draft error */}
+      {draftError && (
+        <div className="alert alert-error" style={{ margin: '0 0 8px' }}>
+          <span className="alert-text">Draft error: {draftError}</span>
+        </div>
       )}
 
       {/* Apply error */}
@@ -1503,16 +1508,39 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {tab.count && <span className="wb-tab-count">{tab.count}</span>}
               </button>
             ))}
-            {activeTab === 'improved' && hasImprove && (
+            {activeTab === 'improved' && hasImprove && !isEditing && (
               <button
                 type="button"
-                className={`tc-edit-toggle${isEditing ? ' tc-edit-toggle-active' : ''}`}
+                className="tc-edit-toggle"
                 style={{ marginLeft: 'auto', alignSelf: 'center' }}
-                onClick={() => setIsEditing(v => !v)}
+                onClick={() => { setEditSnapshot(editedTestCase); setIsEditing(true) }}
               >
                 <Wrench size={11} />
-                {isEditing ? 'Done' : 'Edit'}
+                Edit
               </button>
+            )}
+            {activeTab === 'improved' && hasImprove && isEditing && (
+              <div style={{ marginLeft: 'auto', alignSelf: 'center', display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="tc-edit-toggle"
+                  onClick={() => { setEditedTestCase(editSnapshot); setIsEditing(false) }}
+                >
+                  <X size={11} />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tc-edit-toggle tc-edit-toggle-active"
+                  onClick={() => {
+                    setIsEditing(false)
+                    if (manualCount > 0 || (improveResult?.manual_notes?.length ?? 0) > 0) setManualOverride(true)
+                  }}
+                >
+                  <Check size={11} />
+                  Save
+                </button>
+              </div>
             )}
           </div>
           <div className="wb-content">
@@ -1608,9 +1636,9 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                               <Check size={11} strokeWidth={2.5} />{resolvedCount} resolved
                             </span>
                           )}
-                          {hasImprove && manualCount > 0 && (
+                          {hasImprove && effectiveManualCount > 0 && (
                             <span className="score-ctr sctr-warn">
-                              <AlertTriangle size={11} />{manualCount} manual
+                              <AlertTriangle size={11} />{effectiveManualCount} manual
                             </span>
                           )}
                           {!hasImprove && (
@@ -1634,7 +1662,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 </div>
 
                 {/* Manual work banner — top priority, shown first */}
-                {hasImprove && (improveResult!.manual_notes?.length ?? 0) > 0 && (
+                {hasImprove && !manualOverride && (improveResult!.manual_notes?.length ?? 0) > 0 && (
                   <div className="manual-banner">
                     <div className="mb-head">
                       <Wrench size={13} />

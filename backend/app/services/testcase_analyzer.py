@@ -57,8 +57,9 @@ def _complete_resolutions(
     resolutions: list[IssueResolution],
     issues: list[dict],
 ) -> list[IssueResolution]:
-    seen = {r.issue_index for r in resolutions}
-    result = list(resolutions)
+    valid_resolutions = [r for r in resolutions if 0 <= r.issue_index < len(issues)]
+    seen = {r.issue_index for r in valid_resolutions}
+    result = list(valid_resolutions)
     for idx in range(len(issues)):
         if idx not in seen:
             result.append(IssueResolution(
@@ -74,7 +75,6 @@ def _complete_resolutions(
 def analyze_raw_testcase(
     raw_content: str | None,
     work_item: dict | None,
-    source_type: str = "testit",
     enabled_rules: list[str] | None = None,
 ) -> AnalyzeTestCaseResponse:
     if raw_content is None and work_item is None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 import time
 
 import instructor
@@ -59,7 +60,21 @@ def _make_client() -> instructor.Instructor:
     return instructor.from_openai(openai_client, mode=instructor.Mode.JSON)
 
 
-_client = _make_client()
+def _resolve_temperature(override: float | None, default: float) -> float:
+    return override if override is not None else default
+
+
+_client: instructor.Instructor | None = None
+_client_lock = threading.Lock()
+
+
+def _get_client() -> instructor.Instructor:
+    global _client
+    if _client is None:
+        with _client_lock:
+            if _client is None:
+                _client = _make_client()
+    return _client
 
 
 def analyze_testcase_with_llm(
@@ -71,11 +86,11 @@ def analyze_testcase_with_llm(
     logger.info("LLM analyze: model=%s rules=%d title=%s", settings.LLM_MODEL, rules_count, clean_testcase.get("title", "")[:60])
     t0 = time.perf_counter()
     try:
-        llm_result = _client.chat.completions.create(
+        llm_result = _get_client().chat.completions.create(
             model=settings.LLM_MODEL,
             response_model=_LLMReviewResult,
             max_retries=1,
-            temperature=settings.LLM_TEMPERATURE_REVIEW if settings.LLM_TEMPERATURE_REVIEW is not None else settings.LLM_TEMPERATURE,
+            temperature=_resolve_temperature(settings.LLM_TEMPERATURE_REVIEW, settings.LLM_TEMPERATURE),
             messages=[
                 {"role": "system", "content": prompt},
                 {
@@ -91,7 +106,7 @@ def analyze_testcase_with_llm(
             warnings=llm_result.warnings,
         )
     except Exception as exc:
-        logger.error("LLM analyze failed (%.1fs): %s", time.perf_counter() - t0, _root_cause(exc))
+        logger.error("LLM analyze failed (%.1fs) [%s]: %s", time.perf_counter() - t0, type(exc).__name__, _root_cause(exc))
         return _FALLBACK_REVIEW
 
 
@@ -110,11 +125,11 @@ def improve_testcase_with_llm(
     logger.info("LLM improve: model=%s issues=%d title=%s", settings.LLM_MODEL, len(selected_issues), testcase.get("title", "")[:60])
     t0 = time.perf_counter()
     try:
-        result = _client.chat.completions.create(
+        result = _get_client().chat.completions.create(
             model=settings.LLM_MODEL,
             response_model=ImproveResult,
             max_retries=1,
-            temperature=settings.LLM_TEMPERATURE_IMPROVE if settings.LLM_TEMPERATURE_IMPROVE is not None else settings.LLM_TEMPERATURE,
+            temperature=_resolve_temperature(settings.LLM_TEMPERATURE_IMPROVE, settings.LLM_TEMPERATURE),
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": user_content},
@@ -138,7 +153,7 @@ def parse_testcase_with_llm(raw_text: str) -> TextParseResult | None:
         prompt = "You are a QA assistant."
     t0 = time.perf_counter()
     try:
-        result = _client.chat.completions.create(
+        result = _get_client().chat.completions.create(
             model=settings.LLM_MODEL,
             response_model=TextParseResult,
             max_retries=1,

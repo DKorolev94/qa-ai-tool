@@ -6,6 +6,7 @@ from app.parsing.testit_workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import ImproveResult, ImproveTestCaseResponse, IssueResolution
 from app.services.testcase_analyzer import _coerce_testcase, _complete_resolutions
 from app.services.testcase_diff import build_testcase_diff
+from app.core.time_utils import format_duration_ms as _format_duration_ms
 from app.services.testcase_postprocessor import postprocess_improved_testcase
 
 logger = logging.getLogger(__name__)
@@ -143,8 +144,10 @@ def improve_testcase(
     improved_raw = llm_result.improved_testcase.model_dump()
     processed = postprocess_improved_testcase(clean_dict, improved_raw)
     validation_warnings: list[str] = processed.pop("validation_warnings", [])
-    improvement_notes = processed.pop("improvement_notes", None) or llm_result.improvement_notes
-    manual_notes = processed.pop("manual_notes", None) or llm_result.manual_notes
+    _proc_notes = processed.pop("improvement_notes", None)
+    improvement_notes = _proc_notes if _proc_notes else llm_result.improvement_notes
+    _proc_manual = processed.pop("manual_notes", None)
+    manual_notes = _proc_manual if _proc_manual else llm_result.manual_notes
     processed.pop("warnings", None)
 
     issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues)
@@ -164,7 +167,6 @@ def improve_testcase(
     # Compute display_duration after coercion so restored durations are formatted correctly
     dur = improved_final.duration
     if isinstance(dur, int):
-        from app.services.testcase_postprocessor import _format_duration_ms
         display_duration: str | None = _format_duration_ms(dur)
     else:
         display_duration = processed.get("display_duration")

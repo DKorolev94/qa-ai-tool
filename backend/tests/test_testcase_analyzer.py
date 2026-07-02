@@ -17,16 +17,16 @@ MOCK_REVIEW = ReviewResult(
 
 def test_analyze_returns_response_with_issues():
     with patch("app.services.testcase_analyzer.analyze_testcase_with_llm", return_value=MOCK_REVIEW):
-        result = analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, source_type="testit")
+        result = analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None)
 
     assert result.summary == "Found 1 issue"
     assert len(result.issues) == 1
     assert result.issues[0].severity == "high"
 
 
-def test_analyze_passes_source_type_to_llm():
+def test_analyze_passes_enabled_rules_to_llm():
     with patch("app.services.testcase_analyzer.analyze_testcase_with_llm", return_value=MOCK_REVIEW) as mock_llm:
-        analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, source_type="testit", enabled_rules=["title"])
+        analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, enabled_rules=["title"])
 
     mock_llm.assert_called_once()
     call_args = mock_llm.call_args
@@ -40,7 +40,7 @@ def test_analyze_merges_warnings():
         warnings=["LLM warning"],
     )
     with patch("app.services.testcase_analyzer.analyze_testcase_with_llm", return_value=review_with_warnings):
-        result = analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, source_type="testit")
+        result = analyze_raw_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None)
 
     assert "LLM warning" in result.warnings
 

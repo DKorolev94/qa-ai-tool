@@ -61,7 +61,7 @@ def parse_testit_content(raw: str) -> NormalizedTestCase:
                 return normalize_testit_workitem(parsed)
             if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):
                 return normalize_testit_workitem(parsed[0])
-        except (json.JSONDecodeError, Exception):
+        except Exception:
             pass  # not valid JSON, fall through to text parsing
 
     # Use LLM to parse free-form text (handles all language/format variations)
@@ -97,7 +97,7 @@ def parse_testit_content(raw: str) -> NormalizedTestCase:
     attachments = extract_attachments(raw)
     warnings: list[str] = []
 
-    lines = [l for l in cleaned.splitlines()]
+    lines = cleaned.splitlines()
     non_empty = [l for l in lines if l.strip()]
 
     if not non_empty:

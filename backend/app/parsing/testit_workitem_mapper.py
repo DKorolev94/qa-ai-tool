@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.core.time_utils import format_duration_ms as _format_duration_ms
 from app.parsing.html_cleaner import clean_html
 from app.parsing.attachment_parser import extract_attachments, _EXT_TYPE_MAP
 from app.schemas.testcase import Attachment, NormalizedTestCase, ParameterTable, TestCaseStep, WorkItemLink
@@ -35,19 +36,6 @@ def _extract_str(value: object) -> str | None:
                 return v.strip()
     return str(value).strip() or None
 
-
-def _format_duration_ms(ms: int) -> str:
-    if ms >= 3600000:
-        hours = ms // 3600000
-        minutes = (ms % 3600000) // 60000
-        return f"{hours}h {minutes}m" if minutes else f"{hours}h"
-    if ms >= 60000:
-        minutes = ms // 60000
-        seconds = (ms % 60000) // 1000
-        return f"{minutes}m {seconds}s" if seconds else f"{minutes}m"
-    if ms >= 1000:
-        return f"{ms // 1000}s"
-    return f"{ms}ms"
 
 
 def _display_duration(value: object) -> str | None:
@@ -202,8 +190,10 @@ def map_step(step: dict) -> TestCaseStep:
     )
 
 
-def expand_steps(raw_steps: list) -> list[TestCaseStep]:
+def expand_steps(raw_steps: list, _depth: int = 0) -> list[TestCaseStep]:
     """Expand steps, recursively resolving shared steps (step.workItem.steps)."""
+    if _depth > 10:
+        return []
     result: list[TestCaseStep] = []
     for step in raw_steps:
         if not isinstance(step, dict):
@@ -211,7 +201,7 @@ def expand_steps(raw_steps: list) -> list[TestCaseStep]:
         work_item = step.get("workItem")
         if work_item and isinstance(work_item, dict):
             nested = work_item.get("steps") or []
-            result.extend(expand_steps(nested))
+            result.extend(expand_steps(nested, _depth + 1))
         else:
             result.append(map_step(step))
     return result
@@ -232,7 +222,7 @@ def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
     preconditions = expand_steps(raw_pre)
 
     raw_post = work_item.get("postcondition_steps") or work_item.get("postconditionSteps") or []
-    postconditions = [map_step(s) for s in raw_post if isinstance(s, dict)]
+    postconditions = expand_steps(raw_post)
 
     raw_atts = work_item.get("attachments") or []
     attachments = [_map_attachment(a) for a in raw_atts if isinstance(a, dict)]
