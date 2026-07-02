@@ -90,6 +90,8 @@ Copy `.env.example` to `.env` in the project root and fill in the values.
 | `TESTIT_PRIVATE_TOKEN` | `your_token` | TestIT private token |
 | `TESTIT_PROJECT_UUID` | `uuid` | Default project UUID |
 
+Everything else (timeouts, preflight, temperature, browser runner tuning) has working defaults — see `.env.example`.
+
 ### LLM provider examples
 
 ```bash
@@ -112,5 +114,3 @@ LLM_BASE_URL=http://host.docker.internal:11434/v1
 # Also add to docker-compose.yml under browser-use-runner:
 #   extra_hosts: ["host.docker.internal:host-gateway"]
 ```
-
-See `.env.example` for the full list of optional variables.

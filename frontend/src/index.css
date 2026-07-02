@@ -1063,9 +1063,10 @@ body { padding: 20px; }
 .wb-btn-apply:disabled { opacity: 0.4; cursor: not-allowed; }
 .wb-btn-wrap { position: relative; display: inline-flex; }
 .wb-btn-tip {
-  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  position: absolute; bottom: calc(100% + 6px); right: 0;
   background: var(--tx-primary); color: #fff; border-radius: var(--r-sm);
-  padding: 5px 8px; font-size: 11px; line-height: 15px; white-space: nowrap;
+  padding: 5px 8px; font-size: 11px; line-height: 15px; white-space: normal;
+  max-width: 220px; text-align: right;
   pointer-events: none; opacity: 0; transition: opacity .15s;
   z-index: 100;
 }
