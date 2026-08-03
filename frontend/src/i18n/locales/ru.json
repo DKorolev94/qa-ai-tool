@@ -252,5 +252,63 @@
       "applying": "Применение…",
       "replace": "Заменить"
     }
+  },
+  "runnerView": {
+    "subtitle": "AI-агент автоматически прогоняет тест-кейсы в браузере",
+    "mode": {
+      "fromTms": "Из TMS",
+      "manual": "Вручную"
+    },
+    "testCaseIdLabel": "ID тест-кейса в TestIT",
+    "idPlaceholder": "например, 6110",
+    "loading": "Загрузка...",
+    "load": "Загрузить",
+    "errorPrefix": "Ошибка: ",
+    "flow": {
+      "step1": "Загрузить тест-кейс",
+      "step2": "Проверить шаги",
+      "step3": "Нажать «Запустить»"
+    },
+    "manualTask": {
+      "label": "Задача для агента",
+      "placeholder": "URL: https://app.example.com\n\n1. Войти как admin (логин: admin@example.com, пароль: secret123)\n2. Открыть раздел «Пользователи»\n3. Нажать «Добавить пользователя»\n4. Заполнить поля: Имя: Test User, Email: test@example.com\n5. Нажать «Сохранить»\n6. Убедиться, что пользователь появился в таблице со статусом Active",
+      "limitsTitle": "Пока не поддерживается",
+      "limitsCaptcha": "CAPTCHA / reCAPTCHA, двухфакторная аутентификация (2FA)",
+      "limitsDialogs": "Системные диалоги ОС, загрузка файлов, iframe, drag & drop"
+    },
+    "run": "Запустить",
+    "history": {
+      "recentRuns": "Недавние запуски ({{count}})",
+      "showAll": "Показать все ({{count}})",
+      "hide": "Скрыть",
+      "manualRun": "Ручной запуск",
+      "testCaseHash": "Тест-кейс #{{id}}"
+    },
+    "time": {
+      "today": "Сегодня, {{time}}",
+      "yesterday": "Вчера, {{time}}",
+      "elapsedMinSec": "{{m}} мин {{s}} с",
+      "elapsedSec": "{{s}} с"
+    },
+    "workbench": {
+      "tabTestCase": "Тест-кейс",
+      "runHint": "Нажмите «Запустить» — откроется страница сессии"
+    },
+    "steps": {
+      "colAction": "Действие",
+      "colExpected": "Ожидаемый результат",
+      "colTestData": "Тестовые данные",
+      "precondition": "Предусловие",
+      "postcondition": "Постусловие",
+      "label": "Шаги",
+      "notSpecified": "не указано"
+    },
+    "iterationPicker": {
+      "label": "Набор параметров (окружение / итерация)"
+    },
+    "resolutionBlocker": {
+      "title": "Минимальное разрешение — 1024px",
+      "desc": "Разверните окно браузера или используйте внешний монитор."
+    }
   }
 }

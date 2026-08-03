@@ -3,6 +3,8 @@ import {
   AlertTriangle, CheckCircle2, ChevronDown, ChevronRight,
   Loader2, Monitor, Play, Plus, Upload, XCircle,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api, humanizeFetchError } from '../api'
 import { RunnerSessionView, StatusBadge } from './RunnerSessionView'
 import { SectionHeader } from './SectionHeader'
@@ -12,9 +14,11 @@ import type { FetchResult, RunnerRunResponse, RunnerSession, SessionListItem, St
 
 type InputMode = 'testit' | 'manual'
 
-function fmtElapsed(s: number) {
+function fmtElapsed(s: number, t: TFunction) {
   const m = Math.floor(s / 60)
-  return m > 0 ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`
+  return m > 0
+    ? t('runnerView.time.elapsedMinSec', { m, s: String(s % 60).padStart(2, '0') })
+    : t('runnerView.time.elapsedSec', { s })
 }
 
 function mkSession(
@@ -32,6 +36,7 @@ function mkSession(
 // ── Compact steps table (shared with TestItWorkbench) ─────────────────────
 
 function StepBlock({ label, steps }: { label: string; steps?: Step[] | null }) {
+  const { t } = useTranslation()
   if (!steps?.length) return null
   const hasTestData = steps.some(s => s.test_data)
   const cols = hasTestData ? '28px 1fr 1fr 1fr' : '28px 1fr 1fr'
@@ -41,9 +46,9 @@ function StepBlock({ label, steps }: { label: string; steps?: Step[] | null }) {
       <div className="steps-tbl">
         <div className="steps-head" style={{ gridTemplateColumns: cols }}>
           <div className="steps-th steps-th-num">#</div>
-          <div className="steps-th">Action</div>
-          <div className="steps-th">Expected result</div>
-          {hasTestData && <div className="steps-th">Test data</div>}
+          <div className="steps-th">{t('runnerView.steps.colAction')}</div>
+          <div className="steps-th">{t('runnerView.steps.colExpected')}</div>
+          {hasTestData && <div className="steps-th">{t('runnerView.steps.colTestData')}</div>}
         </div>
         {steps.map((s, i) => (
           <div key={i} className="steps-row" style={{ gridTemplateColumns: cols }}>
@@ -74,9 +79,10 @@ function IterationPicker({
   selected: number
   onChange: (i: number) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div>
-      <label className="source-label">Parameter set (environment / iteration)</label>
+      <label className="source-label">{t('runnerView.iterationPicker.label')}</label>
       <select
         className="source-id-input"
         style={{ width: '100%', cursor: 'pointer' }}
@@ -93,13 +99,14 @@ function IterationPicker({
 }
 
 function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
+  const { t } = useTranslation()
   const tc = fetchResult.normalized_testcase
   const pt = tc.parameter_table
   const hasIterations = pt && pt.rows.length > 1
   const [selectedIteration, setSelectedIteration] = useState(0)
   return (
     <div className="workspace-inner-wb">
-      <SectionHeader title="Test Runner" onBack={onBack} />
+      <SectionHeader title={t('sidebar.testRunner')} onBack={onBack} />
 
       <div className="wb-card">
         <div className="wb-card-left">
@@ -111,7 +118,7 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
         </div>
         <div className="wb-actions">
           <button type="button" className="source-fetch-btn" onClick={() => onRun(selectedIteration)}>
-            <Play size={13} /> Run
+            <Play size={13} /> {t('runnerView.run')}
           </button>
         </div>
       </div>
@@ -119,12 +126,12 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
       <div className="wb-grid" style={{ flex: 1, minHeight: 0 }}>
         <div className="wb-main">
           <div className="wb-tabs-row">
-            <div className="wb-tab wb-tab-active" style={{ cursor: 'default' }}>Test case</div>
+            <div className="wb-tab wb-tab-active" style={{ cursor: 'default' }}>{t('runnerView.workbench.tabTestCase')}</div>
           </div>
           <div className="wb-content">
-            <StepBlock label="Precondition" steps={tc.preconditions} />
+            <StepBlock label={t('runnerView.steps.precondition')} steps={tc.preconditions} />
             <div>
-              <span className="case-sec-label">Steps</span>
+              <span className="case-sec-label">{t('runnerView.steps.label')}</span>
               {tc.steps?.length ? (() => {
                 const hasTestData = tc.steps.some(s => s.test_data)
                 const cols = hasTestData ? '28px 1fr 1fr 1fr' : '28px 1fr 1fr'
@@ -132,9 +139,9 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
                   <div className="steps-tbl">
                     <div className="steps-head" style={{ gridTemplateColumns: cols }}>
                       <div className="steps-th steps-th-num">#</div>
-                      <div className="steps-th">Action</div>
-                      <div className="steps-th">Expected result</div>
-                      {hasTestData && <div className="steps-th">Test data</div>}
+                      <div className="steps-th">{t('runnerView.steps.colAction')}</div>
+                      <div className="steps-th">{t('runnerView.steps.colExpected')}</div>
+                      {hasTestData && <div className="steps-th">{t('runnerView.steps.colTestData')}</div>}
                     </div>
                     {tc.steps.map((s, i) => (
                       <div key={i} className="steps-row" style={{ gridTemplateColumns: cols }}>
@@ -147,10 +154,10 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
                   </div>
                 )
               })() : (
-                <div className="case-text-box case-text-empty">not specified</div>
+                <div className="case-text-box case-text-empty">{t('runnerView.steps.notSpecified')}</div>
               )}
             </div>
-            <StepBlock label="Postcondition" steps={tc.postconditions} />
+            <StepBlock label={t('runnerView.steps.postcondition')} steps={tc.postconditions} />
             {hasIterations && pt && (
               <IterationPicker
                 names={pt.names}
@@ -164,7 +171,7 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
 
         <div className="wb-run-hint">
           <Play size={28} strokeWidth={1.4} style={{ color: 'var(--tx-dim)' }} />
-          <span>Click "Run" — the session page will open</span>
+          <span>{t('runnerView.workbench.runHint')}</span>
         </div>
       </div>
     </div>
@@ -173,13 +180,13 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
 
 // ── Date formatting ───────────────────────────────────────────────────────
 
-function fmtDate(iso: string): string {
+function fmtDate(iso: string, t: TFunction): string {
   const d = new Date(iso)
   const now = new Date()
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
   const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  if (diffDays === 0) return `Today, ${hm}`
-  if (diffDays === 1) return `Yesterday, ${hm}`
+  if (diffDays === 0) return t('runnerView.time.today', { time: hm })
+  if (diffDays === 1) return t('runnerView.time.yesterday', { time: hm })
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '') + '., ' + hm
 }
 
@@ -194,6 +201,7 @@ function SessionHistoryList({
   onOpenLocal: (id: string) => void
   maxItems?: number
 }) {
+  const { t } = useTranslation()
   const runningLocals = localSessions.filter(s => s.status === 'running')
   // Filter out api sessions that duplicate a local session
   const localRunIds = new Set(runningLocals.map(s => s.id))
@@ -217,16 +225,25 @@ function SessionHistoryList({
             <div key={item.local!.id} className="hist-item" onClick={() => onOpenLocal(item.local!.id)}>
               <StatusBadge status={item.local!.status} />
               <span className="hist-title" title={item.local!.title}>{item.local!.title}</span>
-              <span className="hist-meta">{fmtElapsed(Math.round((Date.now() - item.local!.startedAt) / 1000))}</span>
+              <span className="hist-meta">{fmtElapsed(Math.round((Date.now() - item.local!.startedAt) / 1000), t)}</span>
               <ChevronRight size={14} strokeWidth={1.75} className="hist-chevron" />
             </div>
           ) : (
             <div key={item.api!.run_id} className="hist-item" onClick={() => onOpenApi(item.api!)}>
               <StatusBadge status={item.api!.status} />
-              <span className="hist-title" title={item.api!.test_case_id ? `Test case #${item.api!.test_case_id}` : 'Manual run'}>
-                {item.api!.test_case_id ? `Test case #${item.api!.test_case_id}` : 'Manual run'}
+              <span
+                className="hist-title"
+                title={item.api!.test_case_id
+                  ? t('runnerView.history.testCaseHash', { id: item.api!.test_case_id })
+                  : t('runnerView.history.manualRun')}
+              >
+                {item.api!.test_case_id
+                  ? t('runnerView.history.testCaseHash', { id: item.api!.test_case_id })
+                  : t('runnerView.history.manualRun')}
               </span>
-              <span className="hist-meta">{Math.round(item.api!.duration_sec)}s · {fmtDate(item.api!.created_at)}</span>
+              <span className="hist-meta">
+                {t('runnerView.time.elapsedSec', { s: Math.round(item.api!.duration_sec) })} · {fmtDate(item.api!.created_at, t)}
+              </span>
               <ChevronRight size={14} strokeWidth={1.75} className="hist-chevron" />
             </div>
           )
@@ -274,6 +291,7 @@ function InputScreen({
   testItId, onTestItIdChange, fetchLoading, fetchResult, fetchError, onFetch,
   onRunManual, apiSessions, localSessions, onOpenApiSession, onOpenLocalSession,
 }: InputScreenProps) {
+  const { t } = useTranslation()
   const [manualTask, setManualTask] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [showAllHistory, setShowAllHistory] = useState(false)
@@ -291,8 +309,8 @@ function InputScreen({
 
         {/* Section header */}
         <SectionHeader
-          title="Test Runner"
-          subtitle="AI agent automatically runs test cases in the browser"
+          title={t('sidebar.testRunner')}
+          subtitle={t('runnerView.subtitle')}
         />
 
         {/* Segmented control */}
@@ -302,14 +320,14 @@ function InputScreen({
             className={`segmented-option${mode === 'testit' ? ' segmented-option--active' : ''}`}
             onClick={() => onModeChange('testit')}
           >
-            From TMS
+            {t('runnerView.mode.fromTms')}
           </button>
           <button
             type="button"
             className={`segmented-option${mode === 'manual' ? ' segmented-option--active' : ''}`}
             onClick={() => onModeChange('manual')}
           >
-            Manual
+            {t('runnerView.mode.manual')}
           </button>
         </div>
 
@@ -330,13 +348,13 @@ function InputScreen({
 
                 {/* ID input */}
                 <div>
-                  <label className="source-label" htmlFor="runner-testit-id">Test case ID in TestIT</label>
+                  <label className="source-label" htmlFor="runner-testit-id">{t('runnerView.testCaseIdLabel')}</label>
                   <div className="source-input-row">
                     <input
                       id="runner-testit-id"
                       className="source-id-input"
                       type="text"
-                      placeholder="e.g. 6110"
+                      placeholder={t('runnerView.idPlaceholder')}
                       value={testItId}
                       onChange={e => onTestItIdChange(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && canFetch && onFetch()}
@@ -350,8 +368,8 @@ function InputScreen({
                       disabled={!canFetch}
                     >
                       {fetchLoading
-                        ? <><Loader2 size={15} className="spin-icon" />Loading...</>
-                        : <><Upload size={15} />Load</>}
+                        ? <><Loader2 size={15} className="spin-icon" />{t('runnerView.loading')}</>
+                        : <><Upload size={15} />{t('runnerView.load')}</>}
                     </button>
                   </div>
                 </div>
@@ -359,12 +377,16 @@ function InputScreen({
                 {fetchError && (
                   <div className="alert alert-error">
                     <span className="alert-icon-err"><XCircle size={16} strokeWidth={1.75} /></span>
-                    <span className="alert-text"><strong>Error: </strong>{fetchError}</span>
+                    <span className="alert-text"><strong>{t('runnerView.errorPrefix')}</strong>{fetchError}</span>
                   </div>
                 )}
 
                 {/* Flow line */}
-                <FlowLine steps={['Load the test case', 'Review the steps', 'Click \'Run\'']} />
+                <FlowLine steps={[
+                  t('runnerView.flow.step1'),
+                  t('runnerView.flow.step2'),
+                  t('runnerView.flow.step3'),
+                ]} />
               </>
             )}
 
@@ -373,12 +395,12 @@ function InputScreen({
               <>
                 {/* Task textarea with char counter */}
                 <div>
-                  <label className="source-label" htmlFor="runner-manual-task">Task for agent</label>
+                  <label className="source-label" htmlFor="runner-manual-task">{t('runnerView.manualTask.label')}</label>
                   <div className="runner-task-wrap">
                     <textarea
                       id="runner-manual-task"
                       className="runner-task-textarea runner-task-compact"
-                      placeholder={"URL: https://app.example.com\n\n1. Sign in as admin (login: admin@example.com, password: secret123)\n2. Open the Users section\n3. Click \"Add user\"\n4. Fill in Name: Test User, Email: test@example.com\n5. Click \"Save\"\n6. Verify the user appears in the table with status Active"}
+                      placeholder={t('runnerView.manualTask.placeholder')}
                       value={manualTask}
                       onChange={e => setManualTask(e.target.value)}
                       maxLength={4000}
@@ -396,16 +418,16 @@ function InputScreen({
                   onClick={() => onRunManual(manualTask)}
                   disabled={!canRun}
                 >
-                  <Play size={16} /> Run
+                  <Play size={16} /> {t('runnerView.run')}
                 </button>
 
                 {/* Limitations — callout */}
                 <div className="limits-callout">
                   <AlertTriangle size={14} strokeWidth={1.5} />
                   <div className="limits-callout-text">
-                    <span className="limits-callout-title">Not yet supported</span>
-                    <span>CAPTCHA / reCAPTCHA, two-factor authentication (2FA)</span>
-                    <span>OS system dialogs, file upload, iframes, drag & drop</span>
+                    <span className="limits-callout-title">{t('runnerView.manualTask.limitsTitle')}</span>
+                    <span>{t('runnerView.manualTask.limitsCaptcha')}</span>
+                    <span>{t('runnerView.manualTask.limitsDialogs')}</span>
                   </div>
                 </div>
               </>
@@ -421,7 +443,7 @@ function InputScreen({
               className={`history-accordion-btn${historyOpen ? ' history-accordion-btn--open' : ''}`}
               onClick={() => { setHistoryOpen(v => !v); setShowAllHistory(false) }}
             >
-              <span>Recent runs ({sessionCount})</span>
+              <span>{t('runnerView.history.recentRuns', { count: sessionCount })}</span>
               <ChevronDown
                 size={14}
                 strokeWidth={1.75}
@@ -443,7 +465,7 @@ function InputScreen({
                     className="history-show-more"
                     onClick={() => setShowAllHistory(v => !v)}
                   >
-                    {showAllHistory ? 'Hide' : `Show all (${sessionCount})`}
+                    {showAllHistory ? t('runnerView.history.hide') : t('runnerView.history.showAll', { count: sessionCount })}
                   </button>
                 )}
               </div>
@@ -459,6 +481,7 @@ function InputScreen({
 // ── RunnerView ────────────────────────────────────────────────────────────
 
 export function RunnerView() {
+  const { t } = useTranslation()
   const [inputMode, setInputMode] = useState<InputMode>('testit')
   const [testItId, setTestItId] = useState('')
   const [fetchLoading, setFetchLoading] = useState(false)
@@ -515,7 +538,7 @@ export function RunnerView() {
   }
 
   function manualTitle(task: string, startUrl?: string): string {
-    const prefix = 'Manual run'
+    const prefix = t('runnerView.history.manualRun')
     const httpsUrl = task.match(/https?:\/\/[^\s)>\]"']+/)?.[0]
     const bareDomain = !httpsUrl ? task.match(/\b([a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[^\s]*)?)\b/i)?.[0] : undefined
     const url = startUrl || httpsUrl || bareDomain
@@ -538,7 +561,9 @@ export function RunnerView() {
   function handleRunTestIt(iterationIndex = 0) {
     if (!fetchResult) return
     const tc = fetchResult.normalized_testcase
-    const title = tc.title ? `${tc.title} #${fetchResult.work_item_id}` : `Test case #${fetchResult.work_item_id}`
+    const title = tc.title
+      ? `${tc.title} #${fetchResult.work_item_id}`
+      : t('runnerView.history.testCaseHash', { id: fetchResult.work_item_id })
     startSession(mkSession({ title, source: 'testit', workItemId: fetchResult.work_item_id, iterationIndex }))
   }
 
@@ -567,7 +592,9 @@ export function RunnerView() {
     }
     const session: RunnerSession = {
       id: item.run_id,
-      title: item.test_case_id ? `Test case #${item.test_case_id}` : 'Manual run',
+      title: item.test_case_id
+        ? t('runnerView.history.testCaseHash', { id: item.test_case_id })
+        : t('runnerView.history.manualRun'),
       source: item.test_case_id ? 'testit' : 'manual',
       workItemId: item.test_case_id ?? undefined,
       status: item.status,
@@ -587,8 +614,8 @@ export function RunnerView() {
       <main className="workspace">
         <div className="resolution-blocker">
           <Monitor size={48} strokeWidth={1.25} style={{ color: 'var(--tx-dim)' }} />
-          <h2 className="resolution-blocker-title">Minimum resolution — 1024px</h2>
-          <p className="resolution-blocker-desc">Expand the browser window or use an external monitor.</p>
+          <h2 className="resolution-blocker-title">{t('runnerView.resolutionBlocker.title')}</h2>
+          <p className="resolution-blocker-desc">{t('runnerView.resolutionBlocker.desc')}</p>
         </div>
       </main>
     )

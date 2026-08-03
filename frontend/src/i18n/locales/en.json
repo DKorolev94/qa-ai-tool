@@ -246,5 +246,63 @@
       "applying": "Applying…",
       "replace": "Replace"
     }
+  },
+  "runnerView": {
+    "subtitle": "AI agent automatically runs test cases in the browser",
+    "mode": {
+      "fromTms": "From TMS",
+      "manual": "Manual"
+    },
+    "testCaseIdLabel": "Test case ID in TestIT",
+    "idPlaceholder": "e.g. 6110",
+    "loading": "Loading...",
+    "load": "Load",
+    "errorPrefix": "Error: ",
+    "flow": {
+      "step1": "Load the test case",
+      "step2": "Review the steps",
+      "step3": "Click 'Run'"
+    },
+    "manualTask": {
+      "label": "Task for agent",
+      "placeholder": "URL: https://app.example.com\n\n1. Sign in as admin (login: admin@example.com, password: secret123)\n2. Open the Users section\n3. Click \"Add user\"\n4. Fill in Name: Test User, Email: test@example.com\n5. Click \"Save\"\n6. Verify the user appears in the table with status Active",
+      "limitsTitle": "Not yet supported",
+      "limitsCaptcha": "CAPTCHA / reCAPTCHA, two-factor authentication (2FA)",
+      "limitsDialogs": "OS system dialogs, file upload, iframes, drag & drop"
+    },
+    "run": "Run",
+    "history": {
+      "recentRuns": "Recent runs ({{count}})",
+      "showAll": "Show all ({{count}})",
+      "hide": "Hide",
+      "manualRun": "Manual run",
+      "testCaseHash": "Test case #{{id}}"
+    },
+    "time": {
+      "today": "Today, {{time}}",
+      "yesterday": "Yesterday, {{time}}",
+      "elapsedMinSec": "{{m}}m {{s}}s",
+      "elapsedSec": "{{s}}s"
+    },
+    "workbench": {
+      "tabTestCase": "Test case",
+      "runHint": "Click \"Run\" — the session page will open"
+    },
+    "steps": {
+      "colAction": "Action",
+      "colExpected": "Expected result",
+      "colTestData": "Test data",
+      "precondition": "Precondition",
+      "postcondition": "Postcondition",
+      "label": "Steps",
+      "notSpecified": "not specified"
+    },
+    "iterationPicker": {
+      "label": "Parameter set (environment / iteration)"
+    },
+    "resolutionBlocker": {
+      "title": "Minimum resolution — 1024px",
+      "desc": "Expand the browser window or use an external monitor."
+    }
   }
 }
