@@ -12,6 +12,13 @@ _IMPROVE_BASE = _PROMPTS_DIR / "improve_base.md"
 
 _FIX_SECTION_MARKER = "## How to fix"
 
+_LANGUAGE_NAMES: dict[str, str] = {"ru": "Russian", "en": "English"}
+
+
+def _apply_language(text: str, language: str) -> str:
+    return text.replace("{LANGUAGE_NAME}", _LANGUAGE_NAMES.get(language, "Russian"))
+
+
 _RULE_FIX_LABELS: dict[str, str] = {
     "title": "Title",
     "description": "Description",
@@ -51,8 +58,8 @@ def _load_fix_section(rule_id: str) -> str:
     return body.strip()
 
 
-def build_review_prompt(enabled_rules: list[str] | None = None) -> str:
-    base = _load(_REVIEW_BASE)
+def build_review_prompt(enabled_rules: list[str] | None = None, language: str = "ru") -> str:
+    base = _apply_language(_load(_REVIEW_BASE), language)
     if not enabled_rules:
         return base
     rule_sections = [c for r in enabled_rules if (c := _load(_RULES_DIR / f"{r}.md"))]
@@ -70,7 +77,7 @@ def build_review_prompt(enabled_rules: list[str] | None = None) -> str:
     return f"{base}\n\n---\n\n## Check the following aspects\n\n{rules_block}\n\n---\n\n{checklist_block}"
 
 
-def build_improve_prompt(rule_ids: list[str] | None = None) -> str:
+def build_improve_prompt(rule_ids: list[str] | None = None, language: str = "ru") -> str:
     # None: no rule ids passed at all (e.g. issues from an external source
     # with no `rule` field) — fall back to the full rule set instead of a
     # separately maintained monolithic prompt, so rules/*.md stays the single
@@ -88,6 +95,6 @@ def build_improve_prompt(rule_ids: list[str] | None = None) -> str:
         if body:
             label = _RULE_FIX_LABELS.get(rule_id, rule_id)
             fix_sections.append(f"### {label}\n\n{body}")
-    base = _load(_IMPROVE_BASE)
+    base = _apply_language(_load(_IMPROVE_BASE), language)
     rules_block = "\n\n---\n\n".join(fix_sections)
     return f"{base}\n\n---\n\n## How to fix\n\n{rules_block}"

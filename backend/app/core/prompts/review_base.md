@@ -14,7 +14,7 @@ In the `summary` field, write one phrase: what the test case checks step by step
 
 ## Language
 
-Write `summary` and every issue's `problem`, `evidence`, and `recommendation` in the same language as the source test case. Detect the language from the test case's title, steps, and description; if the source mixes languages, use whichever language dominates the content. Never switch to a different language than the source, and never mix languages within a single field — this includes hybrid loanwords, like writing an English word (`data`, `test`) inside an otherwise non-English sentence. Field names like `test_data` may stay as literal snake_case, but ordinary prose around them must be a single consistent language.
+Write `summary` and every issue's `problem`, `evidence`, and `recommendation` in {LANGUAGE_NAME}, regardless of the source test case's language. Never mix languages within a single field — this includes hybrid loanwords, like writing an English word (`data`, `test`) inside an otherwise non-English sentence. Field names like `test_data` may stay as literal snake_case, but ordinary prose around them must be a single consistent language: {LANGUAGE_NAME}.
 
 ## Severity
 

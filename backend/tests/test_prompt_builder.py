@@ -15,3 +15,19 @@ def test_atomicity_improve_prompt_can_close_false_positive():
     assert "false positive" in prompt
     assert "No atomicity violation" in prompt
     assert "manual_needed" in prompt
+
+
+def test_review_prompt_defaults_to_russian_directive():
+    prompt = build_review_prompt(None)
+    assert "in Russian" in prompt
+
+
+def test_review_prompt_english_directive():
+    prompt = build_review_prompt(None, language="en")
+    assert "in English" in prompt
+    assert "in Russian" not in prompt
+
+
+def test_improve_prompt_english_directive():
+    prompt = build_improve_prompt(None, language="en")
+    assert "in English" in prompt
