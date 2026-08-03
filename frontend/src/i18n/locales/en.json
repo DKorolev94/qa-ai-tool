@@ -1,0 +1,22 @@
+{
+  "sidebar": {
+    "brandName": "QA AI Tools",
+    "brandSub": "AI Review Workspace",
+    "toolsLabel": "Tools",
+    "reviewImprove": "Review & Improve",
+    "reviewImproveSub": "test cases",
+    "testRunner": "Test Runner",
+    "testRunnerSub": "run test cases in browser",
+    "generate": "Generate",
+    "generateSub": "test cases",
+    "soon": "Soon",
+    "settings": "Settings",
+    "collapse": "Collapse",
+    "language": "Language"
+  },
+  "common": {
+    "apply": "Apply",
+    "reset": "Reset",
+    "loading": "Loading..."
+  }
+}
