@@ -10,6 +10,7 @@ from app.tms.testit.client import (
     TestItConnectionError,
     TestItNotFoundError,
 )
+from app.tms.testit.link_parser import InvalidWorkItemInputError
 from app.tms.testit.schemas import FetchTestItWorkItemResponse
 
 client = TestClient(app)
@@ -50,7 +51,7 @@ def test_review_config_returns_sources_profiles_and_rules():
 def test_fetch_invalid_input_returns_400():
     with patch(
         "app.api.routes.fetch_and_normalize_work_item",
-        new=AsyncMock(side_effect=ValueError("Could not extract TestIT work item id")),
+        new=AsyncMock(side_effect=InvalidWorkItemInputError("???garbage???")),
     ):
         resp = client.post("/api/testit/workitem/fetch", json={"input": "???garbage???"})
     assert resp.status_code == 400
@@ -96,3 +97,21 @@ def test_fetch_connection_error_returns_503():
 def test_fetch_missing_input_field_returns_422():
     resp = client.post("/api/testit/workitem/fetch", json={})
     assert resp.status_code == 422
+
+
+def test_analyze_missing_input_localized_ru():
+    resp = client.post("/api/analyze-testcase", json={"language": "ru"})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Укажите raw_content или work_item"
+
+
+def test_analyze_missing_input_localized_en():
+    resp = client.post("/api/analyze-testcase", json={"language": "en"})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Provide raw_content or work_item"
+
+
+def test_analyze_missing_input_defaults_to_ru():
+    resp = client.post("/api/analyze-testcase", json={})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Укажите raw_content или work_item"

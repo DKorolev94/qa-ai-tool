@@ -18,7 +18,9 @@ from app.tms.testit.client import (
     TestItNotFoundError,
     TestItResponseError,
 )
+from app.core.errors_i18n import localize
 from app.core.review_config import ReviewConfig, get_review_config
+from app.tms.testit.link_parser import InvalidWorkItemInputError
 from app.tms.testit.parser import parse_testit_content
 from app.tms.testit.workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import (
@@ -75,13 +77,14 @@ async def normalize_workitem(body: WorkItemRequest) -> NormalizedTestCase:
 @router.post("/analyze-testcase", response_model=AnalyzeTestCaseResponse)
 async def analyze_testcase(body: AnalyzeTestCaseRequest) -> AnalyzeTestCaseResponse:
     if body.work_item is None and body.raw_content is None:
-        raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
+        raise HTTPException(status_code=422, detail=localize("missing_input", body.language))
     try:
         return await asyncio.to_thread(
             analyze_raw_testcase,
             raw_content=body.raw_content,
             work_item=body.work_item,
             enabled_rules=body.enabled_rules,
+            language=body.language,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -90,36 +93,37 @@ async def analyze_testcase(body: AnalyzeTestCaseRequest) -> AnalyzeTestCaseRespo
 @router.post("/improve-testcase", response_model=ImproveTestCaseResponse)
 async def improve_testcase_endpoint(body: ImproveTestCaseRequest) -> ImproveTestCaseResponse:
     if body.work_item is None and body.raw_content is None:
-        raise HTTPException(status_code=422, detail="Provide raw_content or work_item")
+        raise HTTPException(status_code=422, detail=localize("missing_input", body.language))
     try:
         return await asyncio.to_thread(
             improve_testcase,
             raw_content=body.raw_content,
             work_item=body.work_item,
             selected_issues=body.selected_issues,
+            language=body.language,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=localize("llm_improve_unavailable", body.language, detail=str(exc)))
 
 
 @router.post("/testit/workitem/fetch", response_model=FetchTestItWorkItemResponse)
 async def fetch_testit_workitem(body: FetchTestItWorkItemRequest) -> FetchTestItWorkItemResponse:
     try:
         return await fetch_and_normalize_work_item(body.input)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except InvalidWorkItemInputError as exc:
+        raise HTTPException(status_code=400, detail=localize(exc.code, body.language, **exc.params))
     except TestItConfigError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItAuthError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
+        raise HTTPException(status_code=401, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItConnectionError as exc:
-        raise HTTPException(status_code=503, detail=f"TestIT unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else f"TestIT unavailable: {exc}")
     except TestItResponseError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItApiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -134,13 +138,13 @@ async def create_testit_draft(body: CreateDraftRequest) -> CreateDraftResponse:
             manual_notes=body.manual_notes,
         )
     except TestItConfigError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItAuthError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
+        raise HTTPException(status_code=401, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItConnectionError as exc:
-        raise HTTPException(status_code=503, detail=f"TestIT unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else f"TestIT unavailable: {exc}")
     except TestItResponseError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItApiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -154,15 +158,15 @@ async def update_testit_original(body: UpdateOriginalRequest) -> UpdateOriginalR
             source_attributes=body.source_attributes,
         )
     except TestItConfigError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItAuthError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
+        raise HTTPException(status_code=401, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItConnectionError as exc:
-        raise HTTPException(status_code=503, detail=f"TestIT unavailable: {exc}")
+        raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else f"TestIT unavailable: {exc}")
     except TestItResponseError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItApiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
