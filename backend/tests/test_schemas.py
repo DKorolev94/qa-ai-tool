@@ -8,6 +8,7 @@ from app.schemas.analysis import (
     IssueResolution,
     _LLMIssue,
 )
+from app.tms.testit.schemas import CreateDraftRequest, FetchTestItWorkItemRequest, UpdateOriginalRequest
 
 
 def test_analyze_request_default_enabled_rules():
@@ -54,7 +55,7 @@ def test_llm_issue_omits_empty_evidence_from_description():
     ).to_issue()
 
     assert issue.description == "У большинства шагов отсутствуют expected results."
-    assert "Пример:" not in issue.description
+    assert "Example:" not in issue.description
 
 
 def test_llm_issue_omits_empty_text_evidence_from_description():
@@ -67,7 +68,7 @@ def test_llm_issue_omits_empty_text_evidence_from_description():
     ).to_issue()
 
     assert issue.description == "Description отсутствует."
-    assert "Пример:" not in issue.description
+    assert "Example:" not in issue.description
 
 
 def test_llm_issue_omits_mixed_empty_assignment_evidence_from_description():
@@ -80,7 +81,7 @@ def test_llm_issue_omits_mixed_empty_assignment_evidence_from_description():
     ).to_issue()
 
     assert issue.description == "Шаг 9 имеет пустое поле action."
-    assert "Пример:" not in issue.description
+    assert "Example:" not in issue.description
 
 
 def test_llm_issue_keeps_meaningful_evidence_in_description():
@@ -92,4 +93,36 @@ def test_llm_issue_keeps_meaningful_evidence_in_description():
         recommendation="Перенести примеры в test_data.",
     ).to_issue()
 
-    assert "Пример: Шаги 2-6: action содержит 'например: Иванов'" in issue.description
+    assert "Example: Шаги 2-6: action содержит 'например: Иванов'" in issue.description
+
+
+def test_analyze_request_defaults_to_ru():
+    req = AnalyzeTestCaseRequest(raw_content="x")
+    assert req.language == "ru"
+
+
+def test_improve_request_accepts_en():
+    req = ImproveTestCaseRequest(raw_content="x", language="en")
+    assert req.language == "en"
+
+
+def test_fetch_request_defaults_to_ru():
+    req = FetchTestItWorkItemRequest(input="6109")
+    assert req.language == "ru"
+
+
+def test_create_draft_request_defaults_to_ru():
+    req = CreateDraftRequest(improved_testcase={}, source_work_item_id="1")
+    assert req.language == "ru"
+
+
+def test_update_original_request_defaults_to_ru():
+    req = UpdateOriginalRequest(improved_testcase={}, source_work_item_id="1")
+    assert req.language == "ru"
+
+
+def test_invalid_language_rejected():
+    import pytest
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        AnalyzeTestCaseRequest(raw_content="x", language="fr")
