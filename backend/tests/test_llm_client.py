@@ -45,8 +45,11 @@ def test_analyze_uses_correct_prompt_for_testit():
     with patch("app.core.llm_client._get_client") as mock_get_client:
         mock_client = mock_get_client.return_value
         mock_client.chat.completions.create.return_value = _mock_llm_review()
-        analyze_testcase_with_llm(SAMPLE_TESTCASE)
+        # language="en" matches _mock_llm_review()'s non-Cyrillic summary ("Good test"),
+        # so the language-mismatch retry doesn't fire and call_args stays the real call.
+        analyze_testcase_with_llm(SAMPLE_TESTCASE, language="en")
 
+    assert mock_client.chat.completions.create.call_count == 1
     call_kwargs = mock_client.chat.completions.create.call_args
     system_msg = call_kwargs[1]["messages"][0]["content"]
     assert len(system_msg) > 50
@@ -58,8 +61,11 @@ def test_analyze_uses_different_prompt_for_manual():
     with patch("app.core.llm_client._get_client") as mock_get_client:
         mock_client = mock_get_client.return_value
         mock_client.chat.completions.create.return_value = _mock_llm_review()
-        analyze_testcase_with_llm(SAMPLE_TESTCASE)
+        # language="en" matches _mock_llm_review()'s non-Cyrillic summary ("Good test"),
+        # so the language-mismatch retry doesn't fire and call_args stays the real call.
+        analyze_testcase_with_llm(SAMPLE_TESTCASE, language="en")
 
+    assert mock_client.chat.completions.create.call_count == 1
     call_kwargs = mock_client.chat.completions.create.call_args
     system_msg = call_kwargs[1]["messages"][0]["content"]
     assert len(system_msg) > 50
