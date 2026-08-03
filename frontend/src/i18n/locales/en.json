@@ -18,5 +18,12 @@
     "apply": "Apply",
     "reset": "Reset",
     "loading": "Loading..."
+  },
+  "actionBanner": {
+    "appliedToOriginal": "Applied to original",
+    "draftCreatedIn": "Draft created in section \"{{sectionName}}\"",
+    "stillNeedsWork": "case still needs work",
+    "openInTestIt": "Open in TestIT",
+    "dismiss": "Dismiss"
   }
 }

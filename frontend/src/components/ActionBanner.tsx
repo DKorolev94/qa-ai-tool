@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, FilePlus, ExternalLink, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ActionNotification } from '../types'
 
 interface Props {
@@ -24,6 +25,7 @@ export function ActionBanner({ notifications }: Props) {
 // Keyed by `${type}-${id}` in the parent, so a fresh draft/apply result (new id)
 // always mounts a new instance and starts un-dismissed.
 function BannerRow({ notification: n }: { notification: ActionNotification }) {
+  const { t } = useTranslation()
   const [closing, setClosing] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
@@ -46,9 +48,9 @@ function BannerRow({ notification: n }: { notification: ActionNotification }) {
       </span>
       <span className="action-banner-text">
         {n.type === 'apply'
-          ? <>Applied to original · <strong>#{n.id}</strong></>
-          : <>Draft created in section "{n.sectionName}" · <strong>#{n.id}</strong></>}
-        {n.isPartial && <span className="action-banner-partial"> · case still needs work</span>}
+          ? <>{t('actionBanner.appliedToOriginal')} · <strong>#{n.id}</strong></>
+          : <>{t('actionBanner.draftCreatedIn', { sectionName: n.sectionName })} · <strong>#{n.id}</strong></>}
+        {n.isPartial && <span className="action-banner-partial"> · {t('actionBanner.stillNeedsWork')}</span>}
         {n.testit_url && (
           <a
             className="action-banner-link"
@@ -56,7 +58,7 @@ function BannerRow({ notification: n }: { notification: ActionNotification }) {
             target="_blank"
             rel="noopener noreferrer"
           >
-            {' · '}Open in TestIT
+            {' · '}{t('actionBanner.openInTestIt')}
             <ExternalLink size={11} strokeWidth={2} style={{ marginLeft: 3, verticalAlign: 'middle' }} />
           </a>
         )}
@@ -65,8 +67,8 @@ function BannerRow({ notification: n }: { notification: ActionNotification }) {
         type="button"
         className="action-banner-close"
         onClick={() => setClosing(true)}
-        aria-label="Dismiss notification"
-        title="Dismiss"
+        aria-label={t('actionBanner.dismiss')}
+        title={t('actionBanner.dismiss')}
       >
         <X size={12} strokeWidth={2} />
       </button>

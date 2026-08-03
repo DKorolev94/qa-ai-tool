@@ -18,5 +18,12 @@
     "apply": "Применить",
     "reset": "Сбросить",
     "loading": "Загрузка..."
+  },
+  "actionBanner": {
+    "appliedToOriginal": "Применено к оригиналу",
+    "draftCreatedIn": "Черновик создан в разделе «{{sectionName}}»",
+    "stillNeedsWork": "кейс всё ещё требует доработки",
+    "openInTestIt": "Открыть в TestIT",
+    "dismiss": "Скрыть"
   }
 }
