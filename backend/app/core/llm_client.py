@@ -17,6 +17,7 @@ from app.schemas.analysis import (
     ReviewResult,
     TextParseResult,
     _LLMReviewResult,
+    _SummaryRewrite,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,11 +95,44 @@ def _get_client(mode: instructor.Mode) -> instructor.Instructor:
     return _clients[mode]
 
 
+_CYRILLIC_RE = re.compile(r'[а-яёА-ЯЁ]')
+
+
+def _has_cyrillic(text: str) -> bool:
+    return bool(_CYRILLIC_RE.search(text))
+
+
+def _rewrite_summary_language(summary: str, want_russian: bool) -> str | None:
+    """One-shot fix for a `summary` written in the wrong language relative to
+    the selected review language — cheaper than re-running the whole review call."""
+    target = "Russian" if want_russian else "English"
+    try:
+        result = _get_client(instructor.Mode.JSON).chat.completions.create(
+            model=settings.LLM_MODEL,
+            response_model=_SummaryRewrite,
+            max_retries=1,
+            temperature=0,
+            extra_body=_extra_body(),
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"Rewrite the given text in {target}, preserving its meaning exactly. Don't add or remove information.",
+                },
+                {"role": "user", "content": summary},
+            ],
+        )
+        return result.summary
+    except Exception as exc:
+        logger.warning("Summary language rewrite failed: %s", _root_cause(exc))
+        return None
+
+
 def analyze_testcase_with_llm(
     clean_testcase: dict,
     enabled_rules: list[str] | None = None,
+    language: str = "ru",
 ) -> ReviewResult:
-    prompt = build_review_prompt(enabled_rules)
+    prompt = build_review_prompt(enabled_rules, language)
     rules_count = len(enabled_rules) if enabled_rules else 0
     logger.info("LLM analyze: model=%s rules=%d title=%s", settings.LLM_MODEL, rules_count, (clean_testcase.get("title") or "")[:60])
     t0 = time.perf_counter()
@@ -123,15 +157,22 @@ def analyze_testcase_with_llm(
                     "role": "user",
                     "content": (
                         f"Test case to analyze:\n\n{json.dumps(clean_testcase, ensure_ascii=False, indent=2)}\n\n"
-                        "Write summary, problem, evidence, and recommendation in the same language as this test case."
+                        f"Write summary, problem, evidence, and recommendation in {'Russian' if language == 'ru' else 'English'}."
                     ),
                 },
             ],
         )
         logger.info("LLM analyze ok: %.1fs issues=%d warnings=%d", time.perf_counter() - t0, len(llm_result.issues), len(llm_result.warnings))
+        summary = llm_result.summary
+        want_russian = language == "ru"
+        if summary.strip() and want_russian != _has_cyrillic(summary):
+            logger.warning("LLM analyze: summary language mismatch, retrying rewrite")
+            rewritten = _rewrite_summary_language(summary, want_russian=want_russian)
+            if rewritten:
+                summary = rewritten
         return ReviewResult(
-            summary=llm_result.summary,
-            issues=[i.to_issue() for i in llm_result.issues],
+            summary=summary,
+            issues=[i.to_issue(language) for i in llm_result.issues],
             warnings=llm_result.warnings,
         )
     except Exception as exc:
@@ -142,17 +183,18 @@ def analyze_testcase_with_llm(
 def improve_testcase_with_llm(
     testcase: dict,
     selected_issues: list[dict],
+    language: str = "ru",
 ) -> ImproveResult:
     rule_ids = [r for iss in selected_issues if (r := iss.get("rule"))]
     if not selected_issues:
         # No issues selected at all — no fix guidance should be included.
-        prompt = build_improve_prompt([])
+        prompt = build_improve_prompt([], language)
     elif rule_ids:
-        prompt = build_improve_prompt(rule_ids)
+        prompt = build_improve_prompt(rule_ids, language)
     else:
         # Issues selected but none carry a `rule` field (e.g. an external
         # source) — fall back to the full rule set for fix guidance.
-        prompt = build_improve_prompt(None)
+        prompt = build_improve_prompt(None, language)
     numbered_issues = [{"issue_index": i, **iss} for i, iss in enumerate(selected_issues)]
     user_content = (
         f"Test case to improve:\n{json.dumps(testcase, ensure_ascii=False, indent=2)}\n\n"

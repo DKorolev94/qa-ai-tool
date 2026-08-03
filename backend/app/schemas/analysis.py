@@ -60,20 +60,37 @@ _RULE_ALIASES: dict[str, str] = {
     "structure": "title",
 }
 
-_RULE_LABELS: dict[str, str] = {
-    "title": "Заголовок",
-    "description": "Описание",
-    "preconditions": "Предусловия",
-    "steps": "Шаги",
-    "postconditions": "Постусловия",
-    "priority": "Приоритет",
-    "expected_results": "Ожидаемые результаты",
-    "test_data": "Тестовые данные",
-    "tags": "Теги",
-    "atomicity": "Атомарность",
-    "independence": "Независимость",
-    "reproducibility": "Воспроизводимость",
-    "structure": "Структура",  # deprecated
+_RULE_LABELS: dict[str, dict[str, str]] = {
+    "en": {
+        "title": "Title",
+        "description": "Description",
+        "preconditions": "Preconditions",
+        "steps": "Steps",
+        "postconditions": "Postconditions",
+        "priority": "Priority",
+        "expected_results": "Expected results",
+        "test_data": "Test data",
+        "tags": "Tags",
+        "atomicity": "Atomicity",
+        "independence": "Independence",
+        "reproducibility": "Reproducibility",
+        "structure": "Structure",  # deprecated
+    },
+    "ru": {
+        "title": "Заголовок",
+        "description": "Описание",
+        "preconditions": "Предусловия",
+        "steps": "Шаги",
+        "postconditions": "Постусловия",
+        "priority": "Приоритет",
+        "expected_results": "Ожидаемые результаты",
+        "test_data": "Тестовые данные",
+        "tags": "Теги",
+        "atomicity": "Атомарность",
+        "independence": "Независимость",
+        "reproducibility": "Воспроизводимость",
+        "structure": "Структура",  # deprecated
+    },
 }
 
 
@@ -127,14 +144,15 @@ class _LLMIssue(BaseModel):
             return v
         return v
 
-    def to_issue(self) -> AnalysisIssue:
+    def to_issue(self, language: str = "ru") -> AnalysisIssue:
         desc = self.problem
         if _has_meaningful_evidence(self.evidence):
             desc = f"{self.problem}\n\nПример: {self.evidence}"
+        labels = _RULE_LABELS.get(language, _RULE_LABELS["ru"])
         return AnalysisIssue(
             rule=self.rule,
             severity=self.severity,
-            title=_RULE_LABELS.get(self.rule, self.rule),
+            title=labels.get(self.rule, self.rule),
             description=desc,
             recommendation=self.recommendation,
         )
@@ -146,6 +164,11 @@ class _LLMReviewResult(BaseModel):
     summary: str
     issues: list[_LLMIssue] = []
     warnings: list[str] = []
+
+
+class _SummaryRewrite(BaseModel):
+    """Internal model for the summary-language-fix retry call."""
+    summary: str
 
 
 class AnalysisStep(BaseModel):

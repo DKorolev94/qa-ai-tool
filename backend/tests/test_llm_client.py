@@ -115,6 +115,70 @@ def test_improve_passes_issues_in_user_message():
     assert "No expected result" in user_msg
 
 
+def test_analyze_passes_language_to_prompt_builder(monkeypatch):
+    from app.core.llm_client import analyze_testcase_with_llm
+
+    captured = {}
+    def fake_build_review_prompt(enabled_rules, language="ru"):
+        captured["language"] = language
+        return "prompt"
+    monkeypatch.setattr("app.core.llm_client.build_review_prompt", fake_build_review_prompt)
+
+    with patch("app.core.llm_client._get_client") as mock_get_client:
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = _mock_llm_review()
+        analyze_testcase_with_llm(SAMPLE_TESTCASE, language="en")
+
+    assert captured["language"] == "en"
+
+
+def test_improve_passes_language_to_prompt_builder(monkeypatch):
+    from app.core.llm_client import improve_testcase_with_llm
+
+    captured = {}
+    def fake_build_improve_prompt(rule_ids, language="ru"):
+        captured["language"] = language
+        return "prompt"
+    monkeypatch.setattr("app.core.llm_client.build_improve_prompt", fake_build_improve_prompt)
+
+    with patch("app.core.llm_client._get_client") as mock_get_client:
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = _mock_improve_result()
+        improve_testcase_with_llm(SAMPLE_TESTCASE, SAMPLE_ISSUES, language="en")
+
+    assert captured["language"] == "en"
+
+
+def test_analyze_rewrites_summary_when_language_mismatches_source():
+    from app.core.llm_client import analyze_testcase_with_llm
+    from app.schemas.analysis import _SummaryRewrite
+
+    russian_testcase = {"title": "Вход в систему", "steps": [{"action": "Открыть страницу входа"}]}
+    mismatched_review = _mock_llm_review()
+    mismatched_review.summary = "This test checks login"  # wrong language for the selected (default ru) language
+    rewritten = _SummaryRewrite(summary="Этот тест проверяет вход")
+
+    with patch("app.core.llm_client._get_client") as mock_get_client:
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.side_effect = [mismatched_review, rewritten]
+        result = analyze_testcase_with_llm(russian_testcase)
+
+    assert result.summary == "Этот тест проверяет вход"
+    assert mock_client.chat.completions.create.call_count == 2
+
+
+def test_analyze_keeps_summary_when_summary_matches_selected_language():
+    from app.core.llm_client import analyze_testcase_with_llm
+
+    with patch("app.core.llm_client._get_client") as mock_get_client:
+        mock_client = mock_get_client.return_value
+        mock_client.chat.completions.create.return_value = _mock_llm_review()
+        result = analyze_testcase_with_llm(SAMPLE_TESTCASE, language="en")
+
+    assert result.summary == "Good test"
+    assert mock_client.chat.completions.create.call_count == 1
+
+
 def test_is_ollama_endpoint_detects_local_ollama():
     from app.core.llm_client import _is_ollama_endpoint
 

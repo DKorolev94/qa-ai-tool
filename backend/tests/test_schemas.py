@@ -96,6 +96,28 @@ def test_llm_issue_keeps_meaningful_evidence_in_description():
     assert "Пример: Шаги 2-6: action содержит 'например: Иванов'" in issue.description
 
 
+def test_llm_issue_title_uses_russian_label_by_default():
+    issue = _LLMIssue(
+        rule="title",
+        severity="low",
+        problem="Weak title",
+        recommendation="Fix it",
+    ).to_issue()
+
+    assert issue.title == "Заголовок"
+
+
+def test_llm_issue_title_uses_english_label_when_language_is_en():
+    issue = _LLMIssue(
+        rule="title",
+        severity="low",
+        problem="Weak title",
+        recommendation="Fix it",
+    ).to_issue(language="en")
+
+    assert issue.title == "Title"
+
+
 def test_analyze_request_defaults_to_ru():
     req = AnalyzeTestCaseRequest(raw_content="x")
     assert req.language == "ru"
