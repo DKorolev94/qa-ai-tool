@@ -3,6 +3,8 @@ import {
   AlertTriangle, Check, CheckCircle2, EyeOff, FilePlus, Loader2, X,
   ExternalLink, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { api, humanizeDraftError } from '../api'
 import { ActionBanner } from './ActionBanner'
 import { ModeButton } from './ModeButton'
@@ -27,19 +29,28 @@ interface Props {
 // would ask the LLM to "fix" a meta-error instead of the actual test case.
 const LLM_UNAVAILABLE_WARNING = 'LLM is unavailable, fallback response returned'
 
-const PRIORITY_LABELS: Record<string, string> = {
-  Critical: 'Critical', Highest: 'Highest', High: 'High', Medium: 'Medium', Low: 'Low',
-  critical: 'Critical', highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low',
+function priorityLabels(t: TFunction): Record<string, string> {
+  const critical = t('workbench.priority.critical')
+  const highest = t('workbench.priority.highest')
+  const high = t('workbench.priority.high')
+  const medium = t('workbench.priority.medium')
+  const low = t('workbench.priority.low')
+  return {
+    Critical: critical, Highest: highest, High: high, Medium: medium, Low: low,
+    critical, highest, high, medium, low,
+  }
 }
 
-// TestIT returns status values in English; map to Russian and badge class
-const STATUS_LABELS: Record<string, string> = {
-  Ready: 'Ready',
-  NotReady: 'Not ready',
-  Draft: 'Draft',
-  NeedsWork: 'Needs work',
-  Obsolete: 'Obsolete',
-  InProgress: 'In progress',
+// TestIT returns status values in English; map to a localized label and badge class
+function statusLabels(t: TFunction): Record<string, string> {
+  return {
+    Ready: t('workbench.status.ready'),
+    NotReady: t('workbench.status.notReady'),
+    Draft: t('workbench.status.draft'),
+    NeedsWork: t('workbench.status.needsWork'),
+    Obsolete: t('workbench.status.obsolete'),
+    InProgress: t('workbench.status.inProgress'),
+  }
 }
 const STATUS_PILL: Record<string, string> = {
   Ready: 'pill-ok',
@@ -55,20 +66,20 @@ const STATUS_PILL: Record<string, string> = {
 // it stays selected and isn't silently overwritten on save.
 const EDITABLE_STATUSES = new Set(['Ready', 'NotReady', 'NeedsWork'])
 
-const FIELD_LABELS: Record<string, string> = {
-  title: 'Title', description: 'Description',
-  preconditions: 'Precondition', postconditions: 'Postcondition',
-  tags: 'Tags', priority: 'Priority', status: 'Status', duration: 'Duration',
-  expected: 'Expected result', action: 'Action', test_data: 'Test data',
-}
-
-function fieldLabel(field: string): string {
-  if (FIELD_LABELS[field]) return FIELD_LABELS[field]
-  const m = field.match(/^steps\.(\d+)\.(.+)$/)
-  if (m) return `Step ${parseInt(m[1]) + 1} — ${FIELD_LABELS[m[2]] ?? m[2]}`
-  const p = field.match(/^preconditions\.(\d+)\.(.+)$/)
-  if (p) return `Precondition ${parseInt(p[1]) + 1} — ${FIELD_LABELS[p[2]] ?? p[2]}`
-  return field
+function fieldLabels(t: TFunction): Record<string, string> {
+  return {
+    title: t('workbench.editable.titleLabel'),
+    description: t('workbench.testCase.descriptionLabel'),
+    preconditions: t('workbench.testCase.preconditionLabel'),
+    postconditions: t('workbench.testCase.postconditionLabel'),
+    tags: t('workbench.testCase.tagsLabel'),
+    priority: t('workbench.editable.priorityLabel'),
+    status: t('workbench.editable.statusLabel'),
+    duration: t('workbench.editable.durationLabel'),
+    expected: t('workbench.steps.colExpected'),
+    action: t('workbench.steps.colAction'),
+    test_data: t('workbench.steps.colTestData'),
+  }
 }
 
 // Highlight %param_name substitutions in action text
@@ -93,6 +104,7 @@ function StepsTable({
   steps: Step[]
   warnMissingTestData?: boolean
 }) {
+  const { t } = useTranslation()
   const showTestData = warnMissingTestData || steps.some(s => !!s.test_data)
   const showComments = steps.some(s => !!s.comments)
   const cols = [
@@ -105,10 +117,10 @@ function StepsTable({
     <div className="steps-tbl">
       <div className="steps-head" style={{ gridTemplateColumns: cols }}>
         <div className="steps-th steps-th-num">#</div>
-        <div className="steps-th">Action</div>
-        <div className="steps-th">Expected result</div>
-        {showTestData && <div className="steps-th">Test data</div>}
-        {showComments && <div className="steps-th">Comments</div>}
+        <div className="steps-th">{t('workbench.steps.colAction')}</div>
+        <div className="steps-th">{t('workbench.steps.colExpected')}</div>
+        {showTestData && <div className="steps-th">{t('workbench.steps.colTestData')}</div>}
+        {showComments && <div className="steps-th">{t('workbench.steps.colComments')}</div>}
       </div>
       {steps.map((step, i) => (
         <div key={i} className="steps-row" style={{ gridTemplateColumns: cols }}>
@@ -166,11 +178,17 @@ function ParamTableView({ table }: { table: ParameterTable }) {
   )
 }
 
-// Link type → Russian label
-const LINK_TYPE_LABELS: Record<string, string> = {
-  Issue: 'Issue', Defect: 'Defect', Requirement: 'Requirement',
-  BlockedBy: 'Blocks', Related: 'Related', Clones: 'Clone',
-  Repository: 'Repository',
+// Link type → localized label
+function linkTypeLabels(t: TFunction): Record<string, string> {
+  return {
+    Issue: t('workbench.linkType.issue'),
+    Defect: t('workbench.linkType.defect'),
+    Requirement: t('workbench.linkType.requirement'),
+    BlockedBy: t('workbench.linkType.blockedBy'),
+    Related: t('workbench.linkType.related'),
+    Clones: t('workbench.linkType.clones'),
+    Repository: t('workbench.linkType.repository'),
+  }
 }
 
 // Derive short readable label from a link (strip URL if title == url)
@@ -200,19 +218,21 @@ const SERVICE_FOOTER_MARKERS = [
 ]
 
 function PartialFieldWarning() {
+  const { t } = useTranslation()
   return (
     <span className="partial-field-missing">
       <AlertTriangle size={11} />
-      not processed
+      {t('workbench.testCase.notProcessed')}
     </span>
   )
 }
 
 function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set<string> }) {
+  const { t } = useTranslation()
   const priority = tc.priority
-  const priorityLabel = priority ? (PRIORITY_LABELS[priority] ?? priority) : null
+  const priorityLabel = priority ? (priorityLabels(t)[priority] ?? priority) : null
   const priorityKey = (priority ?? '').toLowerCase()
-  const statusLabel = tc.status ? (STATUS_LABELS[tc.status] ?? tc.status) : null
+  const statusLabel = tc.status ? (statusLabels(t)[tc.status] ?? tc.status) : null
   const priorityDotClass =
     priorityKey === 'critical' || priorityKey === 'highest' || priorityKey === 'high' ? 'pdot-high' :
     priorityKey === 'medium' ? 'pdot-medium' :
@@ -228,14 +248,14 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
   const globalId = tc.attributes?.['globalId']
   const versionNumber = tc.attributes?.['versionNumber']
   const metaItems: Array<{ label: string; value: string }> = [
-    { label: 'Section', value: tc.section_name ?? '—' },
-    { label: 'Duration', value: dur ?? '—' },
-    { label: 'ID', value: globalId != null ? String(globalId) : '—' },
-    { label: 'Version', value: versionNumber != null ? String(versionNumber) : '—' },
+    { label: t('workbench.testCase.metaSection'), value: tc.section_name ?? '—' },
+    { label: t('workbench.testCase.metaDuration'), value: dur ?? '—' },
+    { label: t('workbench.testCase.metaId'), value: globalId != null ? String(globalId) : '—' },
+    { label: t('workbench.testCase.metaVersion'), value: versionNumber != null ? String(versionNumber) : '—' },
   ]
   // Optional: Author only when present in attributes
   const author = tc.attributes?.['Author'] ?? tc.attributes?.['Автор'] ?? tc.attributes?.['author'] ?? tc.attributes?.['createdBy']
-  if (author != null) metaItems.push({ label: 'Author', value: String(author) })
+  if (author != null) metaItems.push({ label: t('workbench.testCase.metaAuthor'), value: String(author) })
   const hasAnyMeta = metaItems.some(m => m.value !== '—')
 
   const hasPost = (tc.postconditions?.length ?? 0) > 0
@@ -269,7 +289,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       {/* Metadata grid */}
       {hasAnyMeta && (
         <div>
-          <span className="case-sec-label">Metadata</span>
+          <span className="case-sec-label">{t('workbench.testCase.metadataLabel')}</span>
           <div className="meta-grid">
             {metaItems.map(item => (
               <div key={item.label} className="meta-card">
@@ -286,18 +306,18 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       {/* Tags — always show; filter source-NNNN; separate service tags */}
       {(() => {
         const allTags = tc.tags ?? []
-        const sourceMatch = allTags.map(t => t.match(SOURCE_TAG_RE)).find(Boolean)
+        const sourceMatch = allTags.map(tag => tag.match(SOURCE_TAG_RE)).find(Boolean)
         const sourceId = sourceMatch?.[1]
-        const withoutSource = allTags.filter(t => !SOURCE_TAG_RE.test(t))
+        const withoutSource = allTags.filter(tag => !SOURCE_TAG_RE.test(tag))
         const regularTags = withoutSource
         const hasAny = regularTags.length > 0
 
         return (
           <div>
-            <span className="case-sec-label">Tags</span>
+            <span className="case-sec-label">{t('workbench.testCase.tagsLabel')}</span>
             {sourceId && (
               <div className="source-id-badge">
-                Source case: <span style={{ color: 'var(--accent)' }}>#{sourceId}</span>
+                {t('workbench.testCase.sourceCaseLabel')}<span style={{ color: 'var(--accent)' }}>#{sourceId}</span>
               </div>
             )}
             {hasAny ? (
@@ -306,14 +326,14 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
                   <span
                     key={tag}
                     className={`tag-chip${WARN_TAGS.has(tag) ? ' tag-chip-warn' : ''}`}
-                    title={WARN_TAGS.has(tag) ? 'Flagged for manual QA review before use' : undefined}
+                    title={WARN_TAGS.has(tag) ? t('workbench.testCase.tagFlaggedTitle') : undefined}
                   >
                     {tag}
                   </span>
                 ))}
               </div>
             ) : (
-              <div className="case-text-box case-text-empty">not specified</div>
+              <div className="case-text-box case-text-empty">{t('workbench.testCase.notSpecified')}</div>
             )}
           </div>
         )
@@ -321,7 +341,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
 
       {/* Linked issues / requirements — always show */}
       <div>
-        <span className="case-sec-label">Related issues</span>
+        <span className="case-sec-label">{t('workbench.testCase.relatedIssuesLabel')}</span>
         {(tc.links?.length ?? 0) > 0 ? (
           <div className="links-list">
             {tc.links!.map((link, i) => (
@@ -333,7 +353,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
                 rel="noopener noreferrer"
               >
                 <span className={`link-type-badge link-type-${(link.type ?? 'default').toLowerCase()}`}>
-                  {LINK_TYPE_LABELS[link.type ?? ''] ?? link.type ?? 'Link'}
+                  {linkTypeLabels(t)[link.type ?? ''] ?? link.type ?? t('workbench.testCase.linkFallback')}
                 </span>
                 <span className="link-label">{linkLabel(link)}</span>
                 <ExternalLink size={11} className="link-ext-icon" />
@@ -341,35 +361,35 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
             ))}
           </div>
         ) : (
-          <div className="case-text-box case-text-empty">not specified</div>
+          <div className="case-text-box case-text-empty">{t('workbench.testCase.notSpecified')}</div>
         )}
       </div>
 
       {/* Description — always show */}
       <div>
-        <span className="case-sec-label">Description</span>
+        <span className="case-sec-label">{t('workbench.testCase.descriptionLabel')}</span>
         {tc.description?.trim()
           ? <div className="case-text-box" style={{ whiteSpace: 'pre-line' }}>{tc.description.trim()}</div>
           : partialFields?.has('description')
             ? <div className="case-text-box case-text-empty"><PartialFieldWarning /></div>
-            : <div className="case-text-box case-text-empty">not specified</div>
+            : <div className="case-text-box case-text-empty">{t('workbench.testCase.notSpecified')}</div>
         }
       </div>
 
       {/* Attachments — show list when any exist */}
       {(tc.attachments?.length ?? 0) > 0 && (
         <div>
-          <span className="case-sec-label">Attachments</span>
+          <span className="case-sec-label">{t('workbench.testCase.attachmentsLabel')}</span>
           <div className="links-list">
             {tc.attachments!.map((att, i) => (
               att.url
                 ? <a key={i} className="link-row" href={att.url} target="_blank" rel="noopener noreferrer">
-                    <span className="link-type-badge link-type-default">{att.type ?? 'file'}</span>
+                    <span className="link-type-badge link-type-default">{att.type ?? t('workbench.testCase.attachmentFileFallback')}</span>
                     <span className="link-label">{att.name ?? att.file_id ?? att.url}</span>
                     <ExternalLink size={11} className="link-ext-icon" />
                   </a>
                 : <div key={i} className="link-row" style={{ cursor: 'default' }}>
-                    <span className="link-type-badge link-type-default">{att.type ?? 'file'}</span>
+                    <span className="link-type-badge link-type-default">{att.type ?? t('workbench.testCase.attachmentFileFallback')}</span>
                     <span className="link-label">{att.name ?? att.file_id ?? '—'}</span>
                   </div>
             ))}
@@ -380,7 +400,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       {/* Product versions */}
       {(tc.product_versions?.length ?? 0) > 0 && (
         <div>
-          <span className="case-sec-label">Product versions</span>
+          <span className="case-sec-label">{t('workbench.testCase.productVersionsLabel')}</span>
           <div className="tag-chips">
             {tc.product_versions!.map((v, i) => (
               <span key={i} className="tag-chip" style={{ fontFamily: 'monospace' }}>{v}</span>
@@ -390,35 +410,35 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
       )}
 
       {/* Preconditions */}
-      <StepBlock label="Precondition" steps={tc.preconditions} />
+      <StepBlock label={t('workbench.testCase.preconditionLabel')} steps={tc.preconditions} />
 
       {/* Steps — always show; warn on missing test_data */}
       <div>
         <span className="case-sec-label">
-          Steps
+          {t('workbench.testCase.stepsLabel')}
         </span>
         {(tc.steps?.length ?? 0) > 0 ? (
           <StepsTable steps={tc.steps!} warnMissingTestData />
         ) : partialFields?.has('steps') ? (
           <div className="case-text-box case-text-empty"><PartialFieldWarning /></div>
         ) : (
-          <div className="case-text-box case-text-empty">not specified</div>
+          <div className="case-text-box case-text-empty">{t('workbench.testCase.notSpecified')}</div>
         )}
       </div>
 
       {/* Postconditions — always shown */}
       <div>
-        <span className="case-sec-label">Postcondition</span>
+        <span className="case-sec-label">{t('workbench.testCase.postconditionLabel')}</span>
         {hasPost
           ? <StepsTable steps={tc.postconditions!} />
-          : <div className="case-text-box case-text-empty">not specified</div>
+          : <div className="case-text-box case-text-empty">{t('workbench.testCase.notSpecified')}</div>
         }
       </div>
 
       {/* Parameters table — shown only when data present */}
       {tc.parameter_table && tc.parameter_table.names.length > 0 && (
         <div>
-          <span className="case-sec-label">Parameters</span>
+          <span className="case-sec-label">{t('workbench.testCase.parametersLabel')}</span>
           <ParamTableView table={tc.parameter_table} />
         </div>
       )}
@@ -456,6 +476,7 @@ function EditableStepsTable({ steps, showComments, onUpdate, onRemove, onAdd }: 
   onRemove: (i: number) => void
   onAdd: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="tc-edit-steps">
       {steps.map((step, i) => (
@@ -464,44 +485,45 @@ function EditableStepsTable({ steps, showComments, onUpdate, onRemove, onAdd }: 
           <div className="tc-edit-step-fields">
             <AutoTextarea
               className="tc-edit-cell"
-              placeholder="Action"
+              placeholder={t('workbench.steps.colAction')}
               value={step.action ?? ''}
               onChange={v => onUpdate(i, 'action', v)}
             />
             <AutoTextarea
               className="tc-edit-cell tc-edit-cell-dim"
-              placeholder="Expected result"
+              placeholder={t('workbench.steps.colExpected')}
               value={step.expected ?? ''}
               onChange={v => onUpdate(i, 'expected', v)}
             />
             <AutoTextarea
               className="tc-edit-cell"
-              placeholder="Test data"
+              placeholder={t('workbench.steps.colTestData')}
               value={step.test_data ?? ''}
               onChange={v => onUpdate(i, 'test_data', v)}
             />
             {showComments && (
               <AutoTextarea
                 className="tc-edit-cell tc-edit-cell-dim"
-                placeholder="Comment"
+                placeholder={t('workbench.steps.commentPlaceholder')}
                 value={step.comments ?? ''}
                 onChange={v => onUpdate(i, 'comments', v)}
               />
             )}
           </div>
-          <button type="button" className="tc-edit-step-del" title="Remove step" onClick={() => onRemove(i)}>
+          <button type="button" className="tc-edit-step-del" title={t('workbench.steps.removeStepTitle')} onClick={() => onRemove(i)}>
             ×
           </button>
         </div>
       ))}
       <button type="button" className="tc-edit-add-step" onClick={onAdd}>
-        + Add step
+        {t('workbench.steps.addStep')}
       </button>
     </div>
   )
 }
 
 function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updated: TestCase) => void }) {
+  const { t } = useTranslation()
   function updateStep(field: 'steps' | 'preconditions' | 'postconditions', index: number, key: keyof Step, value: string) {
     const steps = [...(tc[field] ?? [])]
     steps[index] = { ...steps[index], [key]: value || null }
@@ -520,7 +542,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
   return (
     <div className="tc-editor">
       <div>
-        <span className="case-sec-label">Title</span>
+        <span className="case-sec-label">{t('workbench.editable.titleLabel')}</span>
         <input
           className="tc-edit-input"
           value={tc.title ?? ''}
@@ -529,39 +551,39 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
       </div>
       <div className="tc-edit-row2">
         <div>
-          <span className="case-sec-label">Priority</span>
+          <span className="case-sec-label">{t('workbench.editable.priorityLabel')}</span>
           <select
             className="tc-edit-input"
             value={tc.priority ?? ''}
             onChange={e => onChange({ ...tc, priority: e.target.value || null })}
           >
-            <option value="">— not set —</option>
-            <option value="Critical">Critical</option>
-            <option value="Highest">Highest</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
+            <option value="">{t('workbench.editable.notSet')}</option>
+            <option value="Critical">{t('workbench.priority.critical')}</option>
+            <option value="Highest">{t('workbench.priority.highest')}</option>
+            <option value="High">{t('workbench.priority.high')}</option>
+            <option value="Medium">{t('workbench.priority.medium')}</option>
+            <option value="Low">{t('workbench.priority.low')}</option>
           </select>
         </div>
         <div>
-          <span className="case-sec-label">Status</span>
+          <span className="case-sec-label">{t('workbench.editable.statusLabel')}</span>
           <select
             className="tc-edit-input"
             value={tc.status ?? ''}
             onChange={e => onChange({ ...tc, status: e.target.value || null })}
           >
-            <option value="">— not set —</option>
-            <option value="Ready">Ready</option>
-            <option value="NotReady">Not ready</option>
-            <option value="NeedsWork">Needs work</option>
+            <option value="">{t('workbench.editable.notSet')}</option>
+            <option value="Ready">{t('workbench.status.ready')}</option>
+            <option value="NotReady">{t('workbench.status.notReady')}</option>
+            <option value="NeedsWork">{t('workbench.status.needsWork')}</option>
             {tc.status && !EDITABLE_STATUSES.has(tc.status) && (
-              <option value={tc.status}>{STATUS_LABELS[tc.status] ?? tc.status}</option>
+              <option value={tc.status}>{statusLabels(t)[tc.status] ?? tc.status}</option>
             )}
           </select>
         </div>
       </div>
       <div>
-        <span className="case-sec-label">Tags</span>
+        <span className="case-sec-label">{t('workbench.testCase.tagsLabel')}</span>
         <div className="tc-edit-tags">
           {(tc.tags ?? []).map(tag => (
             <span key={tag} className="tc-edit-tag">
@@ -569,13 +591,13 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
               <button
                 type="button"
                 className="tc-edit-tag-del"
-                onClick={() => onChange({ ...tc, tags: (tc.tags ?? []).filter(t => t !== tag) })}
+                onClick={() => onChange({ ...tc, tags: (tc.tags ?? []).filter(existing => existing !== tag) })}
               >×</button>
             </span>
           ))}
           <input
             className="tc-edit-tag-input"
-            placeholder="+ tag"
+            placeholder={t('workbench.editable.tagPlaceholder')}
             onKeyDown={e => {
               if ((e.key === 'Enter' || e.key === ',') && e.currentTarget.value.trim()) {
                 e.preventDefault()
@@ -590,7 +612,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         </div>
       </div>
       <div>
-        <span className="case-sec-label">Duration</span>
+        <span className="case-sec-label">{t('workbench.editable.durationLabel')}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <input
             className="tc-edit-input"
@@ -606,11 +628,11 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
               onChange({ ...tc, duration: isNaN(mins) || mins <= 0 ? null : String(mins * 60000) })
             }}
           />
-          <span style={{ fontSize: 11, color: 'var(--tx-dim)' }}>min</span>
+          <span style={{ fontSize: 11, color: 'var(--tx-dim)' }}>{t('workbench.editable.minutesSuffix')}</span>
         </div>
       </div>
       <div>
-        <span className="case-sec-label">Description</span>
+        <span className="case-sec-label">{t('workbench.testCase.descriptionLabel')}</span>
         <textarea
           className="tc-edit-textarea"
           value={tc.description ?? ''}
@@ -621,7 +643,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
-        <span className="case-sec-label">Precondition</span>
+        <span className="case-sec-label">{t('workbench.testCase.preconditionLabel')}</span>
         <EditableStepsTable
           steps={tc.preconditions ?? []}
           showComments={false}
@@ -631,7 +653,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
-        <span className="case-sec-label">Steps</span>
+        <span className="case-sec-label">{t('workbench.testCase.stepsLabel')}</span>
         <EditableStepsTable
           steps={tc.steps ?? []}
           showComments
@@ -641,7 +663,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
         />
       </div>
       <div>
-        <span className="case-sec-label">Postcondition</span>
+        <span className="case-sec-label">{t('workbench.testCase.postconditionLabel')}</span>
         <EditableStepsTable
           steps={tc.postconditions ?? []}
           showComments={false}
@@ -655,9 +677,13 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
 }
 
 const DIFF_SECTION_ORDER = ['steps', 'preconditions', 'postconditions', 'metadata'] as const
-const DIFF_SECTION_LABELS: Record<string, string> = {
-  steps: 'Steps', preconditions: 'Preconditions',
-  postconditions: 'Postconditions', metadata: 'Metadata',
+function diffSectionLabels(t: TFunction): Record<string, string> {
+  return {
+    steps: t('workbench.testCase.stepsLabel'),
+    preconditions: t('workbench.diff.sectionPreconditions'),
+    postconditions: t('workbench.diff.sectionPostconditions'),
+    metadata: t('workbench.testCase.metadataLabel'),
+  }
 }
 
 function diffSectionKey(field: string): string {
@@ -672,28 +698,29 @@ function diffItemKey(field: string): string {
   return m ? `${m[1]}.${m[2]}` : field
 }
 
-function diffItemLabel(itemKey: string): string {
+function diffItemLabel(t: TFunction, itemKey: string): string {
   const m = itemKey.match(/^(steps|preconditions|postconditions)\.(\d+)$/)
   if (m) {
     const n = parseInt(m[2]) + 1
-    if (m[1] === 'steps') return `Step ${n}`
-    if (m[1] === 'preconditions') return `Precondition ${n}`
-    return `Postcondition ${n}`
+    if (m[1] === 'steps') return t('workbench.diff.stepN', { n })
+    if (m[1] === 'preconditions') return t('workbench.diff.preconditionN', { n })
+    return t('workbench.diff.postconditionN', { n })
   }
-  return FIELD_LABELS[itemKey] ?? itemKey
+  return fieldLabels(t)[itemKey] ?? itemKey
 }
 
-function diffSubLabel(field: string): string {
+function diffSubLabel(t: TFunction, field: string): string {
   const m = field.match(/^(?:steps|preconditions|postconditions)\.\d+\.(.+)$/)
   const key = m ? m[1] : field
-  return FIELD_LABELS[key] ?? key
+  return fieldLabels(t)[key] ?? key
 }
 
 function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['changes'] }) {
+  const { t } = useTranslation()
   if (!changes.length) {
     return (
       <div style={{ color: 'var(--tx-dim)', fontSize: 13, padding: '16px 0', textAlign: 'center' }}>
-        No changes
+        {t('workbench.diff.noChanges')}
       </div>
     )
   }
@@ -717,11 +744,11 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
     <>
       {/* Header */}
       <div className="diff-header">
-        <span className="diff-header-title">Change history</span>
+        <span className="diff-header-title">{t('workbench.diff.changeHistory')}</span>
         <div style={{ display: 'flex', gap: 5 }}>
-          {addedCount   > 0 && <span className="diff-pill diff-pill-add">+{addedCount} added</span>}
-          {changedCount > 0 && <span className="diff-pill diff-pill-chg">✎ {changedCount} changed</span>}
-          {removedCount > 0 && <span className="diff-pill diff-pill-del">−{removedCount} removed</span>}
+          {addedCount   > 0 && <span className="diff-pill diff-pill-add">+{t('workbench.diff.addedPill', { count: addedCount })}</span>}
+          {changedCount > 0 && <span className="diff-pill diff-pill-chg">✎ {t('workbench.diff.changedPill', { count: changedCount })}</span>}
+          {removedCount > 0 && <span className="diff-pill diff-pill-del">−{t('workbench.diff.removedPill', { count: removedCount })}</span>}
         </div>
       </div>
 
@@ -735,19 +762,19 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
         return (
           <div key={sk} className="diff-section">
             <div className="diff-section-header">
-              <span className="diff-section-label">{DIFF_SECTION_LABELS[sk]}</span>
+              <span className="diff-section-label">{diffSectionLabels(t)[sk]}</span>
               {sAdd > 0 && <span className="diff-count diff-count-add">+{sAdd}</span>}
-              {sChg > 0 && <span className="diff-count diff-count-chg">{sChg} chg</span>}
+              {sChg > 0 && <span className="diff-count diff-count-chg">{t('workbench.diff.chgCount', { count: sChg })}</span>}
               {sDel > 0 && <span className="diff-count diff-count-del">−{sDel}</span>}
             </div>
 
             {[...items.entries()].map(([ik, fieldChanges]) => {
-              const blockLabel = diffItemLabel(ik)
+              const blockLabel = diffItemLabel(t, ik)
               return (
                 <div key={ik} className="diff-block">
                   <div className="diff-block-path">{blockLabel}</div>
                   {fieldChanges.map((change, ci) => {
-                    const sub = diffSubLabel(change.field)
+                    const sub = diffSubLabel(t, change.field)
                     const showSub = sub !== blockLabel
                     const before = change.before != null ? String(change.before).trim() : ''
                     const after  = change.after  != null ? String(change.after).trim()  : ''
@@ -801,23 +828,25 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
 // issue.title from the backend is a fixed English label derived from issue.rule
 // (see _RULE_LABELS in app/schemas/analysis.py) — never free text.
 // Map by rule id instead of parsing the title text.
-const RULE_LABEL: Record<string, string> = {
-  title: 'Title',
-  description: 'Description',
-  preconditions: 'Preconditions',
-  steps: 'Steps',
-  postconditions: 'Postconditions',
-  priority: 'Priority',
-  expected_results: 'Expected results',
-  test_data: 'Test data',
-  tags: 'Tags',
-  atomicity: 'Atomicity',
-  independence: 'Independence',
-  reproducibility: 'Reproducibility',
+function ruleLabels(t: TFunction): Record<string, string> {
+  return {
+    title: t('workbench.editable.titleLabel'),
+    description: t('workbench.testCase.descriptionLabel'),
+    preconditions: t('workbench.diff.sectionPreconditions'),
+    steps: t('workbench.testCase.stepsLabel'),
+    postconditions: t('workbench.diff.sectionPostconditions'),
+    priority: t('workbench.editable.priorityLabel'),
+    expected_results: t('workbench.rule.expectedResults'),
+    test_data: t('workbench.steps.colTestData'),
+    tags: t('workbench.testCase.tagsLabel'),
+    atomicity: t('workbench.rule.atomicity'),
+    independence: t('workbench.rule.independence'),
+    reproducibility: t('workbench.rule.reproducibility'),
+  }
 }
 
-function issueTitle(issue: ReviewIssue): string {
-  return (issue.rule && RULE_LABEL[issue.rule]) ?? issue.title
+function issueTitle(t: TFunction, issue: ReviewIssue): string {
+  return (issue.rule && ruleLabels(t)[issue.rule]) ?? issue.title
 }
 
 function parseIssueDescription(description: string): { text: string; evidence: string | null } {
@@ -833,6 +862,7 @@ function IssueRow({ issue, resolution, hasImprovement, ruleDescription, onDismis
   ruleDescription?: string
   onDismiss?: () => void
 }) {
+  const { t } = useTranslation()
   const isResolved = resolution?.status === 'resolved'
   const borderClass = isResolved ? 'iborder-resolved' :
     issue.severity === 'high' ? 'iborder-h' :
@@ -841,7 +871,7 @@ function IssueRow({ issue, resolution, hasImprovement, ruleDescription, onDismis
   return (
     <div className={`issue-row ${borderClass}${isResolved ? ' issue-row-resolved' : ''}`}>
       <div className="issue-body">
-        <div className="issue-title-text" title={ruleDescription}>{issueTitle(issue)}</div>
+        <div className="issue-title-text" title={ruleDescription}>{issueTitle(t, issue)}</div>
         {description && <div className="issue-loc">{description}</div>}
         {evidence && <div className="issue-evidence">{evidence}</div>}
         {resolution?.status === 'manual_needed' && resolution.reason && (
@@ -849,19 +879,19 @@ function IssueRow({ issue, resolution, hasImprovement, ruleDescription, onDismis
         )}
       </div>
       {resolution?.status === 'resolved' && (
-        <span className="issue-badge ib-resolved" title="Fixed by AI Improve">Resolved</span>
+        <span className="issue-badge ib-resolved" title={t('workbench.issue.resolvedTitle')}>{t('workbench.issue.resolvedBadge')}</span>
       )}
       {resolution?.status === 'manual_needed' && (
-        <span className="issue-badge ib-manual" title="AI Improve couldn't fix this automatically — needs a person to edit it">Manual</span>
+        <span className="issue-badge ib-manual" title={t('workbench.issue.manualTitle')}>{t('workbench.issue.manualBadge')}</span>
       )}
       {resolution?.status === 'skipped' && (
-        <span className="issue-badge ib-skipped" title="Already fine in the improved version — no change was needed">Skipped</span>
+        <span className="issue-badge ib-skipped" title={t('workbench.issue.skippedTitle')}>{t('workbench.issue.skippedBadge')}</span>
       )}
       {hasImprovement && !resolution && (
-        <span className="issue-badge ib-skipped" title="Not included in the last Improve run">Not processed</span>
+        <span className="issue-badge ib-skipped" title={t('workbench.issue.notProcessedTitle')}>{t('workbench.issue.notProcessedBadge')}</span>
       )}
       {onDismiss && (
-        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title="Exclude from Improve — this issue won't be auto-fixed">
+        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title={t('workbench.issue.dismissTitle')}>
           <X size={11} />
         </button>
       )}
@@ -870,11 +900,12 @@ function IssueRow({ issue, resolution, hasImprovement, ruleDescription, onDismis
 }
 
 function RailLoading() {
+  const { t } = useTranslation()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--accent)', fontSize: 12, fontWeight: 500 }}>
         <span className="spinner"><Sparkles size={13} /></span>
-        Analyzing test case...
+        {t('workbench.rail.analyzingTestCase')}
       </div>
       {[75, 55, 65, 45, 60].map((w, i) => (
         <div key={i} style={{ height: 11, borderRadius: 4, width: `${w}%` }} className="skel" />
@@ -897,6 +928,7 @@ function ConfirmApplyModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="action-modal-overlay" onClick={loading ? undefined : onCancel}>
       <div className="action-modal action-modal-destructive" onClick={e => e.stopPropagation()}>
@@ -905,25 +937,25 @@ function ConfirmApplyModal({
             <AlertTriangle size={18} strokeWidth={1.75} />
           </span>
           <div>
-            <div className="action-modal-title">Replace original?</div>
+            <div className="action-modal-title">{t('workbench.confirmApply.title')}</div>
             <div className="action-modal-subtitle">#{workItemId}</div>
           </div>
         </div>
         <div className="action-modal-body">
-          The improved version will fully replace the original test case in TestIT.
+          {t('workbench.confirmApply.body')}
           <div className="action-modal-warn-text">
             <span className="action-modal-warn-dot" />
-            This action cannot be undone
+            {t('workbench.confirmApply.warnText')}
           </div>
         </div>
         <div className="action-modal-footer">
           <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel} disabled={loading}>
-            Cancel
+            {t('workbench.common.cancel')}
           </button>
           <button type="button" className="wb-btn-danger" onClick={onConfirm} disabled={loading}>
             {loading
-              ? <><Loader2 size={13} className="spin-icon" /> Applying…</>
-              : <><AlertTriangle size={13} /> Replace</>
+              ? <><Loader2 size={13} className="spin-icon" /> {t('workbench.confirmApply.applying')}</>
+              : <><AlertTriangle size={13} /> {t('workbench.confirmApply.replace')}</>
             }
           </button>
         </div>
@@ -933,6 +965,7 @@ function ConfirmApplyModal({
 }
 
 export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRules, onApply, onBack }: Props) {
+  const { t } = useTranslation()
   const [analyzeResult, setAnalyzeResult] = useState<AnalyzeResult | null>(null)
   const [analyzeLoading, setAnalyzeLoading] = useState(false)
   const [analyzeError, setAnalyzeError] = useState<string | null>(null)
@@ -1129,13 +1162,13 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const effectiveManualCount = manualOverride ? 0 : manualCount
 
   function scoreBadge(s: number) {
-    if (s >= 85) return 'Excellent'
-    if (s >= 70) return 'Good'
-    if (s >= 50) return 'Fair'
-    return 'Poor'
+    if (s >= 85) return t('workbench.rail.scoreExcellent')
+    if (s >= 70) return t('workbench.rail.scoreGood')
+    if (s >= 50) return t('workbench.rail.scoreFair')
+    return t('workbench.rail.scorePoor')
   }
 
-  const SCORE_BADGE_TOOLTIP = '85+ Excellent · 70+ Good · 50+ Fair · below 50 Poor'
+  const SCORE_BADGE_TOOLTIP = t('workbench.rail.scoreBadgeTooltip')
 
   function scoreBadgeClass(s: number) {
     if (s >= 70) return 'score-good'
@@ -1182,12 +1215,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   // Humanize improve errors for display
   function humanizeImproveError(msg: string): string {
     const m = msg.toLowerCase()
-    if (m.includes('timeout') || m.includes('timed out')) return 'AI response timed out'
-    if (m.includes('500') || m.includes('internal')) return 'Internal AI server error'
-    if (m.includes('429') || m.includes('rate')) return 'Too many requests — try again later'
-    if (m.includes('503') || m.includes('unavailable')) return 'AI service temporarily unavailable'
-    if (m.includes('502')) return 'AI returned an invalid response — try again'
-    return 'Request processing error'
+    if (m.includes('timeout') || m.includes('timed out')) return t('workbench.errors.aiTimeout')
+    if (m.includes('500') || m.includes('internal')) return t('workbench.errors.aiInternalError')
+    if (m.includes('429') || m.includes('rate')) return t('workbench.errors.aiRateLimited')
+    if (m.includes('503') || m.includes('unavailable')) return t('workbench.errors.aiUnavailable')
+    if (m.includes('502')) return t('workbench.errors.aiInvalidResponse')
+    return t('workbench.errors.genericProcessingError')
   }
 
   const improveStatus: 'success' | 'partial' | 'error' | null = improveError
@@ -1207,13 +1240,13 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const canDraft = (improveStatus === 'success' || improveStatus === 'partial') && !applyResult
   const canApply = improveStatus === 'success' && openCriticalCount === 0 && effectiveManualCount === 0 && !applyResult
   const applyBlockReason = improveStatus === 'partial'
-    ? 'Case partially improved, manual review needed'
+    ? t('workbench.actions.blockReasonPartial')
     : openCriticalCount > 0 && effectiveManualCount > 0
-      ? `Unresolved critical issues (${openCriticalCount}) and requiring manual fix (${effectiveManualCount})`
+      ? t('workbench.actions.blockReasonCriticalAndManual', { critical: openCriticalCount, manual: effectiveManualCount })
       : openCriticalCount > 0
-        ? `Unresolved critical issues: ${openCriticalCount}`
+        ? t('workbench.actions.blockReasonCritical', { count: openCriticalCount })
         : effectiveManualCount > 0
-          ? `${effectiveManualCount} ${effectiveManualCount === 1 ? 'issue requires' : 'issues require'} manual fix in TestIT`
+          ? t('workbench.actions.blockReasonManual', { count: effectiveManualCount })
           : null
 
   // Fields empty in improved result when AI partially processed — shown as ⚠ не обработано
@@ -1252,11 +1285,11 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   const improvedTabAccessible = hasImprove || !!improveError
   const tabs = [
-    { id: 'original' as const, label: 'Original', disabled: false, count: null },
-    { id: 'improved' as const, label: 'Improved', disabled: !improvedTabAccessible,
+    { id: 'original' as const, label: t('workbench.tabs.original'), disabled: false, count: null },
+    { id: 'improved' as const, label: t('workbench.tabs.improved'), disabled: !improvedTabAccessible,
       count: improveStatus === 'success' ? '✓' : improveStatus === 'partial' ? '!' : improveStatus === 'error' ? '✕' : null },
-    { id: 'diff' as const, label: 'Changes', disabled: !hasImprove, count: diffCount ? String(diffCount) : null },
-    { id: 'json' as const, label: 'JSON', disabled: false, count: null },
+    { id: 'diff' as const, label: t('workbench.tabs.changes'), disabled: !hasImprove, count: diffCount ? String(diffCount) : null },
+    { id: 'json' as const, label: t('workbench.tabs.json'), disabled: false, count: null },
   ]
 
   const isLoading = analyzeLoading || improveLoading || draftLoading
@@ -1282,7 +1315,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
       {/* Page header */}
       <SectionHeader
-        title="Review & Improve test cases"
+        title={t('app.reviewImproveTitle')}
         onBack={onBack}
         actions={
           <ModeButton
@@ -1304,43 +1337,43 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             {analyzeLoading && (
               <span className="wb-status-analyzed">
                 <span className="spinner" style={{ display: 'inline-flex' }}><Sparkles size={12} /></span>
-                Analyzing...
+                {t('workbench.processStatus.analyzing')}
               </span>
             )}
             {analyzeResult && !improveStatus && (
               <span className="wb-status-analyzed">
                 <Sparkles size={12} />
-                {analyzeResult.issues.length} issues
+                {t('workbench.header.issuesCount', { count: analyzeResult.issues.length })}
               </span>
             )}
             {improveStatus === 'success' && (
               <span className="wb-status-ok">
                 <CheckCircle2 size={13} />
-                Improved
+                {t('workbench.processStatus.improved')}
               </span>
             )}
             {improveStatus === 'partial' && (
               <span className="wb-status-partial">
                 <AlertTriangle size={13} />
-                Needs review
+                {t('workbench.processStatus.needsReview')}
               </span>
             )}
             {improveStatus === 'error' && (
               <span className="wb-status-err">
                 <AlertTriangle size={13} />
-                Improve error
+                {t('workbench.processStatus.improveError')}
               </span>
             )}
             {improveStatus === 'success' && resolvedCount > 0 && (
               <span className="wb-metric wb-metric-ok">
                 <Check size={11} strokeWidth={2.5} />
-                {resolvedCount} resolved
+                {t('workbench.header.resolvedCount', { count: resolvedCount })}
               </span>
             )}
             {improveStatus && improveStatus !== 'error' && effectiveManualCount > 0 && (
               <span className="wb-metric wb-metric-warn">
                 <AlertTriangle size={11} />
-                {effectiveManualCount} manual
+                {t('workbench.header.manualCount', { count: effectiveManualCount })}
               </span>
             )}
           </div>
@@ -1350,7 +1383,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
           {analyzeLoading && !analyzeResult && (
             <button type="button" className="wb-btn wb-btn-sec" disabled>
               <span className="spinner" style={{ display: 'inline-flex' }}><Sparkles size={13} /></span>
-              Analyzing...
+              {t('workbench.processStatus.analyzing')}
             </button>
           )}
           {/* Re-run analyze */}
@@ -1361,7 +1394,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               disabled={analyzeLoading || improveLoading}
             >
               <RotateCcw size={13} />
-              Re-run review
+              {t('workbench.actions.rerunReview')}
             </button>
           )}
           {/* Improve / retry */}
@@ -1369,28 +1402,28 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             improveLoading ? (
               <button type="button" className="wb-btn wb-btn-sec" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><Wand2 size={13} /></span>
-                Improving...
+                {t('workbench.actions.improving')}
               </button>
             ) : improveStatus === 'error' ? (
               <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}
                 disabled={analyzeFailed}
-                title={analyzeFailed ? 'AI analysis failed — re-run review before improving' : undefined}>
+                title={analyzeFailed ? t('workbench.actions.analyzeFailedTooltip') : undefined}>
                 <RotateCcw size={13} />
-                Retry
+                {t('workbench.actions.retry')}
               </button>
             ) : hasImprove ? (
               <button type="button" className="wb-btn wb-btn-sec" onClick={runImprove}
                 disabled={improveLoading || analyzeLoading || analyzeFailed}
-                title={analyzeFailed ? 'AI analysis failed — re-run review before improving' : undefined}>
+                title={analyzeFailed ? t('workbench.actions.analyzeFailedTooltip') : undefined}>
                 <Wand2 size={13} />
-                Improve again
+                {t('workbench.actions.improveAgain')}
               </button>
             ) : (
               <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}
                 disabled={analyzeFailed}
-                title={analyzeFailed ? 'AI analysis failed — re-run review before improving' : undefined}>
+                title={analyzeFailed ? t('workbench.actions.analyzeFailedTooltip') : undefined}>
                 <Wand2 size={13} />
-                Improve
+                {t('workbench.actions.improve')}
               </button>
             )
           )}
@@ -1399,22 +1432,22 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             hasDraft ? (
               <button type="button" className="wb-btn wb-btn-done" disabled>
                 <CheckCircle2 size={13} />
-                Draft created
+                {t('workbench.actions.draftCreated')}
               </button>
             ) : draftLoading ? (
               <button type="button" className="wb-btn wb-btn-sec" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><CheckCircle2 size={13} /></span>
-                Creating...
+                {t('workbench.actions.creatingDraft')}
               </button>
             ) : canDraft ? (
               <button
                 type="button"
                 className={`wb-btn ${improveStatus === 'partial' ? 'wb-btn-sec-warn' : 'wb-btn-sec'}`}
-                title={improveStatus === 'partial' ? 'Case partially improved, manual review recommended' : undefined}
+                title={improveStatus === 'partial' ? t('workbench.actions.draftPartialTooltip') : undefined}
                 onClick={() => runCreateDraft()}
               >
                 <CheckCircle2 size={13} />
-                Create draft
+                {t('workbench.actions.createDraft')}
               </button>
             ) : null
           )}
@@ -1423,12 +1456,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
             hasApply ? (
               <button type="button" className="wb-btn wb-btn-done" disabled>
                 <CheckCircle2 size={13} />
-                Applied
+                {t('workbench.actions.applied')}
               </button>
             ) : applyLoading ? (
               <button type="button" className="wb-btn-apply" disabled>
                 <span className="spinner" style={{ display: 'inline-flex' }}><Wand2 size={13} /></span>
-                Applying...
+                {t('workbench.actions.applyingToOriginal')}
               </button>
             ) : (
               <div className="wb-btn-wrap">
@@ -1439,7 +1472,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   onClick={() => canApply && setShowConfirmApply(true)}
                 >
                   <CheckCircle2 size={13} />
-                  Apply to original
+                  {t('workbench.actions.applyToOriginal')}
                 </button>
                 {!canApply && applyBlockReason && (
                   <span className="wb-btn-tip">{applyBlockReason}</span>
@@ -1463,14 +1496,14 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       {/* Draft error */}
       {draftError && (
         <div className="alert alert-error" style={{ margin: '0 0 8px' }}>
-          <span className="alert-text">Draft error: {draftError}</span>
+          <span className="alert-text">{t('workbench.errors.draftErrorPrefix')}{draftError}</span>
         </div>
       )}
 
       {/* Apply error */}
       {applyError && (
         <div className="alert alert-error" style={{ margin: '0 0 8px' }}>
-          <span className="alert-text">Apply error: {applyError}</span>
+          <span className="alert-text">{t('workbench.errors.applyErrorPrefix')}{applyError}</span>
         </div>
       )}
 
@@ -1503,7 +1536,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 onClick={() => { setEditSnapshot(editedTestCase); setIsEditing(true) }}
               >
                 <Wrench size={11} />
-                Edit
+                {t('workbench.editable.editButton')}
               </button>
             )}
             {activeTab === 'improved' && hasImprove && isEditing && (
@@ -1514,7 +1547,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   onClick={() => { setEditedTestCase(editSnapshot); setIsEditing(false) }}
                 >
                   <X size={11} />
-                  Cancel
+                  {t('workbench.common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -1525,7 +1558,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   }}
                 >
                   <Check size={11} />
-                  Save
+                  {t('workbench.common.save')}
                 </button>
               </div>
             )}
@@ -1536,12 +1569,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               <div className="improve-error-block">
                 <AlertTriangle size={24} className="improve-error-icon" />
                 <div className="improve-error-body">
-                  <div className="improve-error-title">Failed to improve</div>
+                  <div className="improve-error-title">{t('workbench.errors.failedToImprove')}</div>
                   <div className="improve-error-msg">{humanizeImproveError(improveError ?? '')}</div>
                 </div>
                 <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}>
                   <RotateCcw size={13} />
-                  Retry
+                  {t('workbench.actions.retry')}
                 </button>
               </div>
             )}
@@ -1550,7 +1583,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 <div className="improve-partial-banner">
                   <AlertTriangle size={14} />
                   <div>
-                    <span>Improvement partially completed. Some fields require review.</span>
+                    <span>{t('workbench.processStatus.partialBanner')}</span>
                     {(improveResult?.validation_warnings?.length ?? 0) > 0 && (
                       <span className="improve-partial-detail">
                         {improveResult!.validation_warnings!.join('; ')}
@@ -1583,7 +1616,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         {/* Right: AI Review rail */}
         <div className="rail-panel">
           <div className="rail-head">
-            <span className="rail-title">AI Review</span>
+            <span className="rail-title">{t('workbench.rail.title')}</span>
             {analyzeResult && <span className="rail-count">{analyzeResult.issues.length}</span>}
           </div>
           <div className="rail-scroll">
@@ -1598,7 +1631,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {/* Score card */}
                 {score !== null && (
                   <div className="score-card">
-                    <div className="score-head">Quality score</div>
+                    <div className="score-head">{t('workbench.rail.qualityScore')}</div>
                     <div className="score-main">
                       <div className="score-ring">
                         <svg viewBox="0 0 56 56" width="56" height="56">
@@ -1620,17 +1653,17 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                         <div className="score-ctrs">
                           {hasImprove && resolvedCount > 0 && (
                             <span className="score-ctr sctr-ok">
-                              <Check size={11} strokeWidth={2.5} />{resolvedCount} resolved
+                              <Check size={11} strokeWidth={2.5} />{t('workbench.header.resolvedCount', { count: resolvedCount })}
                             </span>
                           )}
                           {hasImprove && effectiveManualCount > 0 && (
                             <span className="score-ctr sctr-warn">
-                              <AlertTriangle size={11} />{effectiveManualCount} manual
+                              <AlertTriangle size={11} />{t('workbench.header.manualCount', { count: effectiveManualCount })}
                             </span>
                           )}
                           {!hasImprove && (
                             <span style={{ fontSize: 11, color: 'var(--tx-muted)' }}>
-                              {analyzeResult.issues.length} issues
+                              {t('workbench.header.issuesCount', { count: analyzeResult.issues.length })}
                             </span>
                           )}
                         </div>
@@ -1643,7 +1676,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 <div className="ai-summary">
                   <div className="ai-label">
                     <Sparkles size={11} />
-                    AI Review
+                    {t('workbench.rail.title')}
                   </div>
                   <div className="ai-text">{analyzeResult.summary}</div>
                 </div>
@@ -1653,7 +1686,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="manual-banner">
                     <div className="mb-head">
                       <Wrench size={13} />
-                      Requires manual work
+                      {t('workbench.rail.manualWorkHeading')}
                     </div>
                     {improveResult!.manual_notes!.map((note, i) => (
                       <div key={i} className="mb-item">
@@ -1666,7 +1699,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 {/* Unresolved issues by severity */}
                 {highIssues.length > 0 && (
                   <div>
-                    <div className="issues-section-label isl-high">Critical · {highIssues.length}</div>
+                    <div className="issues-section-label isl-high">{t('workbench.rail.criticalSection', { count: highIssues.length })}</div>
                     {highIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
                         ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
@@ -1676,7 +1709,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 )}
                 {medIssues.length > 0 && (
                   <div>
-                    <div className="issues-section-label isl-medium">Medium · {medIssues.length}</div>
+                    <div className="issues-section-label isl-medium">{t('workbench.rail.mediumSection', { count: medIssues.length })}</div>
                     {medIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
                         ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
@@ -1686,7 +1719,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 )}
                 {lowIssues.length > 0 && (
                   <div>
-                    <div className="issues-section-label isl-low">Low · {lowIssues.length}</div>
+                    <div className="issues-section-label isl-low">{t('workbench.rail.lowSection', { count: lowIssues.length })}</div>
                     {lowIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
                         ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
@@ -1700,7 +1733,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="resolved-section">
                     <button type="button" className="resolved-toggle" onClick={() => setShowResolved(v => !v)}>
                       <Check size={11} strokeWidth={2.5} />
-                      Resolved
+                      {t('workbench.rail.resolvedToggle')}
                       <span className="resolved-toggle-count">{resolvedVisible.length}</span>
                       <span className="resolved-toggle-hint">{showResolved ? '▲' : '▼'}</span>
                     </button>
@@ -1716,7 +1749,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   <div className="dismissed-section">
                     <button type="button" className="dismissed-toggle" onClick={() => setShowDismissed(v => !v)}>
                       <EyeOff size={11} />
-                      Excluded · {dismissedIssuesList.length}
+                      {t('workbench.rail.excludedToggle', { count: dismissedIssuesList.length })}
                       <span className="dismissed-toggle-hint">{showDismissed ? '▲' : '▼'}</span>
                     </button>
                     {showDismissed && dismissedIssuesList.map(({ issue, idx }) => (
@@ -1725,11 +1758,11 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                           <div
                             className="issue-title-text issue-title-dismissed"
                             title={issue.rule ? ruleDescriptions[issue.rule] : undefined}
-                          >{issueTitle(issue)}</div>
+                          >{issueTitle(t, issue)}</div>
                         </div>
                         <button type="button" className="issue-restore-btn"
                           onClick={() => setDismissedIndices(prev => { const s = new Set(prev); s.delete(idx); return s })}
-                          title="Restore">
+                          title={t('workbench.rail.restoreTitle')}>
                           <RotateCcw size={11} />
                         </button>
                       </div>
@@ -1738,7 +1771,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 )}
                 {analyzeResult.issues.length === 0 && (
                   <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--tx-muted)', fontSize: 13 }}>
-                    No issues found
+                    {t('workbench.rail.noIssuesFound')}
                   </div>
                 )}
 

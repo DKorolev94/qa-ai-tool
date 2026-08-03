@@ -68,5 +68,180 @@
     "readOnly": "Только чтение",
     "reviewModeTitle": "Режим ревью",
     "reviewModeBody": "Проверки настраиваются через режим ревью и кастомные правила."
+  },
+  "workbench": {
+    "common": {
+      "cancel": "Отмена",
+      "save": "Сохранить"
+    },
+    "testCase": {
+      "metaSection": "Раздел",
+      "metaDuration": "Длительность",
+      "metaId": "ID",
+      "metaVersion": "Версия",
+      "metaAuthor": "Автор",
+      "metadataLabel": "Метаданные",
+      "tagsLabel": "Теги",
+      "tagFlaggedTitle": "Помечено для ручной проверки QA перед использованием",
+      "notSpecified": "не указано",
+      "sourceCaseLabel": "Исходный кейс: ",
+      "relatedIssuesLabel": "Связанные issue",
+      "linkFallback": "Ссылка",
+      "descriptionLabel": "Описание",
+      "attachmentsLabel": "Вложения",
+      "attachmentFileFallback": "файл",
+      "productVersionsLabel": "Версии продукта",
+      "preconditionLabel": "Предусловие",
+      "stepsLabel": "Шаги",
+      "postconditionLabel": "Постусловие",
+      "parametersLabel": "Параметры",
+      "notProcessed": "не обработано"
+    },
+    "priority": {
+      "critical": "Критический",
+      "highest": "Наивысший",
+      "high": "Высокий",
+      "medium": "Средний",
+      "low": "Низкий"
+    },
+    "status": {
+      "ready": "Готов",
+      "notReady": "Не готов",
+      "draft": "Черновик",
+      "needsWork": "Требует доработки",
+      "obsolete": "Устарел",
+      "inProgress": "В процессе"
+    },
+    "linkType": {
+      "issue": "Задача",
+      "defect": "Дефект",
+      "requirement": "Требование",
+      "blockedBy": "Блокирует",
+      "related": "Связано",
+      "clones": "Клон",
+      "repository": "Репозиторий"
+    },
+    "steps": {
+      "colAction": "Действие",
+      "colExpected": "Ожидаемый результат",
+      "colTestData": "Тестовые данные",
+      "colComments": "Комментарии",
+      "commentPlaceholder": "Комментарий",
+      "removeStepTitle": "Удалить шаг",
+      "addStep": "+ Добавить шаг"
+    },
+    "editable": {
+      "titleLabel": "Заголовок",
+      "priorityLabel": "Приоритет",
+      "notSet": "— не задано —",
+      "statusLabel": "Статус",
+      "tagPlaceholder": "+ тег",
+      "durationLabel": "Длительность",
+      "minutesSuffix": "мин",
+      "editButton": "Редактировать"
+    },
+    "diff": {
+      "noChanges": "Нет изменений",
+      "changeHistory": "История изменений",
+      "addedPill": "{{count}} добавлено",
+      "changedPill": "{{count}} изменено",
+      "removedPill": "{{count}} удалено",
+      "chgCount": "{{count}} изм.",
+      "sectionPreconditions": "Предусловия",
+      "sectionPostconditions": "Постусловия",
+      "stepN": "Шаг {{n}}",
+      "preconditionN": "Предусловие {{n}}",
+      "postconditionN": "Постусловие {{n}}"
+    },
+    "rule": {
+      "expectedResults": "Ожидаемые результаты",
+      "atomicity": "Атомарность",
+      "independence": "Независимость",
+      "reproducibility": "Воспроизводимость"
+    },
+    "issue": {
+      "resolvedTitle": "Исправлено AI Improve",
+      "resolvedBadge": "Исправлено",
+      "manualTitle": "AI Improve не смог исправить это автоматически — требуется правка человеком",
+      "manualBadge": "Вручную",
+      "skippedTitle": "Уже в порядке в улучшенной версии — изменения не требовались",
+      "skippedBadge": "Пропущено",
+      "notProcessedTitle": "Не включено в последний запуск Improve",
+      "notProcessedBadge": "Не обработано",
+      "dismissTitle": "Исключить из Improve — это замечание не будет исправлено автоматически"
+    },
+    "rail": {
+      "title": "AI-ревью",
+      "analyzingTestCase": "Анализ тест-кейса...",
+      "qualityScore": "Оценка качества",
+      "scoreBadgeTooltip": "85+ Отлично · 70+ Хорошо · 50+ Удовлетворительно · ниже 50 Плохо",
+      "scoreExcellent": "Отлично",
+      "scoreGood": "Хорошо",
+      "scoreFair": "Удовлетворительно",
+      "scorePoor": "Плохо",
+      "manualWorkHeading": "Требуется ручная доработка",
+      "criticalSection": "Критично · {{count}}",
+      "mediumSection": "Средне · {{count}}",
+      "lowSection": "Низко · {{count}}",
+      "resolvedToggle": "Исправлено",
+      "excludedToggle": "Исключено · {{count}}",
+      "restoreTitle": "Восстановить",
+      "noIssuesFound": "Проблем не найдено"
+    },
+    "header": {
+      "issuesCount": "{{count}} проблем",
+      "resolvedCount": "{{count}} исправлено",
+      "manualCount": "{{count}} вручную"
+    },
+    "processStatus": {
+      "analyzing": "Анализ...",
+      "improved": "Улучшено",
+      "needsReview": "Требует проверки",
+      "improveError": "Ошибка Improve",
+      "partialBanner": "Улучшение выполнено частично. Некоторые поля требуют проверки."
+    },
+    "tabs": {
+      "original": "Оригинал",
+      "improved": "Улучшено",
+      "changes": "Изменения",
+      "json": "JSON"
+    },
+    "actions": {
+      "rerunReview": "Повторить ревью",
+      "improving": "Улучшение...",
+      "analyzeFailedTooltip": "Анализ AI не выполнен — повторите ревью перед улучшением",
+      "retry": "Повторить",
+      "improveAgain": "Улучшить снова",
+      "improve": "Улучшить",
+      "draftCreated": "Черновик создан",
+      "creatingDraft": "Создание...",
+      "createDraft": "Создать черновик",
+      "draftPartialTooltip": "Кейс улучшен частично, рекомендуется ручная проверка",
+      "applied": "Применено",
+      "applyingToOriginal": "Применение...",
+      "applyToOriginal": "Применить к оригиналу",
+      "blockReasonPartial": "Кейс улучшен частично, требуется ручная проверка",
+      "blockReasonCriticalAndManual": "Неразрешённые критичные замечания ({{critical}}) и требующие ручной правки ({{manual}})",
+      "blockReasonCritical": "Неразрешённые критичные замечания: {{count}}",
+      "blockReasonManual": "{{count}} замечаний требуют ручной правки в TestIT"
+    },
+    "errors": {
+      "draftErrorPrefix": "Ошибка создания черновика: ",
+      "applyErrorPrefix": "Ошибка применения: ",
+      "failedToImprove": "Не удалось улучшить",
+      "aiTimeout": "Истекло время ожидания ответа AI",
+      "aiInternalError": "Внутренняя ошибка сервера AI",
+      "aiRateLimited": "Слишком много запросов — попробуйте позже",
+      "aiUnavailable": "Сервис AI временно недоступен",
+      "aiInvalidResponse": "AI вернул некорректный ответ — попробуйте снова",
+      "genericProcessingError": "Ошибка обработки запроса"
+    },
+    "confirmApply": {
+      "title": "Заменить оригинал?",
+      "body": "Улучшенная версия полностью заменит оригинальный тест-кейс в TestIT.",
+      "warnText": "Это действие нельзя отменить",
+      "applying": "Применение…",
+      "replace": "Заменить"
+    }
   }
 }

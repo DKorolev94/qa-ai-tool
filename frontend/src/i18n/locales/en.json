@@ -68,5 +68,180 @@
     "readOnly": "Read only",
     "reviewModeTitle": "Review mode",
     "reviewModeBody": "Checks are configured via review mode and custom rules."
+  },
+  "workbench": {
+    "common": {
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "testCase": {
+      "metaSection": "Section",
+      "metaDuration": "Duration",
+      "metaId": "ID",
+      "metaVersion": "Version",
+      "metaAuthor": "Author",
+      "metadataLabel": "Metadata",
+      "tagsLabel": "Tags",
+      "tagFlaggedTitle": "Flagged for manual QA review before use",
+      "notSpecified": "not specified",
+      "sourceCaseLabel": "Source case: ",
+      "relatedIssuesLabel": "Related issues",
+      "linkFallback": "Link",
+      "descriptionLabel": "Description",
+      "attachmentsLabel": "Attachments",
+      "attachmentFileFallback": "file",
+      "productVersionsLabel": "Product versions",
+      "preconditionLabel": "Precondition",
+      "stepsLabel": "Steps",
+      "postconditionLabel": "Postcondition",
+      "parametersLabel": "Parameters",
+      "notProcessed": "not processed"
+    },
+    "priority": {
+      "critical": "Critical",
+      "highest": "Highest",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "status": {
+      "ready": "Ready",
+      "notReady": "Not ready",
+      "draft": "Draft",
+      "needsWork": "Needs work",
+      "obsolete": "Obsolete",
+      "inProgress": "In progress"
+    },
+    "linkType": {
+      "issue": "Issue",
+      "defect": "Defect",
+      "requirement": "Requirement",
+      "blockedBy": "Blocks",
+      "related": "Related",
+      "clones": "Clone",
+      "repository": "Repository"
+    },
+    "steps": {
+      "colAction": "Action",
+      "colExpected": "Expected result",
+      "colTestData": "Test data",
+      "colComments": "Comments",
+      "commentPlaceholder": "Comment",
+      "removeStepTitle": "Remove step",
+      "addStep": "+ Add step"
+    },
+    "editable": {
+      "titleLabel": "Title",
+      "priorityLabel": "Priority",
+      "notSet": "— not set —",
+      "statusLabel": "Status",
+      "tagPlaceholder": "+ tag",
+      "durationLabel": "Duration",
+      "minutesSuffix": "min",
+      "editButton": "Edit"
+    },
+    "diff": {
+      "noChanges": "No changes",
+      "changeHistory": "Change history",
+      "addedPill": "{{count}} added",
+      "changedPill": "{{count}} changed",
+      "removedPill": "{{count}} removed",
+      "chgCount": "{{count}} chg",
+      "sectionPreconditions": "Preconditions",
+      "sectionPostconditions": "Postconditions",
+      "stepN": "Step {{n}}",
+      "preconditionN": "Precondition {{n}}",
+      "postconditionN": "Postcondition {{n}}"
+    },
+    "rule": {
+      "expectedResults": "Expected results",
+      "atomicity": "Atomicity",
+      "independence": "Independence",
+      "reproducibility": "Reproducibility"
+    },
+    "issue": {
+      "resolvedTitle": "Fixed by AI Improve",
+      "resolvedBadge": "Resolved",
+      "manualTitle": "AI Improve couldn't fix this automatically — needs a person to edit it",
+      "manualBadge": "Manual",
+      "skippedTitle": "Already fine in the improved version — no change was needed",
+      "skippedBadge": "Skipped",
+      "notProcessedTitle": "Not included in the last Improve run",
+      "notProcessedBadge": "Not processed",
+      "dismissTitle": "Exclude from Improve — this issue won't be auto-fixed"
+    },
+    "rail": {
+      "title": "AI Review",
+      "analyzingTestCase": "Analyzing test case...",
+      "qualityScore": "Quality score",
+      "scoreBadgeTooltip": "85+ Excellent · 70+ Good · 50+ Fair · below 50 Poor",
+      "scoreExcellent": "Excellent",
+      "scoreGood": "Good",
+      "scoreFair": "Fair",
+      "scorePoor": "Poor",
+      "manualWorkHeading": "Requires manual work",
+      "criticalSection": "Critical · {{count}}",
+      "mediumSection": "Medium · {{count}}",
+      "lowSection": "Low · {{count}}",
+      "resolvedToggle": "Resolved",
+      "excludedToggle": "Excluded · {{count}}",
+      "restoreTitle": "Restore",
+      "noIssuesFound": "No issues found"
+    },
+    "header": {
+      "issuesCount": "{{count}} issues",
+      "resolvedCount": "{{count}} resolved",
+      "manualCount": "{{count}} manual"
+    },
+    "processStatus": {
+      "analyzing": "Analyzing...",
+      "improved": "Improved",
+      "needsReview": "Needs review",
+      "improveError": "Improve error",
+      "partialBanner": "Improvement partially completed. Some fields require review."
+    },
+    "tabs": {
+      "original": "Original",
+      "improved": "Improved",
+      "changes": "Changes",
+      "json": "JSON"
+    },
+    "actions": {
+      "rerunReview": "Re-run review",
+      "improving": "Improving...",
+      "analyzeFailedTooltip": "AI analysis failed — re-run review before improving",
+      "retry": "Retry",
+      "improveAgain": "Improve again",
+      "improve": "Improve",
+      "draftCreated": "Draft created",
+      "creatingDraft": "Creating...",
+      "createDraft": "Create draft",
+      "draftPartialTooltip": "Case partially improved, manual review recommended",
+      "applied": "Applied",
+      "applyingToOriginal": "Applying...",
+      "applyToOriginal": "Apply to original",
+      "blockReasonPartial": "Case partially improved, manual review needed",
+      "blockReasonCriticalAndManual": "Unresolved critical issues ({{critical}}) and requiring manual fix ({{manual}})",
+      "blockReasonCritical": "Unresolved critical issues: {{count}}",
+      "blockReasonManual": "{{count}} issues require manual fix in TestIT"
+    },
+    "errors": {
+      "draftErrorPrefix": "Draft error: ",
+      "applyErrorPrefix": "Apply error: ",
+      "failedToImprove": "Failed to improve",
+      "aiTimeout": "AI response timed out",
+      "aiInternalError": "Internal AI server error",
+      "aiRateLimited": "Too many requests — try again later",
+      "aiUnavailable": "AI service temporarily unavailable",
+      "aiInvalidResponse": "AI returned an invalid response — try again",
+      "genericProcessingError": "Request processing error"
+    },
+    "confirmApply": {
+      "title": "Replace original?",
+      "body": "The improved version will fully replace the original test case in TestIT.",
+      "warnText": "This action cannot be undone",
+      "applying": "Applying…",
+      "replace": "Replace"
+    }
   }
 }
