@@ -171,3 +171,26 @@ def test_token_not_in_exception_message():
         with pytest.raises(TestItAuthError) as exc_info:
             run(client.get_work_item("6109"))
     assert "supersecrettoken" not in str(exc_info.value)
+
+
+# ── Error code / params ───────────────────────────────────────────────────────
+
+def test_auth_error_has_code():
+    from app.tms.testit.client import TestItAuthError
+    exc = TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
+    assert exc.code == "testit_auth_failed"
+    assert exc.params == {}
+
+
+def test_not_found_error_has_code_and_params():
+    from app.tms.testit.client import TestItNotFoundError
+    exc = TestItNotFoundError("TestIT work item not found: 6109", code="testit_not_found", id="6109")
+    assert exc.code == "testit_not_found"
+    assert exc.params == {"id": "6109"}
+
+
+def test_error_without_code_defaults_to_none():
+    from app.tms.testit.client import TestItConnectionError
+    exc = TestItConnectionError("Connection to TestIT timed out")
+    assert exc.code is None
+    assert exc.params == {}

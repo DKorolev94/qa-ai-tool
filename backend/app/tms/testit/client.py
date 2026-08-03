@@ -10,7 +10,10 @@ logger = logging.getLogger(__name__)
 # ── Exceptions ───────────────────────────────────────────────────────────────
 
 class TestItError(Exception):
-    pass
+    def __init__(self, message: str, code: str | None = None, **params) -> None:
+        super().__init__(message)
+        self.code = code
+        self.params = params
 
 class TestItConfigError(TestItError):
     pass
@@ -28,8 +31,8 @@ class TestItResponseError(TestItError):
     pass
 
 class TestItApiError(TestItError):
-    def __init__(self, message: str, status_code: int | None = None) -> None:
-        super().__init__(message)
+    def __init__(self, message: str, status_code: int | None = None, code: str | None = None, **params) -> None:
+        super().__init__(message, code=code, **params)
         self.status_code = status_code
 
 
@@ -48,9 +51,9 @@ class TestItClient:
 
     def _check_config(self) -> None:
         if not self._base_url:
-            raise TestItConfigError("TESTIT_BASE_URL is not configured in .env")
+            raise TestItConfigError("TESTIT_BASE_URL is not configured in .env", code="testit_base_url_missing")
         if not self._token:
-            raise TestItConfigError("TESTIT_PRIVATE_TOKEN is not configured in .env")
+            raise TestItConfigError("TESTIT_PRIVATE_TOKEN is not configured in .env", code="testit_token_missing")
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -70,22 +73,29 @@ class TestItClient:
             ) as client:
                 resp = await client.get(url, headers=self._headers())
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError(
-                "TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN."
+                "TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.",
+                code="testit_auth_failed",
             )
         if resp.status_code == 404:
-            raise TestItNotFoundError(f"TestIT work item not found: {work_item_id}")
+            raise TestItNotFoundError(
+                f"TestIT work item not found: {work_item_id}",
+                code="testit_not_found",
+                id=work_item_id,
+            )
 
         try:
             data = resp.json()
         except Exception:
             raise TestItResponseError(
-                f"TestIT returned non-JSON response (HTTP {resp.status_code})"
+                f"TestIT returned non-JSON response (HTTP {resp.status_code})",
+                code="testit_response_error",
+                status_code=resp.status_code,
             )
 
         if not resp.is_success:
@@ -109,17 +119,17 @@ class TestItClient:
             ) as client:
                 resp = await client.get(url, headers=self._headers())
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
-            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
 
         try:
             data = resp.json()
         except Exception:
-            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})")
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
 
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or "TestIT API error"
@@ -137,17 +147,17 @@ class TestItClient:
             ) as client:
                 resp = await client.get(url, headers=self._headers())
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
-            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
 
         try:
             data = resp.json()
         except Exception:
-            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})")
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
 
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or "TestIT API error"
@@ -165,17 +175,17 @@ class TestItClient:
             ) as client:
                 resp = await client.get(url, headers=self._headers())
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
-            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
 
         try:
             data = resp.json()
         except Exception:
-            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})")
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
 
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or "TestIT API error"
@@ -218,17 +228,17 @@ class TestItClient:
                     json=payload,
                 )
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
-            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
 
         try:
             data = resp.json()
         except Exception:
-            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})")
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
 
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or "TestIT API error"
@@ -255,18 +265,20 @@ class TestItClient:
             ) as client:
                 resp = await client.post(url, headers={**self._headers(), "Content-Type": "application/json"}, json=payload)
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
-            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
 
         try:
             data = resp.json()
         except Exception:
             raise TestItResponseError(
-                f"TestIT returned non-JSON response (HTTP {resp.status_code})"
+                f"TestIT returned non-JSON response (HTTP {resp.status_code})",
+                code="testit_response_error",
+                status_code=resp.status_code,
             )
 
         if not resp.is_success:
@@ -304,14 +316,18 @@ class TestItClient:
                     json=payload,
                 )
         except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out")
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
         except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}")
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
 
         if resp.status_code in (401, 403):
-            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.")
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
         if resp.status_code == 404:
-            raise TestItNotFoundError(f"TestIT work item not found: {work_item_id}")
+            raise TestItNotFoundError(
+                f"TestIT work item not found: {work_item_id}",
+                code="testit_not_found",
+                id=work_item_id,
+            )
 
         if resp.status_code == 204:
             # Success — no body returned; reconstruct minimal response from payload
@@ -325,7 +341,9 @@ class TestItClient:
             data = resp.json()
         except Exception:
             raise TestItResponseError(
-                f"TestIT returned non-JSON response (HTTP {resp.status_code})"
+                f"TestIT returned non-JSON response (HTTP {resp.status_code})",
+                code="testit_response_error",
+                status_code=resp.status_code,
             )
 
         if not resp.is_success:
