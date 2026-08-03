@@ -3,6 +3,8 @@ import {
   AlertTriangle, Check, ChevronLeft, ChevronRight, Clock, Loader2,
   Monitor, Square, Terminal, Video, X,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type {
   ActionDetail, HistoricalStep, RunnerSession, RunnerSessionStatus,
   WsDoneEvent, WsEvent, WsFrameEvent, WsLogEvent, WsStepEvent, WsStepPendingEvent, WsStepUpdateEvent,
@@ -15,12 +17,12 @@ function fmtSec(s: number): string {
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-function fmtSecShort(s: number): string {
-  return `${s}s`
+function fmtSecShort(s: number, t: TFunction): string {
+  return t('runnerSession.timeShort', { s })
 }
 
-function pluralSteps(n: number): string {
-  return `${n} ${n === 1 ? 'step' : 'steps'}`
+function pluralSteps(n: number, t: TFunction): string {
+  return t('runnerSession.stepsCount', { count: n })
 }
 
 function pluralActions(n: number): string {
@@ -41,20 +43,22 @@ function cleanSummary(raw: string): string {
 
 // ── Status badge ──────────────────────────────────────────────────────────
 
-const BADGE_CFG: Record<string, { label: string; cls: string }> = {
-  running:          { label: 'Running',         cls: 'sess-badge--running'          },
-  passed:           { label: 'Passed',              cls: 'sess-badge--passed'           },
-  passed_unstable:  { label: 'Passed with warnings', cls: 'sess-badge--passed-unstable' },
-  failed:           { label: 'Failed',           cls: 'sess-badge--failed'           },
-  blocked:          { label: 'Blocked',         cls: 'sess-badge--blocked'          },
-  stopped:          { label: 'Stopped',           cls: 'sess-badge--stopped'          },
+const BADGE_CFG: Record<string, { key: string; cls: string }> = {
+  running:          { key: 'running',         cls: 'sess-badge--running'          },
+  passed:           { key: 'passed',           cls: 'sess-badge--passed'           },
+  passed_unstable:  { key: 'passedUnstable',   cls: 'sess-badge--passed-unstable'  },
+  failed:           { key: 'failed',           cls: 'sess-badge--failed'           },
+  blocked:          { key: 'blocked',          cls: 'sess-badge--blocked'          },
+  stopped:          { key: 'stopped',          cls: 'sess-badge--stopped'          },
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const cfg = BADGE_CFG[status] ?? { label: status, cls: 'sess-badge--blocked' }
+  const { t } = useTranslation()
+  const cfg = BADGE_CFG[status]
+  const label = cfg ? t(`runnerSession.badge.${cfg.key}`) : status
   return (
-    <span className={`sess-badge ${cfg.cls}`}>
-      {cfg.label}
+    <span className={`sess-badge ${cfg?.cls ?? 'sess-badge--blocked'}`}>
+      {label}
       {status === 'passed_unstable' && <span className="sess-badge-warn-dot" />}
     </span>
   )
@@ -161,8 +165,8 @@ function liveActionToDetail(actions: WsStepEvent['actions']): ActionDetail | und
   }
 }
 
-function stepFromLive(e: WsStepEvent): UiStep {
-  const summary = e.summary || e.next_goal || `Step ${e.step}`
+function stepFromLive(e: WsStepEvent, t: TFunction): UiStep {
+  const summary = e.summary || e.next_goal || t('runnerSession.stepFallback', { num: e.step })
   const action = liveActionToDetail(e.actions) || e.action
   const rawStatus: 'ok' | 'error' = e.status === 'error' ? 'error' : 'ok'
   return {
@@ -183,31 +187,31 @@ const DONE_GOAL_RE = /\bdone\s*\(\s*\)/i
 
 const SKIP_ACTIONS = new Set(['done', 'write_file', 'replace_file', 'read_file'])
 
-function fmtAction(a: RawAction): string {
+function fmtAction(a: RawAction, t: TFunction): string {
   const i = a.input
   switch (a.name) {
-    case 'navigate':    return `→ ${String(i.url ?? '').replace(/^https?:\/\//, '').slice(0, 55)}`
-    case 'input':       return `type "${String(i.text ?? '').slice(0, 40)}"`
+    case 'navigate':    return t('runnerSession.actionFmt.navigate', { url: String(i.url ?? '').replace(/^https?:\/\//, '').slice(0, 55) })
+    case 'input':       return t('runnerSession.actionFmt.input', { text: String(i.text ?? '').slice(0, 40) })
     case 'click': {
-      const t = i.xpath ? String(i.xpath).slice(0, 45) : (i.index != null ? `#${i.index}` : '')
-      return t ? `click ${t}` : 'click'
+      const target = i.xpath ? String(i.xpath).slice(0, 45) : (i.index != null ? `#${i.index}` : '')
+      return target ? t('runnerSession.actionFmt.clickTarget', { target }) : t('runnerSession.actionFmt.click')
     }
-    case 'wait':        return `wait ${i.seconds}s`
+    case 'wait':        return t('runnerSession.actionFmt.wait', { seconds: i.seconds })
     case 'scroll': {
       const amt = i.amount != null ? ` ${i.amount}px` : ''
-      return `scroll ${i.direction ?? ''}${amt}`
+      return t('runnerSession.actionFmt.scroll', { value: `${i.direction ?? ''}${amt}` })
     }
     case 'evaluate': {
       const code = String(i.code ?? '').trim().slice(0, 60)
-      return code ? `eval: ${code}` : 'evaluate'
+      return code ? t('runnerSession.actionFmt.evalCode', { code }) : t('runnerSession.actionFmt.evaluate')
     }
     case 'extract': {
       const q = String(i.query ?? '').slice(0, 45)
-      return q ? `extract: ${q}` : 'extract'
+      return q ? t('runnerSession.actionFmt.extractQuery', { query: q }) : t('runnerSession.actionFmt.extract')
     }
-    case 'search_page': return `search "${String(i.query ?? '').slice(0, 40)}"`
-    case 'send_keys':   return `keys ${String(i.keys ?? '')}`
-    case 'go_back':     return 'go back'
+    case 'search_page': return t('runnerSession.actionFmt.search', { query: String(i.query ?? '').slice(0, 40) })
+    case 'send_keys':   return t('runnerSession.actionFmt.sendKeys', { keys: String(i.keys ?? '') })
+    case 'go_back':     return t('runnerSession.actionFmt.goBack')
     default:            return a.name
   }
 }
@@ -230,14 +234,14 @@ function isDoneStep(h: HistoricalStep): boolean {
   return false
 }
 
-function stepFromHistory(h: HistoricalStep): UiStep {
+function stepFromHistory(h: HistoricalStep, t: TFunction): UiStep {
   const toolResults = (h.results ?? [])
     .map(r => r.content)
     .filter((c): c is string => !!c)
   const rawStatus: 'ok' | 'error' = h.status === 'error' ? 'error' : 'ok'
   return {
     num: h.step,
-    summary: h.summary || h.next_goal || `Step ${h.step}`,
+    summary: h.summary || h.next_goal || t('runnerSession.stepFallback', { num: h.step }),
     nextGoal: h.next_goal || undefined,
     url: h.url || undefined,
     status: deriveEvalStatus(rawStatus, h.summary || '', toolResults.length > 0 ? toolResults : undefined),
@@ -271,6 +275,7 @@ function TimelineStep({
   expanded: boolean
   onToggle: () => void
 }) {
+  const { t } = useTranslation()
   const isCurrent = step.status === 'current'
   const stateKey = step.status
 
@@ -290,7 +295,7 @@ function TimelineStep({
     || (!!step.isRetry && !!step.retryErrorMsg)
     || showEval
 
-  const rowLabel = cleanedSummary || cleanedGoal || `Step ${step.num}`
+  const rowLabel = cleanedSummary || cleanedGoal || t('runnerSession.stepFallback', { num: step.num })
 
   return (
     <div
@@ -312,10 +317,10 @@ function TimelineStep({
         <span className="tl-row-num">{step.num}</span>
         <span className="tl-row-label">{rowLabel}</span>
         <span className="tl-row-right">
-          {step.wasRetried && <span className="tl-row-retried-dot" title="Step was retried" />}
-          {step.isRetry && <span className="tl-row-retry-chip">&#x21A9; retry</span>}
+          {step.wasRetried && <span className="tl-row-retried-dot" title={t('runnerSession.retriedTitle')} />}
+          {step.isRetry && <span className="tl-row-retry-chip">&#x21A9; {t('runnerSession.retry')}</span>}
           {step.elapsedSec != null && step.elapsedSec >= 1 && (
-            <span className="tl-row-time">{fmtSecShort(step.elapsedSec)}</span>
+            <span className="tl-row-time">{fmtSecShort(step.elapsedSec, t)}</span>
           )}
           {hasDetails && !isCurrent && (
             <ChevronRight size={10} className={`tl-row-chevron${expanded ? ' open' : ''}`} />
@@ -330,24 +335,24 @@ function TimelineStep({
             <div className="tl-detail-body">
               {step.isRetry && step.retryErrorMsg && (
                 <div className="tl-detail-row tl-detail-row--warn">
-                  <span className="tl-dl">previous</span>
+                  <span className="tl-dl">{t('runnerSession.detail.previous')}</span>
                   <span className="tl-dv">{step.retryErrorMsg}</span>
                 </div>
               )}
               {showIntention && (
                 <div className="tl-detail-row">
-                  <span className="tl-dl">intention</span>
+                  <span className="tl-dl">{t('runnerSession.detail.intention')}</span>
                   <span className="tl-dv">{cleanedGoal}</span>
                 </div>
               )}
               {visibleActions.length > 0 && (
                 <div className="tl-detail-row tl-detail-row--top">
-                  <span className="tl-dl">action</span>
+                  <span className="tl-dl">{t('runnerSession.detail.action')}</span>
                   <div className="tl-dv-actions">
                     {visibleActions.map((a, i) => (
                       <div key={i} className="tl-dv-action">
                         <span className="tl-dv-atype">{a.name}</span>
-                        <span className="tl-dv-aval">{fmtAction(a)}</span>
+                        <span className="tl-dv-aval">{fmtAction(a, t)}</span>
                       </div>
                     ))}
                   </div>
@@ -355,7 +360,7 @@ function TimelineStep({
               )}
               {hasToolResults && (
                 <div className="tl-detail-row tl-detail-row--top">
-                  <span className="tl-dl">result</span>
+                  <span className="tl-dl">{t('runnerSession.detail.result')}</span>
                   <div className="tl-dv-results">
                     {(step.toolResults ?? []).map((r, i) => (
                       <span key={i} className="tl-dv-result">{r || '—'}</span>
@@ -365,7 +370,7 @@ function TimelineStep({
               )}
               {showEval && (
                 <div className="tl-detail-row">
-                  <span className="tl-dl">eval</span>
+                  <span className="tl-dl">{t('runnerSession.detail.eval')}</span>
                   <span className={`tl-dv tl-dv-eval--${stateKey}`}>{step.summary}</span>
                 </div>
               )}
@@ -382,6 +387,7 @@ function TimelineStep({
 // ── Pending ghost step ────────────────────────────────────────────────────
 
 function PendingStep({ num }: { num: number }) {
+  const { t } = useTranslation()
   return (
     <div className="tl-step tl-step--pending">
       <div className="tl-row">
@@ -389,7 +395,7 @@ function PendingStep({ num }: { num: number }) {
           <Loader2 size={11} className="spin-icon" />
         </span>
         <span className="tl-row-num">{num}</span>
-        <span className="tl-row-label tl-row-label--pending">Waiting for model…</span>
+        <span className="tl-row-label tl-row-label--pending">{t('runnerSession.waitingForModel')}</span>
       </div>
     </div>
   )
@@ -400,6 +406,7 @@ function PendingStep({ num }: { num: number }) {
 // ── Result banner ─────────────────────────────────────────────────────────────
 
 function ResultBanner({ summary, status }: { summary: string; status: string }) {
+  const { t } = useTranslation()
   const cleaned = fmtDoneSummary(summary)
   if (!cleaned) return null
   const isOk = status === 'passed' || status === 'passed_unstable'
@@ -409,7 +416,7 @@ function ResultBanner({ summary, status }: { summary: string; status: string }) 
   return (
     <div className={`steps-result-banner ${cls}`}>
       <span className="rb-icon"><Icon size={12} strokeWidth={2.5} /></span>
-      <span className="rb-text">{cleaned || <em style={{ opacity: 0.5 }}>no data</em>}</span>
+      <span className="rb-text">{cleaned || <em style={{ opacity: 0.5 }}>{t('runnerSession.noData')}</em>}</span>
     </div>
   )
 }
@@ -427,6 +434,7 @@ function StepsFeed({
   doneSummary?: string | null
   doneResultStatus?: string | null
 }) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [expandedStep, setExpandedStep] = useState<number | null>(null)
 
@@ -450,8 +458,8 @@ function StepsFeed({
       <div className="steps-summary-bar">
         <span className="steps-summary-total">
           {totalCount > 0
-            ? `${pluralSteps(totalCount)}`
-            : (running ? 'Running…' : 'No steps')}
+            ? pluralSteps(totalCount, t)
+            : (running ? t('runnerSession.runningEllipsis') : t('runnerSession.noSteps'))}
         </span>
         {totalCount > 0 && (
           <>
@@ -474,7 +482,7 @@ function StepsFeed({
         {running && steps.length === 0 && (
           <div className="steps-waiting">
             <div className="steps-dots"><span /><span /><span /></div>
-            <span className="steps-waiting-lbl">Waiting for steps…</span>
+            <span className="steps-waiting-lbl">{t('runnerSession.waitingForSteps')}</span>
           </div>
         )}
         {steps.map((s, idx) => (
@@ -507,6 +515,7 @@ function ViewportTabFloat({
   onChange: (tab: ViewTab) => void
   logCount: number
 }) {
+  const { t } = useTranslation()
   return (
     <div className="vft-pill">
       <button
@@ -515,7 +524,7 @@ function ViewportTabFloat({
         onClick={() => onChange('screen')}
       >
         <Monitor size={11} />
-        Screen
+        {t('runnerSession.tabs.screen')}
       </button>
       <button
         type="button"
@@ -523,7 +532,7 @@ function ViewportTabFloat({
         onClick={() => onChange('logs')}
       >
         <Terminal size={11} />
-        Logs
+        {t('runnerSession.tabs.logs')}
         {logCount > 0 && (
           <span className="vft-count">{logCount > 999 ? '999+' : logCount}</span>
         )}
@@ -535,12 +544,13 @@ function ViewportTabFloat({
 // ── Video player ──────────────────────────────────────────────────────────
 
 function VideoPlayer({ url }: { url: string }) {
+  const { t } = useTranslation()
   const [err, setErr] = useState(false)
   if (err) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, opacity: 0.45, height: '100%', justifyContent: 'center' }}>
         <Monitor size={22} style={{ color: 'rgba(255,255,255,0.4)' }} />
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Video unavailable</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('runnerSession.video.unavailable')}</div>
       </div>
     )
   }
@@ -591,6 +601,7 @@ function LogsPane({
   isCompleted?: boolean
   logsLoading?: boolean
 }) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const sessionLogs = logs.filter(l => l.source === 'session')
@@ -606,10 +617,10 @@ function LogsPane({
   }, [visible.length, running])
 
   function emptyMessage() {
-    if (logsLoading) return 'Loading logs…'
-    if (running)     return 'Logs will appear during execution…'
-    if (isCompleted) return 'Logs not saved'
-    return 'No logs'
+    if (logsLoading) return t('runnerSession.logs.loading')
+    if (running)     return t('runnerSession.logs.willAppear')
+    if (isCompleted) return t('runnerSession.logs.notSaved')
+    return t('runnerSession.logs.none')
   }
 
   return (
@@ -630,7 +641,7 @@ function LogsPane({
         {visible.length === 0 ? (
           <div className="session-logs-empty">
             {logsLoading
-              ? <><Loader2 size={13} className="spin-icon" style={{ display: 'inline-block', marginRight: 6 }} /> Loading logs…</>
+              ? <><Loader2 size={13} className="spin-icon" style={{ display: 'inline-block', marginRight: 6 }} /> {t('runnerSession.logs.loading')}</>
               : emptyMessage()}
           </div>
         ) : (
@@ -641,7 +652,7 @@ function LogsPane({
                 key={i}
                 className={`session-log-line session-log--${log.level}`}
               >
-                <span className="session-log-time">{Math.round(log.elapsed_sec)}s</span>
+                <span className="session-log-time">{fmtSecShort(Math.round(log.elapsed_sec), t)}</span>
                 <span className="session-log-cat" style={{ color: log.level === 'error' ? '#F87171' : cc }}>
                   {log.category}
                 </span>
@@ -658,12 +669,12 @@ function LogsPane({
 
 
 
-function humanizeBlockedSummary(summary: string): string {
+function humanizeBlockedSummary(summary: string, t: TFunction): string {
   const lower = summary.toLowerCase()
-  if (lower.includes('captcha')) return 'Blocked by CAPTCHA: could not verify result'
-  if (lower.includes('2fa') || lower.includes('two-factor') || lower.includes('mfa')) return 'Blocked by two-factor authentication'
-  if (lower.includes('preflight') || lower.includes('not accessible')) return 'Site unavailable: preflight check failed'
-  return 'Blocked: could not complete verification'
+  if (lower.includes('captcha')) return t('runnerSession.blockedReason.captcha')
+  if (lower.includes('2fa') || lower.includes('two-factor') || lower.includes('mfa')) return t('runnerSession.blockedReason.twoFactor')
+  if (lower.includes('preflight') || lower.includes('not accessible')) return t('runnerSession.blockedReason.preflight')
+  return t('runnerSession.blockedReason.generic')
 }
 
 // ── Session footer ────────────────────────────────────────────────────────
@@ -678,13 +689,14 @@ function SessionFooter({
   retryStepCount?: number
   onScrollToStep?: (stepNum: number) => void
 }) {
+  const { t } = useTranslation()
   const effectiveStatus = displayStatus ?? doneEvent.status
   const showReason = (doneEvent.status === 'failed' || doneEvent.status === 'blocked' || doneEvent.status === 'stopped') && doneEvent.summary
   const reasonText = doneEvent.status === 'blocked'
-    ? humanizeBlockedSummary(doneEvent.summary)
+    ? humanizeBlockedSummary(doneEvent.summary, t)
     : doneEvent.summary
   const unstableReason = effectiveStatus === 'passed_unstable' && retryStepCount
-    ? `${retryStepCount} ${retryStepCount === 1 ? 'step' : 'steps'} required retry`
+    ? t('runnerSession.requiredRetry', { count: retryStepCount })
     : null
   return (
     <div className="session-footer">
@@ -694,7 +706,7 @@ function SessionFooter({
         <Clock size={12} strokeWidth={1.75} style={{ color: 'var(--tx-dim)', flexShrink: 0 }} />
         <span className="session-footer-meta">{fmtSec(Math.round(doneEvent.duration_sec))}</span>
         <span className="session-footer-div" />
-        <span className="session-footer-meta">{pluralSteps(stepsCount ?? doneEvent.steps_count)}</span>
+        <span className="session-footer-meta">{pluralSteps(stepsCount ?? doneEvent.steps_count, t)}</span>
         {unstableReason && (
           <>
             <span className="session-footer-div" />
@@ -710,7 +722,7 @@ function SessionFooter({
                 className="session-footer-step-link"
                 onClick={() => onScrollToStep(failedStepNum)}
               >
-                Step {failedStepNum}
+                {t('runnerSession.stepFallback', { num: failedStepNum })}
               </button>
             )}
             <span className="session-footer-reason" title={doneEvent.summary}>{reasonText}</span>
@@ -742,6 +754,9 @@ export interface RunnerSessionViewProps {
 }
 
 export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, stepsApiPath, externalRunId }: RunnerSessionViewProps) {
+  const { t } = useTranslation()
+  const tRef = useRef(t)
+  useEffect(() => { tRef.current = t })
   const [liveSteps, setLiveSteps] = useState<WsStepEvent[]>([])
   const [pendingStepNum, setPendingStepNum] = useState<number | null>(null)
   const [logEvents, setLogEvents] = useState<WsLogEvent[]>([])
@@ -883,7 +898,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
             signal: abort.signal,
           })
           if (!res.ok) {
-            let detail = `HTTP ${res.status}`
+            let detail = tRef.current('runnerSession.wsErrors.httpError', { status: res.status })
             try { const err = await res.json(); detail = err.detail || detail } catch { /* use status */ }
             throw new Error(detail)
           }
@@ -959,14 +974,14 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
 
         ws.onclose = () => {
           if (!mountedRef.current || receivedDone) return
-          setWsError('Connection to runner lost')
+          setWsError(tRef.current('runnerSession.wsErrors.connectionLost'))
           onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
         }
 
         ws.onerror = () => {
           if (!mountedRef.current) return
           receivedDone = true
-          setWsError('WebSocket connection error')
+          setWsError(tRef.current('runnerSession.wsErrors.connectionError'))
           onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
         }
 
@@ -999,7 +1014,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
   // Build display steps — filter done marker, add duplicate-goal flags + retry markers
   const uiSteps: UiStep[] = (() => {
     const base = historicalSteps
-      ? historicalSteps.filter(h => !isDoneStep(h)).map(stepFromHistory)
+      ? historicalSteps.filter(h => !isDoneStep(h)).map(h => stepFromHistory(h, t))
       : liveSteps
           .filter(s => {
             if (DONE_GOAL_RE.test(s.next_goal || '')) return false
@@ -1007,7 +1022,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
             const hasMeaningfulSummary = !!s.summary && s.summary !== 'done'
             return hasGoal || s.status === 'error' || hasMeaningfulSummary
           })
-          .map(stepFromLive)
+          .map(s => stepFromLive(s, t))
     const processed = processUiSteps(base)
     // Mark the last step as 'current' during execution
     if (isRunning && processed.length > 0) {
@@ -1070,7 +1085,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
           <StatusBadge status={isRunning ? 'running' : (displayStatus)} />
           {isRunning && (
             <button type="button" className="session-stop-btn" onClick={handleStop}>
-              <Square size={11} strokeWidth={2} /> Stop
+              <Square size={11} strokeWidth={2} /> {t('runnerSession.stop')}
             </button>
           )}
         </div>
@@ -1110,15 +1125,18 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
                     {!hasLiveFrame && (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, opacity: 0.35 }}>
                         <Loader2 size={22} className="spin-icon" style={{ color: 'rgba(255,255,255,0.5)' }} />
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Connecting to browser…</div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('runnerSession.connectingToBrowser')}</div>
                       </div>
                     )}
                     {hasLiveFrame && (
                       <div className="session-live-hud">
-                        <span className="session-live-badge">● LIVE</span>
+                        <span className="session-live-badge">● {t('runnerSession.live')}</span>
                         {uiSteps.length > 0 && (
                           <div className="session-live-caption">
-                            {`Step ${uiSteps[uiSteps.length - 1].num} — ${cleanSummary(uiSteps[uiSteps.length - 1].summary)}`}
+                            {t('runnerSession.liveCaption', {
+                              num: uiSteps[uiSteps.length - 1].num,
+                              summary: cleanSummary(uiSteps[uiSteps.length - 1].summary),
+                            })}
                           </div>
                         )}
                       </div>
@@ -1129,12 +1147,12 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
                 ) : videoUnavailable ? (
                   <div className="session-viewport-inner" style={{ flexDirection: 'column', gap: 10, opacity: 0.4 }}>
                     <Monitor size={22} style={{ color: 'rgba(255,255,255,0.3)' }} />
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>Video not saved</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>{t('runnerSession.video.notSaved')}</div>
                   </div>
                 ) : (
                   <div className="session-viewport-inner" style={{ flexDirection: 'column', gap: 10, opacity: 0.4 }}>
                     <Loader2 size={22} className="spin-icon" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>Processing video…</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>{t('runnerSession.video.processing')}</div>
                   </div>
                 )}
               </div>

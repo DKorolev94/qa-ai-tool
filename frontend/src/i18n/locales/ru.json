@@ -316,5 +316,84 @@
       "title": "Минимальное разрешение — 1024px",
       "desc": "Разверните окно браузера или используйте внешний монитор."
     }
+  },
+  "runnerSession": {
+    "badge": {
+      "running": "Выполняется",
+      "passed": "Пройден",
+      "passedUnstable": "Пройден с предупреждениями",
+      "failed": "Провален",
+      "blocked": "Заблокирован",
+      "stopped": "Остановлен"
+    },
+    "stepsCount_one": "{{count}} шаг",
+    "stepsCount_few": "{{count}} шага",
+    "stepsCount_many": "{{count}} шагов",
+    "stepsCount_other": "{{count}} шага",
+    "stepFallback": "Шаг {{num}}",
+    "timeShort": "{{s}} с",
+    "detail": {
+      "previous": "предыдущее",
+      "intention": "намерение",
+      "action": "действие",
+      "result": "результат",
+      "eval": "оценка"
+    },
+    "retry": "повтор",
+    "retriedTitle": "Шаг был повторён",
+    "waitingForModel": "Ожидание ответа модели…",
+    "noData": "нет данных",
+    "runningEllipsis": "Выполняется…",
+    "noSteps": "Нет шагов",
+    "waitingForSteps": "Ожидание шагов…",
+    "tabs": {
+      "screen": "Экран",
+      "logs": "Логи"
+    },
+    "video": {
+      "unavailable": "Видео недоступно",
+      "notSaved": "Видео не сохранено",
+      "processing": "Обработка видео…"
+    },
+    "logs": {
+      "loading": "Загрузка логов…",
+      "willAppear": "Логи появятся во время выполнения…",
+      "notSaved": "Логи не сохранены",
+      "none": "Нет логов"
+    },
+    "blockedReason": {
+      "captcha": "Заблокировано CAPTCHA: не удалось подтвердить результат",
+      "twoFactor": "Заблокировано двухфакторной аутентификацией",
+      "preflight": "Сайт недоступен: предварительная проверка не пройдена",
+      "generic": "Заблокировано: не удалось завершить проверку"
+    },
+    "requiredRetry_one": "{{count}} шаг потребовал повтора",
+    "requiredRetry_few": "{{count}} шага потребовали повтора",
+    "requiredRetry_many": "{{count}} шагов потребовали повтора",
+    "requiredRetry_other": "{{count}} шага потребовали повтора",
+    "connectingToBrowser": "Подключение к браузеру…",
+    "live": "В ЭФИРЕ",
+    "liveCaption": "Шаг {{num}} — {{summary}}",
+    "stop": "Остановить",
+    "wsErrors": {
+      "connectionLost": "Соединение с раннером потеряно",
+      "connectionError": "Ошибка соединения WebSocket",
+      "httpError": "HTTP {{status}}"
+    },
+    "actionFmt": {
+      "navigate": "→ {{url}}",
+      "input": "ввод \"{{text}}\"",
+      "click": "клик",
+      "clickTarget": "клик {{target}}",
+      "wait": "ожидание {{seconds}} с",
+      "scroll": "прокрутка {{value}}",
+      "evaluate": "выполнение кода",
+      "evalCode": "выполнение кода: {{code}}",
+      "extract": "извлечение",
+      "extractQuery": "извлечение: {{query}}",
+      "search": "поиск \"{{query}}\"",
+      "sendKeys": "клавиши {{keys}}",
+      "goBack": "назад"
+    }
   }
 }

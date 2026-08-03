@@ -306,5 +306,80 @@
       "title": "Minimum resolution — 1024px",
       "desc": "Expand the browser window or use an external monitor."
     }
+  },
+  "runnerSession": {
+    "badge": {
+      "running": "Running",
+      "passed": "Passed",
+      "passedUnstable": "Passed with warnings",
+      "failed": "Failed",
+      "blocked": "Blocked",
+      "stopped": "Stopped"
+    },
+    "stepsCount_one": "{{count}} step",
+    "stepsCount_other": "{{count}} steps",
+    "stepFallback": "Step {{num}}",
+    "timeShort": "{{s}}s",
+    "detail": {
+      "previous": "previous",
+      "intention": "intention",
+      "action": "action",
+      "result": "result",
+      "eval": "eval"
+    },
+    "retry": "retry",
+    "retriedTitle": "Step was retried",
+    "waitingForModel": "Waiting for model…",
+    "noData": "no data",
+    "runningEllipsis": "Running…",
+    "noSteps": "No steps",
+    "waitingForSteps": "Waiting for steps…",
+    "tabs": {
+      "screen": "Screen",
+      "logs": "Logs"
+    },
+    "video": {
+      "unavailable": "Video unavailable",
+      "notSaved": "Video not saved",
+      "processing": "Processing video…"
+    },
+    "logs": {
+      "loading": "Loading logs…",
+      "willAppear": "Logs will appear during execution…",
+      "notSaved": "Logs not saved",
+      "none": "No logs"
+    },
+    "blockedReason": {
+      "captcha": "Blocked by CAPTCHA: could not verify result",
+      "twoFactor": "Blocked by two-factor authentication",
+      "preflight": "Site unavailable: preflight check failed",
+      "generic": "Blocked: could not complete verification"
+    },
+    "requiredRetry_one": "{{count}} step required retry",
+    "requiredRetry_other": "{{count}} steps required retry",
+    "connectingToBrowser": "Connecting to browser…",
+    "live": "LIVE",
+    "liveCaption": "Step {{num}} — {{summary}}",
+    "stop": "Stop",
+    "wsErrors": {
+      "connectionLost": "Connection to runner lost",
+      "connectionError": "WebSocket connection error",
+      "httpError": "HTTP {{status}}"
+    },
+    "actionFmt": {
+      "navigate": "→ {{url}}",
+      "input": "type \"{{text}}\"",
+      "click": "click",
+      "clickTarget": "click {{target}}",
+      "wait": "wait {{seconds}}s",
+      "scroll": "scroll {{value}}",
+      "evaluate": "evaluate",
+      "evalCode": "eval: {{code}}",
+      "extract": "extract",
+      "extractQuery": "extract: {{query}}",
+      "search": "search \"{{query}}\"",
+      "sendKeys": "keys {{keys}}",
+      "goBack": "go back"
+    }
   }
 }
