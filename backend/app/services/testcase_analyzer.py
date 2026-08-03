@@ -134,6 +134,7 @@ def analyze_raw_testcase(
     raw_content: str | None,
     work_item: dict | None,
     enabled_rules: list[str] | None = None,
+    language: str = "ru",
 ) -> AnalyzeTestCaseResponse:
     if raw_content is None and work_item is None:
         raise ValueError("Provide raw_content or work_item")
@@ -147,6 +148,7 @@ def analyze_raw_testcase(
     llm_result: ReviewResult = analyze_testcase_with_llm(
         clean_dict,
         enabled_rules=enabled_rules,
+        language=language,
     )
 
     parse_warnings = normalized.warnings or []

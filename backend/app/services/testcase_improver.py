@@ -151,6 +151,7 @@ def improve_testcase(
     raw_content: str | None,
     work_item: dict | None,
     selected_issues: list[dict],
+    language: str = "ru",
 ) -> ImproveTestCaseResponse:
     if raw_content is None and work_item is None:
         raise ValueError("Provide raw_content or work_item")
@@ -164,6 +165,7 @@ def improve_testcase(
     llm_result: ImproveResult = improve_testcase_with_llm(
         clean_dict,
         selected_issues,
+        language=language,
     )
 
     improved_raw = llm_result.improved_testcase.model_dump()

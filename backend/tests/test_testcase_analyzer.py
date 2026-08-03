@@ -180,3 +180,13 @@ def test_complete_resolutions_fills_missing():
     assert statuses[0] == "resolved"
     assert statuses[1] == "skipped"
     assert statuses[2] == "skipped"
+
+
+def test_analyze_raw_testcase_passes_language(monkeypatch):
+    captured = {}
+    def fake_llm(clean_testcase, enabled_rules=None, language="ru"):
+        captured["language"] = language
+        return ReviewResult(summary="s", issues=[], warnings=[])
+    monkeypatch.setattr("app.services.testcase_analyzer.analyze_testcase_with_llm", fake_llm)
+    analyze_raw_testcase(raw_content=None, work_item={"name": "x", "steps": []}, language="en")
+    assert captured["language"] == "en"
