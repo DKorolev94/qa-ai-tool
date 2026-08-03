@@ -29,5 +29,13 @@
   "errorBoundary": {
     "title": "Что-то пошло не так",
     "subtitle": "Попробуйте обновить страницу или перейти в другой раздел."
+  },
+  "modeButton": {
+    "custom": "Свой набор",
+    "rulesCount": "{{count}} правил",
+    "reviewMode": "Режим ревью",
+    "activeOfTotal": "Активно <1>{{active}}</1> из {{total}} правил",
+    "allRules": "Все правила →",
+    "apply": "Применить"
   }
 }

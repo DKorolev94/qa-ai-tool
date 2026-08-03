@@ -29,5 +29,13 @@
   "errorBoundary": {
     "title": "Something went wrong",
     "subtitle": "Try refreshing the page or navigating to another section."
+  },
+  "modeButton": {
+    "custom": "Custom",
+    "rulesCount": "{{count}} rules",
+    "reviewMode": "Review mode",
+    "activeOfTotal": "Active <1>{{active}}</1> of {{total}} rules",
+    "allRules": "All rules →",
+    "apply": "Apply"
   }
 }

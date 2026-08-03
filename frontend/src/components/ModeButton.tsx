@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Star } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import type { ReviewConfig, ReviewRuleId } from '../types'
 import { RulesModal } from './RulesModal'
 
@@ -11,6 +12,7 @@ interface ModeButtonProps {
 }
 
 export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply }: ModeButtonProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [localPreset, setLocalPreset] = useState(selectedPreset)
   const [localRules, setLocalRules] = useState<ReviewRuleId[]>(enabledRules)
@@ -50,8 +52,8 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
   }
 
   const currentLabel = selectedPreset === 'custom'
-    ? 'Custom'
-    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Strict review')
+    ? t('modeButton.custom')
+    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? t('modeButton.custom'))
 
   const total = reviewConfig.rules.length
 
@@ -68,7 +70,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
           </span>
           <span>{currentLabel}</span>
           <span className="mode-btn-sep" />
-          <span className="mode-btn-pill">{enabledRules.length} rules</span>
+          <span className="mode-btn-pill">{t('modeButton.rulesCount', { count: enabledRules.length })}</span>
           <span className={`mode-btn-chevron${open ? ' open' : ''}`}>
             <ChevronDown size={16} strokeWidth={1.75} />
           </span>
@@ -76,7 +78,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
 
         {open && (
           <div className="review-dropdown">
-            <div className="rd-header">Review mode</div>
+            <div className="rd-header">{t('modeButton.reviewMode')}</div>
 
             <div className="rd-presets">
               {reviewConfig.profiles.map(profile => (
@@ -93,7 +95,7 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
                     )}
                   </div>
                   {profile.rules.length > 0 && (
-                    <span className="rd-preset-count">{profile.rules.length} rules</span>
+                    <span className="rd-preset-count">{t('modeButton.rulesCount', { count: profile.rules.length })}</span>
                   )}
                 </div>
               ))}
@@ -101,7 +103,9 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
 
             <div className="rd-summary">
               <div className="rd-summary-line">
-                Active <strong>{localRules.length}</strong> of {total} rules
+                <Trans i18nKey="modeButton.activeOfTotal" values={{ active: localRules.length, total }}>
+                  Active <strong>{{ active: localRules.length } as any}</strong> of {{ total } as any} rules
+                </Trans>
               </div>
             </div>
 
@@ -111,9 +115,9 @@ export function ModeButton({ reviewConfig, selectedPreset, enabledRules, onApply
                 className="rd-link"
                 onClick={() => { setOpen(false); setRulesModalOpen(true) }}
               >
-                All rules →
+                {t('modeButton.allRules')}
               </button>
-              <button type="button" className="rd-apply" onClick={handleApply}>Apply</button>
+              <button type="button" className="rd-apply" onClick={handleApply}>{t('modeButton.apply')}</button>
             </div>
           </div>
         )}
