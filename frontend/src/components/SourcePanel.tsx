@@ -1,6 +1,7 @@
 import {
   CheckCircle2, Clock3, FileText, List, Lock, Loader2, Shield, ShieldCheck, Upload, XCircle,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { FetchResult } from '../types'
 
 interface SourcePanelProps {
@@ -18,6 +19,7 @@ export function SourcePanel({
   testItId, onTestItIdChange, fetchLoading, fetchResult, fetchError,
   onFetch, presetLabel, enabledRulesCount,
 }: SourcePanelProps) {
+  const { t } = useTranslation()
   const canFetch = testItId.trim().length > 0 && !fetchLoading
 
   return (
@@ -35,13 +37,13 @@ export function SourcePanel({
 
         {/* Input */}
         <div>
-          <label className="source-label" htmlFor="testit-id">Test case ID in TestIT</label>
+          <label className="source-label" htmlFor="testit-id">{t('sourcePanel.testCaseIdLabel')}</label>
           <div className="source-input-row">
             <input
               id="testit-id"
               className="source-id-input"
               type="text"
-              placeholder="e.g. 6110"
+              placeholder={t('sourcePanel.idPlaceholder')}
               value={testItId}
               onChange={e => onTestItIdChange(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && canFetch && onFetch()}
@@ -55,8 +57,8 @@ export function SourcePanel({
               disabled={!canFetch}
             >
               {fetchLoading
-                ? <><Loader2 size={15} className="spinner" />Loading...</>
-                : <><Upload size={15} />Load</>
+                ? <><Loader2 size={15} className="spinner" />{t('sourcePanel.loading')}</>
+                : <><Upload size={15} />{t('sourcePanel.load')}</>
               }
             </button>
           </div>
@@ -66,7 +68,7 @@ export function SourcePanel({
         {fetchError && (
           <div className="alert alert-error">
             <span className="alert-icon-err"><XCircle size={16} strokeWidth={1.75} /></span>
-            <span className="alert-text"><strong>Error: </strong>{fetchError}</span>
+            <span className="alert-text"><strong>{t('sourcePanel.error')}</strong>{fetchError}</span>
           </div>
         )}
 
@@ -74,7 +76,7 @@ export function SourcePanel({
         {fetchResult && (
           <div className="alert alert-success">
             <span className="alert-icon-ok"><CheckCircle2 size={16} strokeWidth={1.75} /></span>
-            <span className="alert-text"><strong>Loaded: </strong>{fetchResult.normalized_testcase.title}</span>
+            <span className="alert-text"><strong>{t('sourcePanel.loaded')}</strong>{fetchResult.normalized_testcase.title}</span>
             <span className="alert-id">{fetchResult.work_item_id}</span>
           </div>
         )}
@@ -83,12 +85,12 @@ export function SourcePanel({
         <div className="status-bar">
           <div className="status-chip">
             <span className="status-chip-icon"><Clock3 size={14} strokeWidth={1.75} /></span>
-            <span className="status-chip-label">Mode</span>
+            <span className="status-chip-label">{t('sourcePanel.modeLabel')}</span>
             <span className="status-chip-value">{presetLabel}</span>
           </div>
           <div className="status-chip">
             <span className="status-chip-icon"><ShieldCheck size={14} strokeWidth={1.75} /></span>
-            <span className="status-chip-value">{enabledRulesCount} rules</span>
+            <span className="status-chip-value">{t('sourcePanel.rulesCount', { count: enabledRulesCount })}</span>
           </div>
         </div>
 
@@ -97,34 +99,34 @@ export function SourcePanel({
           <div className="info-card">
             <div className="info-card-title">
               <span className="info-card-title-icon"><List size={14} strokeWidth={1.75} /></span>
-              How it works
+              {t('sourcePanel.howItWorksTitle')}
             </div>
             <div className="info-steps">
-              <div className="info-step"><span className="info-step-num">1</span>Load test case by ID</div>
-              <div className="info-step"><span className="info-step-num">2</span>Review issues found by AI</div>
-              <div className="info-step"><span className="info-step-num">3</span>Apply improvements</div>
+              <div className="info-step"><span className="info-step-num">1</span>{t('sourcePanel.step1')}</div>
+              <div className="info-step"><span className="info-step-num">2</span>{t('sourcePanel.step2')}</div>
+              <div className="info-step"><span className="info-step-num">3</span>{t('sourcePanel.step3')}</div>
             </div>
           </div>
           <div className="info-card">
             <div className="info-card-title">
               <span className="info-card-title-icon"><FileText size={14} strokeWidth={1.75} /></span>
-              What gets loaded
+              {t('sourcePanel.whatGetsLoadedTitle')}
             </div>
             <div className="info-card-body">
-              Title, description, preconditions, steps, postconditions and metadata.
+              {t('sourcePanel.whatGetsLoadedBody')}
             </div>
             <div className="info-tag">
               <Lock size={10} strokeWidth={2} />
-              Read only
+              {t('sourcePanel.readOnly')}
             </div>
           </div>
           <div className="info-card">
             <div className="info-card-title">
               <span className="info-card-title-icon"><Shield size={14} strokeWidth={1.75} /></span>
-              Review mode
+              {t('sourcePanel.reviewModeTitle')}
             </div>
             <div className="info-card-body">
-              Checks are configured via review mode and custom rules.
+              {t('sourcePanel.reviewModeBody')}
             </div>
           </div>
         </div>

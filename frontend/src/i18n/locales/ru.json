@@ -46,5 +46,24 @@
     "rulesSelected": "Выбрано правил: {{count}}",
     "reset": "Сбросить",
     "apply": "Применить"
+  },
+  "sourcePanel": {
+    "testCaseIdLabel": "ID тест-кейса в TestIT",
+    "idPlaceholder": "например, 6110",
+    "loading": "Загрузка...",
+    "load": "Загрузить",
+    "error": "Ошибка: ",
+    "loaded": "Загружено: ",
+    "modeLabel": "Режим",
+    "rulesCount": "{{count}} правил",
+    "howItWorksTitle": "Как это работает",
+    "step1": "Загрузите тест-кейс по ID",
+    "step2": "Просмотрите проблемы, найденные AI",
+    "step3": "Примените улучшения",
+    "whatGetsLoadedTitle": "Что загружается",
+    "whatGetsLoadedBody": "Заголовок, описание, предусловия, шаги, постусловия и метаданные.",
+    "readOnly": "Только чтение",
+    "reviewModeTitle": "Режим ревью",
+    "reviewModeBody": "Проверки настраиваются через режим ревью и кастомные правила."
   }
 }

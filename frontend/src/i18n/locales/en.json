@@ -46,5 +46,24 @@
     "rulesSelected": "{{count}} rules selected",
     "reset": "Reset",
     "apply": "Apply"
+  },
+  "sourcePanel": {
+    "testCaseIdLabel": "Test case ID in TestIT",
+    "idPlaceholder": "e.g. 6110",
+    "loading": "Loading...",
+    "load": "Load",
+    "error": "Error: ",
+    "loaded": "Loaded: ",
+    "modeLabel": "Mode",
+    "rulesCount": "{{count}} rules",
+    "howItWorksTitle": "How it works",
+    "step1": "Load test case by ID",
+    "step2": "Review issues found by AI",
+    "step3": "Apply improvements",
+    "whatGetsLoadedTitle": "What gets loaded",
+    "whatGetsLoadedBody": "Title, description, preconditions, steps, postconditions and metadata.",
+    "readOnly": "Read only",
+    "reviewModeTitle": "Review mode",
+    "reviewModeBody": "Checks are configured via review mode and custom rules."
   }
 }
