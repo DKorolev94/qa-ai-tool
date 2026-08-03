@@ -37,5 +37,14 @@
     "activeOfTotal": "Active <1>{{active}}</1> of {{total}} rules",
     "allRules": "All rules →",
     "apply": "Apply"
+  },
+  "rulesModal": {
+    "title": "Review rules",
+    "selectAll": "Select all",
+    "countOfTotal": "{{count}} of {{total}}",
+    "descriptionNotAvailable": "Description not available.",
+    "rulesSelected": "{{count}} rules selected",
+    "reset": "Reset",
+    "apply": "Apply"
   }
 }

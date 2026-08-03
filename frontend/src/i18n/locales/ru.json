@@ -37,5 +37,14 @@
     "activeOfTotal": "Активно <1>{{active}}</1> из {{total}} правил",
     "allRules": "Все правила →",
     "apply": "Применить"
+  },
+  "rulesModal": {
+    "title": "Правила ревью",
+    "selectAll": "Выбрать всё",
+    "countOfTotal": "{{count}} из {{total}}",
+    "descriptionNotAvailable": "Описание недоступно.",
+    "rulesSelected": "Выбрано правил: {{count}}",
+    "reset": "Сбросить",
+    "apply": "Применить"
   }
 }
