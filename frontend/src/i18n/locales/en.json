@@ -272,8 +272,10 @@
     },
     "run": "Run",
     "history": {
-      "recentRuns": "Recent runs ({{count}})",
-      "showAll": "Show all ({{count}})",
+      "recentRuns_one": "{{count}} recent run",
+      "recentRuns_other": "{{count}} recent runs",
+      "showAll_one": "Show all {{count}} run",
+      "showAll_other": "Show all {{count}} runs",
       "hide": "Hide",
       "manualRun": "Manual run",
       "testCaseHash": "Test case #{{id}}"

@@ -278,8 +278,14 @@
     },
     "run": "Запустить",
     "history": {
-      "recentRuns": "Недавние запуски ({{count}})",
-      "showAll": "Показать все ({{count}})",
+      "recentRuns_one": "{{count}} недавний запуск",
+      "recentRuns_few": "{{count}} недавних запуска",
+      "recentRuns_many": "{{count}} недавних запусков",
+      "recentRuns_other": "{{count}} недавних запусков",
+      "showAll_one": "Показать все {{count}} запуск",
+      "showAll_few": "Показать все {{count}} запуска",
+      "showAll_many": "Показать все {{count}} запусков",
+      "showAll_other": "Показать все {{count}} запусков",
       "hide": "Скрыть",
       "manualRun": "Ручной запуск",
       "testCaseHash": "Тест-кейс #{{id}}"
