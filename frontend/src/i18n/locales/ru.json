@@ -189,7 +189,10 @@
       "noIssuesFound": "Проблем не найдено"
     },
     "header": {
-      "issuesCount": "{{count}} проблем",
+      "issuesCount_one": "{{count}} проблема",
+      "issuesCount_few": "{{count}} проблемы",
+      "issuesCount_many": "{{count}} проблем",
+      "issuesCount_other": "{{count}} проблем",
       "resolvedCount": "{{count}} исправлено",
       "manualCount": "{{count}} вручную"
     },
@@ -222,8 +225,14 @@
       "applyToOriginal": "Применить к оригиналу",
       "blockReasonPartial": "Кейс улучшен частично, требуется ручная проверка",
       "blockReasonCriticalAndManual": "Неразрешённые критичные замечания ({{critical}}) и требующие ручной правки ({{manual}})",
-      "blockReasonCritical": "Неразрешённые критичные замечания: {{count}}",
-      "blockReasonManual": "{{count}} замечаний требуют ручной правки в TestIT"
+      "blockReasonCritical_one": "{{count}} неразрешённое критичное замечание",
+      "blockReasonCritical_few": "{{count}} неразрешённых критичных замечания",
+      "blockReasonCritical_many": "{{count}} неразрешённых критичных замечаний",
+      "blockReasonCritical_other": "{{count}} неразрешённых критичных замечаний",
+      "blockReasonManual_one": "{{count}} замечание требует ручной правки в TestIT",
+      "blockReasonManual_few": "{{count}} замечания требуют ручной правки в TestIT",
+      "blockReasonManual_many": "{{count}} замечаний требуют ручной правки в TestIT",
+      "blockReasonManual_other": "{{count}} замечания требуют ручной правки в TestIT"
     },
     "errors": {
       "draftErrorPrefix": "Ошибка создания черновика: ",

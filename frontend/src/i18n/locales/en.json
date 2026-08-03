@@ -189,7 +189,8 @@
       "noIssuesFound": "No issues found"
     },
     "header": {
-      "issuesCount": "{{count}} issues",
+      "issuesCount_one": "{{count}} issue",
+      "issuesCount_other": "{{count}} issues",
       "resolvedCount": "{{count}} resolved",
       "manualCount": "{{count}} manual"
     },
@@ -222,8 +223,10 @@
       "applyToOriginal": "Apply to original",
       "blockReasonPartial": "Case partially improved, manual review needed",
       "blockReasonCriticalAndManual": "Unresolved critical issues ({{critical}}) and requiring manual fix ({{manual}})",
-      "blockReasonCritical": "Unresolved critical issues: {{count}}",
-      "blockReasonManual": "{{count}} issues require manual fix in TestIT"
+      "blockReasonCritical_one": "{{count}} unresolved critical issue",
+      "blockReasonCritical_other": "{{count}} unresolved critical issues",
+      "blockReasonManual_one": "{{count}} issue requires manual fix in TestIT",
+      "blockReasonManual_other": "{{count}} issues require manual fix in TestIT"
     },
     "errors": {
       "draftErrorPrefix": "Draft error: ",
