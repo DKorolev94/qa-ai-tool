@@ -14,11 +14,9 @@ DRAFT_SECTION_NAME = "AI Review / Drafts"
 
 # In-process cache: resolved once, reused on subsequent requests
 _resolved_section_id: str | None = None
-_resolved_section_name: str | None = None
 _project_global_id: int | None = None
 _enabled_attribute_ids: set[str] | None = None
 _section_lock = asyncio.Lock()
-_section_name_lock = asyncio.Lock()
 _project_lock = asyncio.Lock()
 _attributes_lock = asyncio.Lock()
 
@@ -57,27 +55,6 @@ async def _resolve_section_id(client: TestItClient, project_id: str) -> str:
         logger.info("Created draft section id=%s parent_id=%s", section_id, root_id)
         _resolved_section_id = section_id
         return _resolved_section_id
-
-
-async def _resolve_section_name(client: TestItClient, section_id: str) -> str:
-    """Section name may not equal DRAFT_SECTION_NAME when TESTIT_DRAFT_SECTION_UUID
-    overrides it, so fetch the real name from TestIT instead of assuming.
-
-    Does not cache on failure — a transient TestIT error shouldn't permanently
-    poison the name for the rest of the process lifetime; retry next request."""
-    global _resolved_section_name
-    if _resolved_section_name is not None:
-        return _resolved_section_name
-    async with _section_name_lock:
-        if _resolved_section_name is not None:
-            return _resolved_section_name
-        try:
-            section = await client.get_section(section_id)
-            _resolved_section_name = section.get("name") or DRAFT_SECTION_NAME
-            return _resolved_section_name
-        except Exception as exc:
-            logger.warning("Could not fetch section name for id=%s: %s", section_id, exc)
-            return DRAFT_SECTION_NAME
 
 
 async def _resolve_project_global_id(client: TestItClient, project_id: str) -> int | None:
@@ -174,12 +151,9 @@ async def create_draft_in_testit(
         else:
             testit_url = f"{settings.TESTIT_BASE_URL}/workItems/{work_item_id}"
 
-    section_name = await _resolve_section_name(client, section_id)
-
     return CreateDraftResponse(
         work_item_id=work_item_id,
         global_id=global_id,
         title=title,
         testit_url=testit_url,
-        section_name=section_name,
     )

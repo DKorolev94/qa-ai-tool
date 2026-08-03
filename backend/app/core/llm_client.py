@@ -17,7 +17,6 @@ from app.schemas.analysis import (
     ReviewResult,
     TextParseResult,
     _LLMReviewResult,
-    _SummaryRewrite,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,50 +94,6 @@ def _get_client(mode: instructor.Mode) -> instructor.Instructor:
     return _clients[mode]
 
 
-_CYRILLIC_RE = re.compile(r'[а-яёА-ЯЁ]')
-
-
-def _has_cyrillic(text: str) -> bool:
-    return bool(_CYRILLIC_RE.search(text))
-
-
-def _source_is_russian(clean_testcase: dict) -> bool:
-    """Best-effort source-language guess from title + step actions — used only
-    to catch a `summary` written in the wrong language, not for anything that
-    needs to be exact."""
-    parts = [str(clean_testcase.get("title") or "")]
-    for section in ("preconditions", "steps", "postconditions"):
-        for step in clean_testcase.get(section) or []:
-            if isinstance(step, dict) and step.get("action"):
-                parts.append(str(step["action"]))
-    return _has_cyrillic(" ".join(parts))
-
-
-def _rewrite_summary_language(summary: str, want_russian: bool) -> str | None:
-    """One-shot fix for a `summary` written in the wrong language relative to
-    the source test case — cheaper than re-running the whole review call."""
-    target = "Russian" if want_russian else "English"
-    try:
-        result = _get_client(instructor.Mode.JSON).chat.completions.create(
-            model=settings.LLM_MODEL,
-            response_model=_SummaryRewrite,
-            max_retries=1,
-            temperature=0,
-            extra_body=_extra_body(),
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"Rewrite the given text in {target}, preserving its meaning exactly. Don't add or remove information.",
-                },
-                {"role": "user", "content": summary},
-            ],
-        )
-        return result.summary
-    except Exception as exc:
-        logger.warning("Summary language rewrite failed: %s", _root_cause(exc))
-        return None
-
-
 def analyze_testcase_with_llm(
     clean_testcase: dict,
     enabled_rules: list[str] | None = None,
@@ -174,14 +129,8 @@ def analyze_testcase_with_llm(
             ],
         )
         logger.info("LLM analyze ok: %.1fs issues=%d warnings=%d", time.perf_counter() - t0, len(llm_result.issues), len(llm_result.warnings))
-        summary = llm_result.summary
-        if summary.strip() and _source_is_russian(clean_testcase) != _has_cyrillic(summary):
-            logger.warning("LLM analyze: summary language mismatch, retrying rewrite")
-            rewritten = _rewrite_summary_language(summary, want_russian=_source_is_russian(clean_testcase))
-            if rewritten:
-                summary = rewritten
         return ReviewResult(
-            summary=summary,
+            summary=llm_result.summary,
             issues=[i.to_issue() for i in llm_result.issues],
             warnings=llm_result.warnings,
         )

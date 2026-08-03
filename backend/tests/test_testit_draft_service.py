@@ -90,16 +90,6 @@ def test_returns_testit_url():
     assert "new-uuid-1234" in result.testit_url
 
 
-def test_returns_section_name_from_configured_section():
-    with _patch_settings(section_id="configured-sect"), \
-         patch("app.tms.testit.draft_service.TestItClient") as MockClient:
-        mock_client = _make_client(section={"name": "Custom Drafts Folder"})
-        MockClient.return_value = mock_client
-        result = run(create_draft_in_testit(IMPROVED, "6109"))
-    mock_client.get_section.assert_called_once_with("configured-sect")
-    assert result.section_name == "Custom Drafts Folder"
-
-
 def test_missing_project_id_raises():
     with _patch_settings(project_id=""):
         with pytest.raises(TestItConfigError, match="TESTIT_PROJECT_UUID"):

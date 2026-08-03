@@ -55,7 +55,7 @@ def test_llm_issue_omits_empty_evidence_from_description():
     ).to_issue()
 
     assert issue.description == "У большинства шагов отсутствуют expected results."
-    assert "Example:" not in issue.description
+    assert "Пример:" not in issue.description
 
 
 def test_llm_issue_omits_empty_text_evidence_from_description():
@@ -68,7 +68,7 @@ def test_llm_issue_omits_empty_text_evidence_from_description():
     ).to_issue()
 
     assert issue.description == "Description отсутствует."
-    assert "Example:" not in issue.description
+    assert "Пример:" not in issue.description
 
 
 def test_llm_issue_omits_mixed_empty_assignment_evidence_from_description():
@@ -81,7 +81,7 @@ def test_llm_issue_omits_mixed_empty_assignment_evidence_from_description():
     ).to_issue()
 
     assert issue.description == "Шаг 9 имеет пустое поле action."
-    assert "Example:" not in issue.description
+    assert "Пример:" not in issue.description
 
 
 def test_llm_issue_keeps_meaningful_evidence_in_description():
@@ -93,7 +93,7 @@ def test_llm_issue_keeps_meaningful_evidence_in_description():
         recommendation="Перенести примеры в test_data.",
     ).to_issue()
 
-    assert "Example: Шаги 2-6: action содержит 'например: Иванов'" in issue.description
+    assert "Пример: Шаги 2-6: action содержит 'например: Иванов'" in issue.description
 
 
 def test_analyze_request_defaults_to_ru():

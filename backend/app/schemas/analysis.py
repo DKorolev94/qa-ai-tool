@@ -61,19 +61,19 @@ _RULE_ALIASES: dict[str, str] = {
 }
 
 _RULE_LABELS: dict[str, str] = {
-    "title": "Title",
-    "description": "Description",
-    "preconditions": "Preconditions",
-    "steps": "Steps",
-    "postconditions": "Postconditions",
-    "priority": "Priority",
-    "expected_results": "Expected results",
-    "test_data": "Test data",
-    "tags": "Tags",
-    "atomicity": "Atomicity",
-    "independence": "Independence",
-    "reproducibility": "Reproducibility",
-    "structure": "Structure",  # deprecated
+    "title": "Заголовок",
+    "description": "Описание",
+    "preconditions": "Предусловия",
+    "steps": "Шаги",
+    "postconditions": "Постусловия",
+    "priority": "Приоритет",
+    "expected_results": "Ожидаемые результаты",
+    "test_data": "Тестовые данные",
+    "tags": "Теги",
+    "atomicity": "Атомарность",
+    "independence": "Независимость",
+    "reproducibility": "Воспроизводимость",
+    "structure": "Структура",  # deprecated
 }
 
 
@@ -86,9 +86,8 @@ _EMPTY_ASSIGNMENT_RE = re.compile(
     re.IGNORECASE,
 )
 _EMPTY_EVIDENCE_TEXT_RE = re.compile(
-    r"^(?:(?:поле|field)\s+)?[\wА-Яа-яЁё ._-]+\s+"
-    r"(?:пустое|пустой|пустая|пусто|отсутствует|не заполнено|не заполнена"
-    r"|is empty|are empty|empty|is missing|are missing|missing|not filled(?: in)?|is blank|are blank|blank)\.?$",
+    r"^(?:поле\s+)?[\wА-Яа-яЁё ._-]+\s+"
+    r"(?:пустое|пустой|пустая|пусто|отсутствует|не заполнено|не заполнена)\.?$",
     re.IGNORECASE,
 )
 
@@ -131,7 +130,7 @@ class _LLMIssue(BaseModel):
     def to_issue(self) -> AnalysisIssue:
         desc = self.problem
         if _has_meaningful_evidence(self.evidence):
-            desc = f"{self.problem}\n\nExample: {self.evidence}"
+            desc = f"{self.problem}\n\nПример: {self.evidence}"
         return AnalysisIssue(
             rule=self.rule,
             severity=self.severity,
@@ -147,11 +146,6 @@ class _LLMReviewResult(BaseModel):
     summary: str
     issues: list[_LLMIssue] = []
     warnings: list[str] = []
-
-
-class _SummaryRewrite(BaseModel):
-    """Internal model for the summary-language-fix retry call."""
-    summary: str
 
 
 class AnalysisStep(BaseModel):

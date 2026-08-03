@@ -30,7 +30,6 @@ class CreateDraftResponse(BaseModel):
     global_id: int | None = None
     title: str
     testit_url: str | None = None
-    section_name: str | None = None
 
 
 class UpdateOriginalRequest(BaseModel):
