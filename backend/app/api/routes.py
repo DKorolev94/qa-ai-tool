@@ -60,8 +60,8 @@ class WorkItemRequest(BaseModel):
 
 
 @router.get("/review-config", response_model=ReviewConfig)
-async def review_config() -> ReviewConfig:
-    return get_review_config()
+async def review_config(language: str = "ru") -> ReviewConfig:
+    return get_review_config(language)
 
 
 @router.post("/clean-testcase", response_model=NormalizedTestCase)
