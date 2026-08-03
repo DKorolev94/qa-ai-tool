@@ -1,6 +1,11 @@
 import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, HistoricalStep, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId, RunnerRunResponse, SessionListItem } from './types'
+import i18n from './i18n'
 
 const BASE = '/api'
+
+function currentLanguage(): 'ru' | 'en' {
+  return i18n.language === 'en' ? 'en' : 'ru'
+}
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -25,37 +30,37 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  getReviewConfig: () => get<ReviewConfig>('/review-config'),
+  getReviewConfig: () => get<ReviewConfig>(`/review-config?language=${currentLanguage()}`),
 
   fetchWorkItem: (input: string) =>
-    post<FetchResult>('/testit/workitem/fetch', { input }),
+    post<FetchResult>('/testit/workitem/fetch', { input, language: currentLanguage() }),
 
   improveTestCase: (body: {
     work_item?: unknown
     raw_content?: string
     selected_issues: ReviewIssue[]
     enabled_rules?: ReviewRuleId[]
-  }) => post<ImproveResult>('/improve-testcase', body),
+  }) => post<ImproveResult>('/improve-testcase', { ...body, language: currentLanguage() }),
 
   analyzeTestCase: (body: {
     work_item?: unknown
     raw_content?: string
     enabled_rules?: ReviewRuleId[]
   }) =>
-    post<AnalyzeResult>('/analyze-testcase', body),
+    post<AnalyzeResult>('/analyze-testcase', { ...body, language: currentLanguage() }),
 
   createDraft: (body: {
     improved_testcase: unknown
     source_work_item_id: string
     source_attributes: Record<string, unknown>
     manual_notes?: string[]
-  }) => post<DraftResult>('/testit/workitem/create-draft', body),
+  }) => post<DraftResult>('/testit/workitem/create-draft', { ...body, language: currentLanguage() }),
 
   applyToOriginal: (body: {
     improved_testcase: unknown
     source_work_item_id: string
     source_attributes: Record<string, unknown>
-  }) => post<ApplyResult>('/testit/workitem/update-original', body),
+  }) => post<ApplyResult>('/testit/workitem/update-original', { ...body, language: currentLanguage() }),
 
   runTestCase: (work_item_id: string) =>
     post<RunnerRunResponse>('/runner/run', { work_item_id }),
@@ -77,28 +82,20 @@ export const api = {
 
 }
 
+// Backend errors from Task 5 onward are already localized in the current UI
+// language — these functions now only strip the "HTTP xxx: " prefix so the
+// user doesn't see raw HTTP jargon, and add HTTP-status-code-based framing
+// where useful (status codes are language-independent, unlike the phrase-
+// matching this used to do against the backend's — now localized — text).
+function stripHttpPrefix(msg: string): string {
+  const match = msg.match(/^HTTP \d+: (.*)$/s)
+  return match ? match[1] : msg
+}
+
 export function humanizeFetchError(msg: string): string {
-  const m = msg.toLowerCase()
-  if (m.includes('401') || m.includes('403'))
-    return 'TestIT: authorization error. Check TESTIT_PRIVATE_TOKEN in .env'
-  if (m.includes('404') || m.includes('not found'))
-    return 'Test case not found. Check the ID'
-  if (m.includes('503') || m.includes('unavailable') || m.includes('configured'))
-    return 'TestIT unavailable or TESTIT_BASE_URL/TOKEN not configured in .env'
-  if (m.includes('could not extract'))
-    return 'Invalid input. Use a numeric ID (e.g. 6109) or paste a TestIT test case URL'
-  return msg
+  return stripHttpPrefix(msg)
 }
 
 export function humanizeDraftError(msg: string): string {
-  const m = msg.toLowerCase()
-  if (m.includes('testit_project'))
-    return 'TESTIT_PROJECT_UUID not set in backend .env'
-  if (m.includes('testit_draft_section'))
-    return 'TESTIT_DRAFT_SECTION_UUID not set in backend .env'
-  if (m.includes('401') || m.includes('403'))
-    return 'TestIT: authorization error'
-  if (m.includes('503') || m.includes('configured'))
-    return 'TestIT unavailable or not configured'
-  return msg
+  return stripHttpPrefix(msg)
 }
