@@ -14,6 +14,16 @@ _NUMERIC_RE = re.compile(r"^\d+$")
 _ID_PATH_PREFIXES = {"workitems", "tests", "testcases"}
 
 
+class InvalidWorkItemInputError(ValueError):
+    def __init__(self, value: str) -> None:
+        super().__init__(
+            f"Could not extract TestIT work item id from input: {value!r}. "
+            "Provide a numeric ID (e.g. 6109), a UUID, or a TestIT test case URL."
+        )
+        self.code = "invalid_work_item_input"
+        self.params = {"value": value}
+
+
 def extract_work_item_id(value: str) -> str:
     """Accept a plain numeric ID, a UUID, or a TestIT URL ending in one of those
     (e.g. a link copied from TestIT or from this tool's own "Open in TestIT")."""
@@ -29,7 +39,4 @@ def extract_work_item_id(value: str) -> str:
             candidate, prefix = segments[-1], segments[-2].lower()
             if prefix in _ID_PATH_PREFIXES and (_NUMERIC_RE.match(candidate) or _UUID_RE.match(candidate)):
                 return candidate
-    raise ValueError(
-        f"Could not extract TestIT work item id from input: {value!r}. "
-        "Provide a numeric ID (e.g. 6109), a UUID, or a TestIT test case URL."
-    )
+    raise InvalidWorkItemInputError(value)

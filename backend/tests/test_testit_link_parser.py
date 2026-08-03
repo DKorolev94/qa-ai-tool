@@ -51,3 +51,11 @@ def test_invalid_string_raises():
 def test_empty_string_raises():
     with pytest.raises(ValueError):
         extract_work_item_id("")
+
+
+def test_invalid_input_raises_typed_error_with_code():
+    from app.tms.testit.link_parser import InvalidWorkItemInputError
+    with pytest.raises(InvalidWorkItemInputError) as exc_info:
+        extract_work_item_id("not a valid id")
+    assert exc_info.value.code == "invalid_work_item_input"
+    assert exc_info.value.params == {"value": "not a valid id"}

@@ -16,7 +16,7 @@ async def apply_to_original_in_testit(
     source_attributes: dict | None = None,
 ) -> UpdateOriginalResponse:
     if not settings.TESTIT_PROJECT_UUID:
-        raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env")
+        raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env", code="testit_project_uuid_missing")
 
     client = TestItClient()
 

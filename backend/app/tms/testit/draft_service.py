@@ -108,7 +108,7 @@ async def create_draft_in_testit(
     manual_notes: list[str] | None = None,
 ) -> CreateDraftResponse:
     if not settings.TESTIT_PROJECT_UUID:
-        raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env")
+        raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env", code="testit_project_uuid_missing")
 
     client = TestItClient()
     if settings.TESTIT_DRAFT_SECTION_UUID:
