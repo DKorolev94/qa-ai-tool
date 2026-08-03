@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import i18n from '../i18n'
 
 interface Props { children: ReactNode }
 interface State { hasError: boolean; error: Error | null }
@@ -21,10 +22,10 @@ export class ErrorBoundary extends Component<Props, State> {
           height: '100%', gap: 12, padding: 40, textAlign: 'center',
         }}>
           <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--tx-primary)', margin: 0 }}>
-            Something went wrong
+            {i18n.t('errorBoundary.title')}
           </h2>
           <p style={{ fontSize: 13, color: 'var(--tx-muted)', maxWidth: 400, margin: 0, lineHeight: 1.5 }}>
-            Try refreshing the page or navigating to another section.
+            {i18n.t('errorBoundary.subtitle')}
           </p>
           <p style={{ fontSize: 11, color: 'var(--tx-dim)', fontFamily: 'monospace', margin: 0 }}>
             {this.state.error?.message}

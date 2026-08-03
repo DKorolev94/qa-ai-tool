@@ -25,5 +25,9 @@
     "stillNeedsWork": "case still needs work",
     "openInTestIt": "Open in TestIT",
     "dismiss": "Dismiss"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "subtitle": "Try refreshing the page or navigating to another section."
   }
 }
