@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { api, humanizeFetchError } from './api'
 import { Sidebar } from './components/Sidebar'
 import { RunnerView } from './components/RunnerView'
@@ -15,31 +16,48 @@ const DEFAULT_RULES: ReviewRuleId[] = [
   'atomicity', 'independence', 'reproducibility',
 ]
 
-const FALLBACK_CONFIG: ReviewConfig = {
-  sources: [{ id: 'testit', label: 'TestIT', enabled: true }],
-  profiles: [
-    { id: 'standard', label: 'Standard review', description: 'Basic checks', rules: ['title', 'description', 'preconditions', 'steps', 'expected_results', 'test_data', 'reproducibility'] },
-    { id: 'strict', label: 'Strict review', description: 'All checks enabled', rules: DEFAULT_RULES },
-  ],
-  rules: [
-    { id: 'title', label: 'Title', description: 'Title is readable, not in snake_case/kebab-case, reflects the scenario.', group: 'Case quality', enabled: true, order: 10 },
-    { id: 'description', label: 'Description', description: 'Description is present, does not duplicate the title or contradict the steps.', group: 'Case quality', enabled: true, order: 12 },
-    { id: 'preconditions', label: 'Preconditions', description: 'Preconditions describe system state, not actions. No references to other test cases.', group: 'Case quality', enabled: true, order: 15 },
-    { id: 'steps', label: 'Steps', description: 'Each step contains one action. The order of steps is logically possible.', group: 'Case quality', enabled: true, order: 17 },
-    { id: 'postconditions', label: 'Postconditions', description: 'The final system state after the test is described.', group: 'Case quality', enabled: true, order: 18 },
-    { id: 'priority', label: 'Priority', description: 'Priority matches the criticality of the scenario.', group: 'Metadata', enabled: true, order: 19 },
-    { id: 'expected_results', label: 'Expected results', description: 'Each significant step has a specific expected result.', group: 'Case quality', enabled: true, order: 20 },
-    { id: 'test_data', label: 'Test data', description: 'Data is explicitly specified in a separate field, not embedded in the action text.', group: 'Case quality', enabled: true, order: 30 },
-    { id: 'tags', label: 'Tags', description: 'Tags match the case content: type, level, module.', group: 'Metadata', enabled: true, order: 40 },
-    { id: 'atomicity', label: 'Atomicity', description: 'One case contains one verification goal.', group: 'Case quality', enabled: true, order: 60 },
-    { id: 'independence', label: 'Independence', description: 'Case runs in any order without dependency on other tests.', group: 'Case quality', enabled: true, order: 70 },
-    { id: 'reproducibility', label: 'Reproducibility', description: 'Case can be run without verbal explanations from the author.', group: 'Case quality', enabled: true, order: 90 },
-  ],
-  defaults: { testit: DEFAULT_RULES },
+function buildFallbackConfig(language: string): ReviewConfig {
+  const isRu = language === 'ru'
+  const rule = (id: ReviewRuleId, en: [string, string], ru: [string, string], group: string, order: number) => ({
+    id, label: isRu ? ru[0] : en[0], description: isRu ? ru[1] : en[1], group, enabled: true, order,
+  })
+  return {
+    sources: [{ id: 'testit', label: 'TestIT', enabled: true }],
+    profiles: [
+      {
+        id: 'standard',
+        label: isRu ? 'Базовая проверка' : 'Standard review',
+        description: isRu ? 'Базовые проверки' : 'Basic checks',
+        rules: ['title', 'description', 'preconditions', 'steps', 'expected_results', 'test_data', 'reproducibility'],
+      },
+      {
+        id: 'strict',
+        label: isRu ? 'Строгая проверка' : 'Strict review',
+        description: isRu ? 'Включены все проверки' : 'All checks enabled',
+        rules: DEFAULT_RULES,
+      },
+    ],
+    rules: [
+      rule('title', ['Title', 'Title is readable, not in snake_case/kebab-case, reflects the scenario.'], ['Заголовок', 'Заголовок читаем, не в snake_case/kebab-case, отражает сценарий.'], 'Case quality', 10),
+      rule('description', ['Description', 'Description is present, does not duplicate the title or contradict the steps.'], ['Описание', 'Описание присутствует, не дублирует заголовок и не противоречит шагам.'], 'Case quality', 12),
+      rule('preconditions', ['Preconditions', 'Preconditions describe system state, not actions. No references to other test cases.'], ['Предусловия', 'Предусловия описывают состояние системы, а не действия. Нет ссылок на другие тест-кейсы.'], 'Case quality', 15),
+      rule('steps', ['Steps', 'Each step contains one action. The order of steps is logically possible.'], ['Шаги', 'Каждый шаг содержит одно действие. Порядок шагов логически возможен.'], 'Case quality', 17),
+      rule('postconditions', ['Postconditions', 'The final system state after the test is described.'], ['Постусловия', 'Описано конечное состояние системы после теста.'], 'Case quality', 18),
+      rule('priority', ['Priority', 'Priority matches the criticality of the scenario.'], ['Приоритет', 'Приоритет соответствует критичности сценария.'], 'Metadata', 19),
+      rule('expected_results', ['Expected results', 'Each significant step has a specific expected result.'], ['Ожидаемые результаты', 'У каждого значимого шага есть конкретный ожидаемый результат.'], 'Case quality', 20),
+      rule('test_data', ['Test data', 'Data is explicitly specified in a separate field, not embedded in the action text.'], ['Тестовые данные', 'Данные явно указаны в отдельном поле, а не встроены в текст действия.'], 'Case quality', 30),
+      rule('tags', ['Tags', 'Tags match the case content: type, level, module.'], ['Теги', 'Теги соответствуют содержанию кейса: тип, уровень, модуль.'], 'Metadata', 40),
+      rule('atomicity', ['Atomicity', 'One case contains one verification goal.'], ['Атомарность', 'Один кейс содержит одну цель проверки.'], 'Case quality', 60),
+      rule('independence', ['Independence', 'Case runs in any order without dependency on other tests.'], ['Независимость', 'Кейс выполняется в любом порядке без зависимости от других тестов.'], 'Case quality', 70),
+      rule('reproducibility', ['Reproducibility', 'Case can be run without verbal explanations from the author.'], ['Воспроизводимость', 'Кейс можно выполнить без устных пояснений автора.'], 'Case quality', 90),
+    ],
+    defaults: { testit: DEFAULT_RULES },
+  }
 }
 
 export default function App() {
-  const [reviewConfig, setReviewConfig] = useState<ReviewConfig>(FALLBACK_CONFIG)
+  const { t, i18n } = useTranslation()
+  const [reviewConfig, setReviewConfig] = useState<ReviewConfig>(() => buildFallbackConfig(i18n.language))
   const [selectedPreset, setSelectedPreset] = useState('strict')
   const [enabledRules, setEnabledRules] = useState<ReviewRuleId[]>(DEFAULT_RULES)
 
@@ -56,8 +74,10 @@ export default function App() {
         setReviewConfig(config)
         setEnabledRules(config.defaults['testit'] ?? DEFAULT_RULES)
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => {
+        setReviewConfig(buildFallbackConfig(i18n.language))
+      })
+  }, [i18n.language])
 
   async function handleFetch() {
     const id = testItId.trim()
@@ -84,8 +104,8 @@ export default function App() {
   }
 
   const presetLabel = selectedPreset === 'custom'
-    ? 'Custom'
-    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? 'Strict review')
+    ? t('modeButton.custom')
+    : (reviewConfig.profiles.find(p => p.id === selectedPreset)?.label ?? reviewConfig.profiles.find(p => p.id === 'strict')?.label ?? '')
 
   if (activeTool === 'runner') {
     return (
@@ -144,7 +164,7 @@ export default function App() {
         <div className="workspace-inner">
           <div className="workspace-col">
             <SectionHeader
-              title="Review & Improve test cases"
+              title={t('app.reviewImproveTitle')}
               actions={
                 <ModeButton
                   reviewConfig={reviewConfig}

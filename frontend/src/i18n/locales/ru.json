@@ -1,4 +1,7 @@
 {
+  "app": {
+    "reviewImproveTitle": "Ревью и улучшение тест-кейсов"
+  },
   "sidebar": {
     "brandName": "QA AI Tools",
     "brandSub": "AI Review Workspace",
