@@ -1130,6 +1130,27 @@ body { padding: 20px; }
 }
 .rail-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 
+/* Wraps freshly-loaded review/improve results so they fade in instead of
+   popping in the instant the spinner is replaced. Each of these components
+   returns a Fragment of several top-level sections, so the wrapper must
+   replicate its parent's flex/gap — a plain block wrapper would collapse
+   the gap between those sections down to zero. */
+.rail-result {
+  display: flex; flex-direction: column; gap: 10px;
+  animation: result-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.tc-fade-in {
+  display: flex; flex-direction: column; gap: 14px;
+  animation: result-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes result-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-result, .tc-fade-in { animation: none; }
+}
+
 /* Score card */
 .score-card { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; background: var(--bg-surface); }
 .score-head { font-size: 12px; font-weight: 500; color: var(--tx-secondary); margin-bottom: 10px; }
@@ -1148,6 +1169,8 @@ body { padding: 20px; }
   border-radius: var(--r-sm); border: 1px solid; line-height: 1;
 }
 .score-good { color: #0369a1; background: rgba(3,105,161,0.07); border-color: rgba(3,105,161,0.2); }
+.score-fair { color: var(--warn); background: rgba(181,71,8,0.07); border-color: rgba(181,71,8,0.2); }
+.score-poor { color: var(--bad); background: var(--bad-bg); border-color: var(--bad-border); }
 .score-ctrs { display: flex; gap: 10px; flex-wrap: wrap; }
 .score-ctr { font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 4px; line-height: 1; }
 .sctr-ok { color: var(--ok); }
@@ -1382,6 +1405,17 @@ body { padding: 20px; }
   display: flex; align-items: center; gap: 8px;
   padding: 8px 14px;
   font-size: 12px; color: var(--tx-secondary);
+  animation: action-banner-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
+  transition: opacity 0.18s ease, max-height 0.18s ease, padding 0.18s ease;
+  max-height: 44px;
+}
+.action-banner-row--closing {
+  opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0;
+}
+@keyframes action-banner-enter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .action-banner-row + .action-banner-row {
   border-top: 1px solid var(--ok-border);
@@ -1400,45 +1434,22 @@ body { padding: 20px; }
   font-size: 11px; color: var(--accent); text-decoration: none; white-space: nowrap;
 }
 .action-banner-link:hover { text-decoration: underline; }
+.action-banner-close {
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; width: 18px; height: 18px;
+  background: none; border: none; cursor: pointer; padding: 0;
+  color: var(--tx-muted); border-radius: var(--r-sm);
+  transition: background 0.14s, color 0.14s;
+}
+.action-banner-close:hover { background: rgba(0,0,0,0.06); color: var(--tx-secondary); }
 .action-banner-row--partial { background: rgba(3,105,161,0.04); }
 .action-banner-row--partial .action-banner-icon { color: #0369a1; }
 .action-banner-row--partial + .action-banner-row,
 .action-banner-row + .action-banner-row--partial { border-top-color: rgba(3,105,161,0.15); }
 .action-banner-partial { color: #0369a1; font-weight: 500; }
-
-/* Action toast */
-.action-toast {
-  position: fixed; bottom: 20px; right: 20px; z-index: 9000;
-  display: flex; align-items: center; gap: 9px;
-  max-width: 420px; padding: 10px 12px;
-  background: var(--bg-panel);
-  border: 1px solid var(--ok-border);
-  border-radius: var(--r-md);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-  font-size: 12px; color: var(--tx-secondary);
-  animation: toast-in 0.2s ease;
+@media (prefers-reduced-motion: reduce) {
+  .action-banner-row { animation: none; transition: none; }
 }
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.action-toast-icon { display: flex; align-items: center; flex-shrink: 0; color: var(--ok); }
-.action-toast-text { flex: 1; min-width: 0; line-height: 1.4; }
-.action-toast-text strong { font-weight: 600; color: var(--tx-primary); }
-.action-toast-link {
-  display: inline-flex; align-items: center;
-  color: var(--accent); text-decoration: none;
-}
-.action-toast-link:hover { text-decoration: underline; }
-.action-toast-close {
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; width: 20px; height: 20px;
-  background: none; border: none; cursor: pointer; padding: 0;
-  color: var(--tx-muted); border-radius: var(--r-sm);
-}
-.action-toast-close:hover { background: var(--bg-hover); color: var(--tx-secondary); }
-.action-toast--partial { border-color: rgba(3,105,161,0.25); }
-.action-toast--partial .action-toast-icon { color: #0369a1; }
 
 /* ── Runner tool ────────────────────────────────────────── */
 .runner-result-card {

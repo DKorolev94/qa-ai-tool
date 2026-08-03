@@ -56,7 +56,7 @@ def parse_testit_content(raw: str) -> NormalizedTestCase:
     if stripped.startswith('{') or stripped.startswith('['):
         try:
             parsed = json.loads(stripped)
-            from app.parsing.testit_workitem_mapper import normalize_testit_workitem
+            from app.tms.testit.workitem_mapper import normalize_testit_workitem
             if isinstance(parsed, dict):
                 return normalize_testit_workitem(parsed)
             if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict):

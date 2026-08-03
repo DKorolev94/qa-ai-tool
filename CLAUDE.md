@@ -61,7 +61,7 @@ frontend/             Vite+React :3000 — UI
 
 Review/improve flow:
 
-1. **Parse**: raw text → `testit_parser.py` or `testit_workitem_mapper.py` → `NormalizedTestCase`
+1. **Parse**: raw text → `app/tms/testit/parser.py` or `app/tms/testit/workitem_mapper.py` → `NormalizedTestCase`
 2. **LLM**: `llm_client.py` uses `instructor` library for structured JSON output (not raw OpenAI SDK). Two calls: `analyze_testcase_with_llm` → `ReviewResult`, `improve_testcase_with_llm` → `ImproveResult`
 3. **Postprocess**: `testcase_postprocessor.py` fixes/validates LLM output; `testcase_diff.py` builds a diff
 
@@ -69,8 +69,11 @@ Key modules:
 - `app/core/llm_client.py` — all LLM calls (review, improve, parse)
 - `app/core/prompt_builder.py` — assembles prompts from `.md` files
 - `app/core/review_config.py` — hardcoded rule/profile/source config (no DB)
-- `app/integrations/testit_client.py` — TestIT REST API client
 - `app/services/runner_service.py` — proxy/WebSocket bridge to browser-use-runner
+
+### TMS integrations
+
+TMS-specific code (client, parsers/mappers, schemas, orchestration services) lives per-tool under `app/tms/<tool>/` — currently only `app/tms/testit/`. The review/improve pipeline itself (`testcase_analyzer.py`, `testcase_improver.py`, `testcase_postprocessor.py`, `prompt_builder.py`, `llm_client.py`) is TMS-agnostic: it works on the internal `NormalizedTestCase`/`AnalyzedTestCase` shape, not on any TMS's raw API format. A second TMS (e.g. Allure TestOps) should land as a new `app/tms/testops/` package exposing the same shape (raw → `NormalizedTestCase`, improved → raw update payload) rather than being mixed into `app/tms/testit/`.
 
 ### Prompts as files
 

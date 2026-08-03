@@ -9,23 +9,22 @@ _PROMPTS_DIR = Path(__file__).parent / "prompts"
 _RULES_DIR = _PROMPTS_DIR / "rules"
 _REVIEW_BASE = _PROMPTS_DIR / "review_base.md"
 _IMPROVE_BASE = _PROMPTS_DIR / "improve_base.md"
-_IMPROVE_LEGACY = _PROMPTS_DIR / "improve.md"
 
-_FIX_SECTION_MARKER = "## Как исправлять"
+_FIX_SECTION_MARKER = "## How to fix"
 
 _RULE_FIX_LABELS: dict[str, str] = {
-    "title": "Заголовок",
-    "description": "Описание",
-    "preconditions": "Предусловия",
-    "steps": "Шаги",
-    "postconditions": "Постусловия",
-    "priority": "Приоритет",
-    "expected_results": "Ожидаемые результаты",
-    "test_data": "Тестовые данные",
-    "tags": "Теги",
-    "atomicity": "Атомарность",
-    "independence": "Независимость",
-    "reproducibility": "Воспроизводимость",
+    "title": "Title",
+    "description": "Description",
+    "preconditions": "Preconditions",
+    "steps": "Steps",
+    "postconditions": "Postconditions",
+    "priority": "Priority",
+    "expected_results": "Expected results",
+    "test_data": "Test data",
+    "tags": "Tags",
+    "atomicity": "Atomicity",
+    "independence": "Independence",
+    "reproducibility": "Reproducibility",
 }
 
 
@@ -67,22 +66,28 @@ def build_review_prompt(enabled_rules: list[str] | None = None) -> str:
         review_only_sections.append(section)
     rules_block = "\n\n---\n\n".join(review_only_sections)
     checklist = "\n".join(f"{i + 1}. {r}" for i, r in enumerate(enabled_rules))
-    checklist_block = f"## Обязательный чеклист правил\n\nВ поле `reasoning` пройди по каждому правилу из списка ниже по порядку. Для каждого правила напиши вывод: есть нарушение или нет, и почему. Пропускать правила запрещено.\n\n{checklist}"
-    return f"{base}\n\n---\n\n## Проверяй следующие аспекты\n\n{rules_block}\n\n---\n\n{checklist_block}"
+    checklist_block = f"## Mandatory rule checklist\n\nIn the `reasoning` field, go through every rule in the list below, in order. For each rule, write a verdict: violation or not, and why. Skipping rules is not allowed.\n\n{checklist}"
+    return f"{base}\n\n---\n\n## Check the following aspects\n\n{rules_block}\n\n---\n\n{checklist_block}"
 
 
 def build_improve_prompt(rule_ids: list[str] | None = None) -> str:
-    if not rule_ids:
-        return _load(_IMPROVE_LEGACY)
-    unique_ids = list(dict.fromkeys(rule_ids))
+    # None: no rule ids passed at all (e.g. issues from an external source
+    # with no `rule` field) — fall back to the full rule set instead of a
+    # separately maintained monolithic prompt, so rules/*.md stays the single
+    # source of truth. An empty list is different: it means no issues were
+    # selected at all, so no fix guidance should be included either —
+    # collapsing that case to "use every rule" invited the LLM to rewrite
+    # fields nobody asked it to touch.
+    if rule_ids is None:
+        unique_ids = list(_RULE_FIX_LABELS.keys())
+    else:
+        unique_ids = list(dict.fromkeys(rule_ids))
     fix_sections = []
     for rule_id in unique_ids:
         body = _load_fix_section(rule_id)
         if body:
             label = _RULE_FIX_LABELS.get(rule_id, rule_id)
             fix_sections.append(f"### {label}\n\n{body}")
-    if not fix_sections:
-        return _load(_IMPROVE_LEGACY)
     base = _load(_IMPROVE_BASE)
     rules_block = "\n\n---\n\n".join(fix_sections)
-    return f"{base}\n\n---\n\n## Как исправлять\n\n{rules_block}"
+    return f"{base}\n\n---\n\n## How to fix\n\n{rules_block}"

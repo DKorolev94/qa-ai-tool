@@ -1,36 +1,37 @@
-## Предусловия (Preconditions)
+## Preconditions
 
-Precondition = setup-шаг: действие, которое нужно выполнить до начала теста. Это может быть навигация, логин, подготовка данных. В TestIT preconditions — это отдельные шаги с полем action (и опционально expected, test_data), выполняемые до основных шагов.
+Precondition = a setup step: an action that must be performed before the test starts. This can be navigation, login, data preparation. In TestIT, preconditions are separate steps with an `action` field (and optionally `expected`, `test_data`), executed before the main steps.
 
-Флажь `high`, если:
-- preconditions пустые, а тест требует конкретного начального состояния (авторизации, нужной страницы, тестовых данных) — без этого первый шаг невыполним.
-- preconditions дублируют основные шаги. Пример: в preconditions "Открыть браузер, перейти на URL, войти в систему", и в steps шаги 1–4 делают то же самое. Тестировщик (и Stagehand) выполнит setup дважды.
+Flag `high` if:
+- preconditions are empty, but the test requires a specific starting state (authentication, the right page, test data) — without it the first step can't be executed.
+- preconditions duplicate the main steps. Example: preconditions say "Open the browser, go to the URL, log in", and steps 1–4 do the same thing. The tester (and Stagehand) will perform the setup twice.
 
-Флажь `medium`, если:
-- в preconditions только "Браузер открыт" — это не несёт информации, лучше убрать или заменить на реальный setup-шаг с URL.
-- preconditions описывают состояние без действия: «Пользователь авторизован» вместо «Войти в систему под учётной записью X» — непонятно как это состояние достигнуть.
+Flag `medium` if:
+- preconditions only say "Browser is open" — this carries no information, better to remove it or replace it with a real setup step that has a URL.
+- preconditions describe a state without an action: "User is authenticated" instead of "Log in with account X" — it's unclear how to reach that state.
 
-Не флажь, если:
-- preconditions описывают конкретные setup-действия: «Перейти на https://...», «Войти с логином X и паролем Y», «Перейти в раздел Z». Это правильный формат.
-- preconditions описывают внешние условия системы, которые не достигаются действиями пользователя в браузере: «Учётная запись тестового пользователя создана», «Тестовый займ #123 существует в БД». Это допустимо.
-- preconditions ссылаются на другой тест-кейс. Это нарушение правила `independence`, не `preconditions`.
-- в API-кейсе preconditions описывают request headers. Пример: `Headers request: Content-Type: application/json`. Не флажь.
+Don't flag if:
+- preconditions describe concrete setup actions: "Go to https://...", "Log in with the credentials in test_data", "Go to section Z". This is the correct format.
+- preconditions describe external system conditions that aren't achieved by user actions in the browser: "A test user account has been created", "Test loan #123 exists in the DB". This is acceptable.
+- preconditions reference another test case. That's a violation of the `independence` rule, not `preconditions`.
+- in an API case, preconditions describe request headers. Example: `Request headers: Content-Type: application/json`. Don't flag it.
+- a precondition step is missing test data (email, password, an ID, etc.). That's a violation of the `test_data` rule, not `preconditions`. Don't create a `preconditions` issue for it, even if `test_data` is also enabled.
 
-## Как исправлять
+## How to fix
 
-Если preconditions содержат описание состояния вместо действия: замени на конкретный setup-шаг.
-- «Пользователь авторизован» → «Войти в систему: перейти на https://..., ввести логин X и пароль Y, нажать кнопку входа»
-- «Открыта страница Займы» → «Перейти в раздел Займы»
+If preconditions contain a description of state instead of an action: replace it with a concrete setup step. Never write a literal email/password/token here unless that exact value is already in the source — follow the `test_data` rule instead: put the credential in `test_data` only if the source has a concrete value; otherwise leave `test_data` empty and mark `manual_needed` — don't invent a value or a placeholder. Word `action` as a plain instruction either way.
+- "User is authenticated" → action: "Log in", test_data: the credentials from the source if there are any, otherwise empty + `manual_needed`
+- "The Loans page is open" → "Go to the Loans section"
 
-Если preconditions пустые и шаги теста начинаются с setup-флоу (открыть URL, залогиниться, навигация к нужному разделу), а затем идёт сам тест:
-1. Перенеси setup-шаги (открытие URL, логин, навигация) в preconditions.
-2. Удали их из основных шагов.
-3. В основных шагах оставь только сам тест (ввод данных, действие, проверка результата).
+If preconditions are empty and the test steps start with a setup flow (open a URL, log in, navigate to the right section), followed by the actual test:
+1. Move the setup steps (opening the URL, login, navigation) into preconditions.
+2. Remove them from the main steps.
+3. Leave only the actual test itself in the main steps (entering data, the action, verifying the result).
 
-Пример правильной структуры:
-- Preconditions: «Перейти на https://...», «Ввести логин admin@example.ru и пароль 0123456, нажать Войти», «Перейти в раздел Займы → вкладка Поиск займов»
-- Steps: «Ввести в поле Фамилия значение "Иванов"», «Нажать кнопку Поиск», «Проверить: в таблице отображается хотя бы одна строка с фамилией "Иванов"»
+Example of a correct structure:
+- Preconditions: action "Go to https://...", action "Log in", action "Go to Loans → Search loans tab"
+- Steps: "Enter \"Smith\" in the Last name field", "Click the Search button", "Verify: the table shows at least one row with the last name \"Smith\""
 
-Если setup-шаги сложно отделить от теста или непонятна граница → `manual_needed`: «Укажи, где заканчивается setup и начинается сам тест — какие шаги перенести в preconditions.»
+If the setup steps are hard to separate from the test, or the boundary is unclear → `manual_needed`: "Specify where setup ends and the actual test begins — which steps to move into preconditions."
 
-Если precondition ссылается на другой тест-кейс → `manual_needed`: «Замени ссылку на тест-кейс конкретными setup-шагами.»
+If a precondition references another test case → `manual_needed`: "Replace the reference to the test case with concrete setup steps."

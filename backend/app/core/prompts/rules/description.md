@@ -1,17 +1,17 @@
-## Описание (Description)
+## Description
 
-Флажь `medium`, если description противоречит title, steps или expected result.
+Flag `medium` if the description contradicts the title, steps, or expected result.
 
-Флажь `low`, если:
-- description отсутствует. Добавь 1–2 предложения: что проверяется, при каких условиях, какой ожидаемый исход. Отсутствие description — это всегда `low`, никогда `medium` или `high`.
-- description полностью повторяет title слово в слово.
+Flag `low` if:
+- the description is missing. Add 1–2 sentences: what is being checked, under what conditions, what's the expected outcome. A missing description is always `low`, never `medium` or `high`.
+- the description is a verbatim repeat of the title.
 
-Не флажь, если description уже есть и отражает суть кейса.
+Don't flag if the description already exists and reflects the essence of the case.
 
-## Как исправлять
+## How to fix
 
-Напиши 1–2 предложения: что проверяется + при каких условиях + ожидаемый исход. Примеры:
-- «Проверка входа с корректными учётными данными. Ожидается успешная авторизация и переход на главную страницу.»
-- «Проверка отображения ошибки при вводе неверного пароля. Форма остаётся открытой.»
+Write 1–2 sentences: what is being checked + under what conditions + the expected outcome. Examples:
+- "Verifies login with valid credentials. Expects successful authentication and redirect to the home page."
+- "Verifies the error message shown when an incorrect password is entered. The form stays open."
 
-Не копируй title. Выводи только то, что следует из шагов.
+Don't copy the title. Derive only what follows from the steps.

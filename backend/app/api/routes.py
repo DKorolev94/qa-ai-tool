@@ -10,7 +10,7 @@ from urllib.parse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
-from app.integrations.testit_client import (
+from app.tms.testit.client import (
     TestItApiError,
     TestItAuthError,
     TestItConfigError,
@@ -19,8 +19,8 @@ from app.integrations.testit_client import (
     TestItResponseError,
 )
 from app.core.review_config import ReviewConfig, get_review_config
-from app.parsing.testit_parser import parse_testit_content
-from app.parsing.testit_workitem_mapper import normalize_testit_workitem
+from app.tms.testit.parser import parse_testit_content
+from app.tms.testit.workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import (
     AnalyzeTestCaseRequest,
     AnalyzeTestCaseResponse,
@@ -28,7 +28,7 @@ from app.schemas.analysis import (
     ImproveTestCaseResponse,
 )
 from app.schemas.testcase import NormalizedTestCase
-from app.schemas.testit import (
+from app.tms.testit.schemas import (
     CreateDraftRequest,
     CreateDraftResponse,
     FetchTestItWorkItemRequest,
@@ -38,9 +38,9 @@ from app.schemas.testit import (
 )
 from app.services.testcase_analyzer import analyze_raw_testcase
 from app.services.testcase_improver import improve_testcase
-from app.services.testit_draft_service import create_draft_in_testit
-from app.services.testit_workitem_service import fetch_and_normalize_work_item
-from app.services.testit_update_service import apply_to_original_in_testit
+from app.tms.testit.draft_service import create_draft_in_testit
+from app.tms.testit.workitem_service import fetch_and_normalize_work_item
+from app.tms.testit.update_service import apply_to_original_in_testit
 from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerStartRequest, WriteTestItResultRequest
 from app.services import runner_service
 from app.core.config import settings
@@ -350,7 +350,7 @@ async def runner_screenshot(path: str) -> FileResponse:
 
 @router.post("/runner/write-testit-result")
 async def write_testit_result(body: WriteTestItResultRequest) -> dict:
-    from app.services.testit_run_service import write_run_result
+    from app.tms.testit.run_service import write_run_result
     try:
         return await write_run_result(
             work_item_id=body.work_item_id,

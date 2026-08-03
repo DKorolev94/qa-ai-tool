@@ -1,34 +1,34 @@
-## Воспроизводимость (Reproducibility)
+## Reproducibility
 
-Тест-кейс должен быть выполним другим тестировщиком без устных пояснений автора.
+A test case must be executable by a different tester without verbal explanations from the author.
 
-Флажь `high`, если:
-- невозможно понять, с какого экрана, состояния или объекта начинать.
-- шаг требует знания, которого нет ни в одном поле: title, preconditions, steps, test_data.
-- кейс нельзя выполнить без скрытой информации от автора.
+Flag `high` if:
+- it's impossible to tell which screen, state, or object to start from.
+- a step requires knowledge that isn't in any field: title, preconditions, steps, test_data.
+- the case can't be executed without hidden information from the author.
 
-Флажь `medium`, если:
-- шаг ссылается на неопределённый объект. Примеры: `выбрать нужный объект`, `заполнить данные`, `перейти в нужный раздел`. Неясно, КАКОЙ именно объект, данные или раздел.
-- не указано, какой пользователь, роль, объект, файл или запись используются.
+Flag `medium` if:
+- a step references an undefined object. Examples: `select the right object`, `fill in the data`, `go to the right section`. It's unclear WHICH object, data, or section exactly.
+- it's not specified which user, role, object, file, or record is used.
 
-Не флажь, если:
-- нужная информация есть в preconditions, test_data или предыдущих шагах.
-- неопределённость не мешает выполнить кейс.
-- роль не указана нигде (preconditions, test_data, steps), но очевидно не влияет на выполнение теста. Не флажь.
-- данные отсутствуют в test_data. Это нарушение правила `test_data`, не `reproducibility`.
-- шаг описывает расплывчатую цель без observable критерия. Это нарушение правила `steps`, не `reproducibility`.
-- начальное состояние неясно из-за пустых preconditions — если правило `preconditions` уже флажит это, не дублируй issue здесь. Одна причина — один issue.
+Don't flag if:
+- the required information is in preconditions, test_data, or previous steps.
+- the ambiguity doesn't prevent executing the case.
+- the role isn't specified anywhere (preconditions, test_data, steps), but it clearly doesn't affect test execution. Don't flag it.
+- the data is missing from test_data. That's a violation of the `test_data` rule, not `reproducibility`.
+- a step describes a vague goal without an observable criterion. That's a violation of the `steps` rule, not `reproducibility`.
+- the starting state is unclear because preconditions are empty — if the `preconditions` rule already flags this, don't duplicate the issue here. One cause — one issue.
 
-## Как исправлять
+## How to fix
 
-Конкретизируй расплывчатые объекты в шагах: вместо «выбрать нужный объект» →
-добавь в action конкретное описание или вынеси в test_data.
+Make vague objects in the steps concrete: instead of "select the right object" →
+add a concrete description to the action, or move it into test_data.
 
-Если объект, код, запись, файл или набор чекбоксов неизвестен без
-бизнес-контекста → `manual_needed`: «Укажи конкретный объект/запись/файл/
-набор чекбоксов для шага N.»
+If an object, code, record, file, or set of checkboxes is unknowable without
+business context → `manual_needed`: "State the concrete object/record/file/
+set of checkboxes for step N."
 
-Не добавляй placeholders со ссылкой на документы, если в тест-кейсе нет
-реальных `links`. Запрещено: `<код из SMS — см. связанные документы>` при
-пустом `links`. В таком случае `manual_needed`: «Укажи источник SMS-кода для
-шага N: тестовый стенд, тестовые данные, документация или связанное требование.»
+Don't invent a source for the data if the test case has no real `links` —
+don't write "see linked documents" or similar when `links` is empty.
+In that case, `manual_needed`: "State the source of the SMS code for
+step N: test stand, test data, documentation, or a linked requirement."

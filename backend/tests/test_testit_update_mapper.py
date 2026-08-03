@@ -1,6 +1,6 @@
 # backend/tests/test_testit_update_mapper.py
 import pytest
-from app.parsing.testit_update_mapper import build_update_payload, _strip_service_footer
+from app.tms.testit.update_mapper import build_update_payload, _strip_service_footer
 
 
 def test_strip_service_footer_removes_footer():
@@ -109,6 +109,36 @@ def test_build_update_payload_maps_priority():
     improved = _make_improved()
     payload = build_update_payload(raw, improved, "6110")
     assert payload["priority"] == "High"
+
+
+def test_build_update_payload_passes_through_unrecognized_priority():
+    # A project-specific priority value ("Blocker", "P1", ...) that the LLM
+    # left untouched shouldn't be silently downgraded to Medium.
+    raw = _make_raw()
+    improved = _make_improved()
+    improved["priority"] = "Blocker"
+    payload = build_update_payload(raw, improved, "6110")
+    assert payload["priority"] == "Blocker"
+
+
+def test_build_update_payload_defaults_missing_priority_to_medium():
+    raw = _make_raw()
+    improved = _make_improved()
+    improved["priority"] = None
+    payload = build_update_payload(raw, improved, "6110")
+    assert payload["priority"] == "Medium"
+
+
+def test_build_update_payload_keeps_original_priority_verbatim_when_unchanged():
+    # LLM echoed the same priority back untouched (no priority issue was
+    # fixed) — pass the original TestIT value through as-is, don't normalize
+    # it even if our own map would've capitalized it differently.
+    raw = _make_raw()
+    raw["priority"] = "highest"
+    improved = _make_improved()
+    improved["priority"] = "highest"
+    payload = build_update_payload(raw, improved, "6110")
+    assert payload["priority"] == "highest"
 
 
 def test_build_update_payload_maps_state():

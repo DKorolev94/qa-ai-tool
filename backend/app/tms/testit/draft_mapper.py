@@ -58,8 +58,8 @@ def build_draft_payload(
     needs_review = _map_status(status) != "Ready"
 
     original_tags: list[str] = list(improved.get("tags") or [])
-    draft_tags = [t for t in original_tags if t not in {"ai-generated", "needs-review"}]
-    draft_tags = ["ai-generated"] + (["needs-review"] if needs_review else []) + draft_tags
+    draft_tags = [t for t in original_tags if t != "needs-review"]
+    draft_tags = (["needs-review"] if needs_review else []) + draft_tags
 
     title = (improved.get("title") or "Untitled").removeprefix("[AI DRAFT] ")
 

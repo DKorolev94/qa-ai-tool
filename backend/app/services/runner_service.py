@@ -22,7 +22,7 @@ def _is_pure_nav(action: str, url: str) -> bool:
 from app.core.config import settings
 from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerScreenshot, RunnerStartRequest
 from app.schemas.testcase import NormalizedTestCase
-from app.services.testit_workitem_service import fetch_and_normalize_work_item
+from app.tms.testit.workitem_service import fetch_and_normalize_work_item
 
 _URL_RE = re.compile(r'https?://[^\s)\]}>"\']+')
 # Matches %param_name% or %param_name (TestIT parameter placeholder format)

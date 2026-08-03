@@ -1,8 +1,8 @@
 from __future__ import annotations
 import logging
 from app.core.llm_client import improve_testcase_with_llm
-from app.parsing.testit_parser import parse_testit_content
-from app.parsing.testit_workitem_mapper import normalize_testit_workitem
+from app.tms.testit.parser import parse_testit_content
+from app.tms.testit.workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import ImproveResult, ImproveTestCaseResponse, IssueResolution
 from app.services.testcase_analyzer import _coerce_testcase, _complete_resolutions
 from app.services.testcase_diff import build_testcase_diff
@@ -10,10 +10,6 @@ from app.core.time_utils import format_duration_ms as _format_duration_ms
 from app.services.testcase_postprocessor import postprocess_improved_testcase
 
 logger = logging.getLogger(__name__)
-
-# Rules that require external context and cannot be auto-resolved:
-# maps issue_title → field that must be non-empty to count as resolved
-_FIELD_REQUIRED_FOR_RESOLVED: dict[str, str] = {}
 
 _VERIFIABLE_RULE_FIELDS: dict[str, list[str]] = {
     "title": ["title"],
@@ -27,6 +23,10 @@ _VERIFIABLE_RULE_FIELDS: dict[str, list[str]] = {
     "test_data": ["steps"],
 }
 
+_ALL_TRACKED_FIELDS = {
+    "title", "description", "tags", "priority", "preconditions", "postconditions", "steps",
+}
+
 _LINKED_DOC_PLACEHOLDERS = (
     "см. связанные документы",
     "смотри связанные документы",
@@ -34,6 +34,8 @@ _LINKED_DOC_PLACEHOLDERS = (
     "см. ссылки",
     "linked documents",
     "related documents",
+    "see related documents",
+    "see links",
 )
 
 _CONTEXT_DEPENDENT_RULES = {
@@ -42,8 +44,8 @@ _CONTEXT_DEPENDENT_RULES = {
 }
 
 _CONTEXT_DEPENDENT_TITLES = {
-    "Тестовые данные",
-    "Воспроизводимость",
+    "Test data",
+    "Reproducibility",
 }
 
 
@@ -85,6 +87,36 @@ def _issue_rule(issue: dict | None) -> str | None:
     return str(value) if value else None
 
 
+def _fields_touched_by_rules(selected_issues: list[dict]) -> set[str]:
+    """Fields the LLM is allowed to change, derived from selected issues' rules.
+
+    An issue without a recognizable rule can't be mapped to a field, so it
+    falls back to trusting the LLM on every field rather than risk reverting
+    a fix it doesn't have rule metadata for.
+    """
+    fields: set[str] = set()
+    for issue in selected_issues:
+        rule = _issue_rule(issue)
+        if rule is None:
+            return set(_ALL_TRACKED_FIELDS)
+        fields.update(_VERIFIABLE_RULE_FIELDS.get(rule, _ALL_TRACKED_FIELDS))
+    return fields
+
+
+def _restore_untouched_fields(improved: dict, original: dict, selected_issues: list[dict]) -> dict:
+    """Revert fields the LLM had no selected issue for back to the original text.
+
+    The LLM regenerates the whole test case on every call, which lets it
+    quietly reword or corrupt fields nobody asked it to touch (e.g. dropping
+    a character in a precondition while "fixing" an unrelated steps issue).
+    """
+    touched = _fields_touched_by_rules(selected_issues)
+    restored = dict(improved)
+    for field in _ALL_TRACKED_FIELDS - touched:
+        restored[field] = original.get(field)
+    return restored
+
+
 def _validate_resolutions(
     resolutions: list[IssueResolution],
     improved: dict,
@@ -95,29 +127,22 @@ def _validate_resolutions(
     has_bad_linked_docs_placeholder = _uses_linked_docs_without_links(improved, original)
     for r in resolutions:
         if r.status == "resolved":
-            required_field = _FIELD_REQUIRED_FOR_RESOLVED.get(r.issue_title)
-            if required_field and not improved.get(required_field):
+            issue = selected_issues[r.issue_index] if 0 <= r.issue_index < len(selected_issues) else None
+            issue_rule = _issue_rule(issue)
+            is_context_dependent = (
+                issue_rule in _CONTEXT_DEPENDENT_RULES
+                or r.issue_title in _CONTEXT_DEPENDENT_TITLES
+            )
+            if has_bad_linked_docs_placeholder and is_context_dependent:
                 r = r.model_copy(update={
                     "status": "manual_needed",
-                    "reason": f"Поле '{required_field}' осталось пустым — исправление требует ручного добавления",
+                    "reason": "Improvement references linked documents, but links is empty — a real data source is needed",
                 })
-            else:
-                issue = selected_issues[r.issue_index] if 0 <= r.issue_index < len(selected_issues) else None
-                issue_rule = _issue_rule(issue)
-                is_context_dependent = (
-                    issue_rule in _CONTEXT_DEPENDENT_RULES
-                    or r.issue_title in _CONTEXT_DEPENDENT_TITLES
-                )
-                if has_bad_linked_docs_placeholder and is_context_dependent:
-                    r = r.model_copy(update={
-                        "status": "manual_needed",
-                        "reason": "Улучшение ссылается на связанные документы, но links пустой — нужен реальный источник данных",
-                    })
-                elif not _rule_field_changed(issue_rule, original, improved):
-                    r = r.model_copy(update={
-                        "status": "skipped",
-                        "reason": "Поле не изменилось — улучшение не применено",
-                    })
+            elif not _rule_field_changed(issue_rule, original, improved):
+                r = r.model_copy(update={
+                    "status": "skipped",
+                    "reason": "Field unchanged — improvement not applied",
+                })
         result.append(r)
     return result
 
@@ -142,6 +167,7 @@ def improve_testcase(
     )
 
     improved_raw = llm_result.improved_testcase.model_dump()
+    improved_raw = _restore_untouched_fields(improved_raw, clean_dict, selected_issues)
     processed = postprocess_improved_testcase(clean_dict, improved_raw)
     validation_warnings: list[str] = processed.pop("validation_warnings", [])
     _proc_notes = processed.pop("improvement_notes", None)
@@ -149,6 +175,24 @@ def improve_testcase(
     _proc_manual = processed.pop("manual_notes", None)
     manual_notes = _proc_manual if _proc_manual else llm_result.manual_notes
     processed.pop("warnings", None)
+    has_invented_data = processed.pop("has_invented_data", False)
+    if has_invented_data:
+        manual_notes = list(manual_notes) + [
+            "The LLM wrote test data (email/password/token) not present in the source test case — "
+            "verify or replace it with a real value before using this test case."
+        ]
+    has_stripped_placeholder = processed.pop("has_stripped_placeholder", False)
+    if has_stripped_placeholder:
+        manual_notes = list(manual_notes) + [
+            "Test data is missing for at least one step and no real value could be determined — "
+            "state it manually rather than leaving a stand-in value."
+        ]
+    has_missing_param_tokens = processed.pop("has_missing_param_tokens", False)
+    if has_missing_param_tokens:
+        manual_notes = list(manual_notes) + [
+            "A TestIT parameter reference (%param%) from the source test case appears to be "
+            "missing or altered — check the diff and restore it if needed."
+        ]
 
     issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues)
     issue_resolutions = _validate_resolutions(issue_resolutions, processed, clean_dict, selected_issues)
@@ -156,6 +200,9 @@ def improve_testcase(
     has_manual_needed = (
         any(r.status == "manual_needed" for r in issue_resolutions)
         or bool(manual_notes)
+        or has_invented_data
+        or has_stripped_placeholder
+        or has_missing_param_tokens
     )
     if has_manual_needed:
         processed["status"] = "NeedsWork"

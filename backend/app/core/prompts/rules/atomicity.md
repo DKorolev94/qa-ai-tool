@@ -1,36 +1,36 @@
-## Атомарность (Atomicity)
+## Atomicity
 
-Один тест-кейс = одна основная цель проверки.
+One test case = one main verification goal.
 
-Флажь `high`, если:
-- в одном кейсе проверяются несколько независимых сценариев. Пример: логин + смена пароля + оплата. Это три разных кейса.
-- кейс имеет несколько независимых expected results.
-- по результату падения непонятно, какая именно функциональность сломалась.
+Flag `high` if:
+- a single case checks several independent scenarios. Example: login + password change + payment. That's three different cases.
+- the case has several independent expected results.
+- it's unclear from a failure which functionality actually broke.
 
-Флажь `medium`, если кейс содержит несколько близких проверок, но всё ещё понятен и выполним.
+Flag `medium` if the case contains several closely related checks, but is still clear and executable.
 
-Не флажь, если:
-- шаги ведут к одной финальной проверке. Много шагов не означает много целей.
-- это E2E-сценарий с одной основной целью.
-- шаги являются setup, навигацией, подготовкой данных или cleanup.
-- дополнительные проверки подтверждают тот же основной результат.
-- заполнение полей формы, нажатие "Продолжить" и переход на следующий экран/шаг
-  являются одним пользовательским потоком. Например: заполнить анкету →
-  перейти на экран подтверждения SMS. Это не две независимые цели, если SMS-шаг
-  является продолжением той же заявки/анкеты.
-- expected results у промежуточных шагов описывают состояние после действия
-  ("поле заполнено", "открылась форма") и не вводят самостоятельную бизнес-проверку.
+Don't flag if:
+- the steps lead to one final check. Many steps doesn't mean many goals.
+- it's an E2E scenario with one main goal.
+- the steps are setup, navigation, data preparation, or cleanup.
+- additional checks confirm the same main result.
+- filling in form fields, clicking "Continue", and moving to the next screen/step
+  are one user flow. Example: filling out a questionnaire →
+  moving to the SMS confirmation screen. This isn't two independent goals if the
+  SMS step is a continuation of the same application/questionnaire.
+- the expected results of intermediate steps describe the state after an action
+  ("field is filled", "the form opened") and don't introduce an independent business check.
 
-Оценивай количество независимых целей, не количество шагов.
+Judge by the number of independent goals, not the number of steps.
 
-## Как исправлять
+## How to fix
 
-Если issue действительно описывает несколько независимых бизнес-сценариев,
-разделить один тест-кейс на несколько нельзя автоматически. Пометь
-`manual_needed`: «Разбить на отдельные кейсы: [сценарий 1], [сценарий 2].
-Каждый кейс — одна независимая цель проверки.»
+If the issue genuinely describes several independent business scenarios,
+splitting one test case into several can't be done automatically. Mark it
+`manual_needed`: "Split into separate cases: [scenario 1], [scenario 2].
+Each case — one independent verification goal."
 
-Если issue оказался ложноположительным: шаги являются setup/навигацией/
-продолжением одного E2E-потока, а независимых целей нет — не меняй тест-кейс
-только ради атомарности. Пометь issue как `resolved` и в `reason` укажи:
-«Нарушения атомарности нет: шаги ведут к одной основной цели.»
+If the issue turns out to be a false positive: the steps are setup/navigation/
+a continuation of one E2E flow, and there are no independent goals — don't change the test case
+just for the sake of atomicity. Mark the issue as `resolved` and in `reason` state:
+"No atomicity violation: the steps lead to one main goal."

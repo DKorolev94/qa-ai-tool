@@ -1,5 +1,5 @@
 import pytest
-from app.parsing.testit_workitem_mapper import normalize_testit_workitem, map_step
+from app.tms.testit.workitem_mapper import normalize_testit_workitem, map_step
 
 
 def _basic_workitem():
@@ -194,3 +194,31 @@ def test_html_cleaned_from_step_action():
     assert "Click" in result.action
     assert "<p>" not in result.expected
     assert "Modal opens" in result.expected
+
+
+def _nest_shared_step(depth: int) -> dict:
+    """Build a chain of shared steps (step.workItem.steps) `depth` levels deep."""
+    step = {"action": f"Leaf action at depth {depth}", "expected": "Done"}
+    for level in range(depth, 0, -1):
+        step = {
+            "action": f"Shared step wrapper {level}",
+            "workItem": {"steps": [step]},
+        }
+    return step
+
+
+def test_moderately_nested_shared_steps_fully_expanded():
+    wi = _basic_workitem()
+    wi["steps"] = [_nest_shared_step(5)]
+    result = normalize_testit_workitem(wi)
+    assert len(result.steps) == 1
+    assert result.steps[0].action == "Leaf action at depth 5"
+    assert not any("deeply nested" in w for w in result.warnings)
+
+
+def test_deeply_nested_shared_steps_warns_instead_of_silently_dropping():
+    wi = _basic_workitem()
+    wi["steps"] = [_nest_shared_step(15)]
+    result = normalize_testit_workitem(wi)
+    assert result.steps == []
+    assert any("deeply nested" in w for w in result.warnings)

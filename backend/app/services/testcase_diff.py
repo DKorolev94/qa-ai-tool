@@ -68,7 +68,7 @@ def build_testcase_diff(original: dict, improved: dict) -> dict:
         original.get("preconditions") or [],
         improved.get("preconditions") or [],
         "preconditions",
-        ["action", "expected"],
+        ["action", "expected", "test_data", "comments"],
         changes,
     )
 
@@ -76,7 +76,7 @@ def build_testcase_diff(original: dict, improved: dict) -> dict:
         original.get("postconditions") or [],
         improved.get("postconditions") or [],
         "postconditions",
-        ["action", "expected"],
+        ["action", "expected", "test_data", "comments"],
         changes,
     )
 

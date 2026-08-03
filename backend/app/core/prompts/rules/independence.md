@@ -1,20 +1,20 @@
-## Независимость (Independence)
+## Independence
 
-Тест-кейс должен выполняться в любом порядке. Он не должен зависеть от других тест-кейсов.
+A test case must run in any order. It must not depend on other test cases.
 
-Флажь `high`, если:
-- preconditions требуют прохождения другого тест-кейса. Пример: `REG-001 должен быть пройден`.
-- steps продолжают сценарий из другого кейса без явной подготовки данных.
-- кейс требует состояние, которое создаётся только другим тестом.
-- результат зависит от порядка выполнения набора тестов.
+Flag `high` if:
+- preconditions require another test case to have been run. Example: `REG-001 must have passed`.
+- the steps continue a scenario from another case without explicit data preparation.
+- the case requires a state that's only created by another test.
+- the result depends on the order in which the test suite runs.
 
-Флажь `medium`, если непонятно, как подготовить пользователя, данные или окружение без запуска другого кейса.
+Flag `medium` if it's unclear how to prepare the user, data, or environment without running another case.
 
-Не флажь, если:
-- нужное состояние явно описано в preconditions.
-- данные можно подготовить через UI, API, DB, fixture или тестовый аккаунт.
-- кейс использует общие тестовые данные, не зависящие от результата другого кейса.
+Don't flag if:
+- the required state is explicitly described in preconditions.
+- the data can be prepared via UI, API, DB, a fixture, or a test account.
+- the case uses shared test data that doesn't depend on the result of another case.
 
-## Как исправлять
+## How to fix
 
-Замени ссылку на другой тест-кейс описанием конкретного состояния системы. Перенеси нужное состояние в preconditions или test_data. Если нельзя определить состояние без знания других тест-кейсов → `manual_needed`: «Опиши, в каком состоянии должна быть система перед этим тестом, без ссылки на другой тест-кейс.»
+Replace the reference to another test case with a description of a concrete system state. Move the required state into preconditions or test_data. If the state can't be determined without knowledge of other test cases → `manual_needed`: "Describe what state the system must be in before this test, without referencing another test case."

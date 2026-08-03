@@ -77,14 +77,6 @@ export const api = {
 
 }
 
-export function parseManualInput(raw: string): { work_item?: unknown; raw_content?: string } {
-  try {
-    return { work_item: JSON.parse(raw) }
-  } catch {
-    return { raw_content: raw }
-  }
-}
-
 export function humanizeFetchError(msg: string): string {
   const m = msg.toLowerCase()
   if (m.includes('401') || m.includes('403'))
@@ -94,7 +86,7 @@ export function humanizeFetchError(msg: string): string {
   if (m.includes('503') || m.includes('unavailable') || m.includes('configured'))
     return 'TestIT unavailable or TESTIT_BASE_URL/TOKEN not configured in .env'
   if (m.includes('could not extract'))
-    return 'Invalid input. Use a numeric ID, e.g.: 6109'
+    return 'Invalid input. Use a numeric ID (e.g. 6109) or paste a TestIT test case URL'
   return msg
 }
 

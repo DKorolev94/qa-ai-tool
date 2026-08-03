@@ -116,7 +116,7 @@ def test_improve_fallback_when_llm_unavailable():
     assert any("unavailable" in w.lower() for w in result.warnings)
 
 
-def test_improve_marks_linked_docs_placeholder_manual_when_links_are_empty():
+def test_improve_strips_placeholder_and_marks_case_needs_work():
     llm_result = ImproveResult(
         improved_testcase=AnalyzedTestCase(
             title="SMS confirmation",
@@ -124,7 +124,7 @@ def test_improve_marks_linked_docs_placeholder_manual_when_links_are_empty():
                 AnalysisStep(
                     action="Ввести код из SMS в поле ввода",
                     expected="Отображается форма ввода кода из SMS",
-                    test_data="<код из SMS — см. связанные документы>",
+                    test_data="[код из SMS — см. связанные документы]",
                 ),
             ],
         ),
@@ -150,6 +150,6 @@ def test_improve_marks_linked_docs_placeholder_manual_when_links_are_empty():
     with patch("app.services.testcase_improver.improve_testcase_with_llm", return_value=llm_result):
         result = improve_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, selected_issues=issues)
 
-    assert result.issue_resolutions[0].status == "manual_needed"
-    assert "links пустой" in (result.issue_resolutions[0].reason or "")
+    assert result.improved_testcase.steps[0].test_data is None
     assert result.improved_testcase.status == "NeedsWork"
+    assert any("stand-in value" in n for n in result.manual_notes)

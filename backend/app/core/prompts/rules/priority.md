@@ -1,14 +1,14 @@
-## Приоритет (Priority)
+## Priority
 
-Флажь `medium`, если priority явно не соответствует важности сценария.
+Flag `medium` if the priority clearly doesn't match the importance of the scenario.
 
-Ориентиры:
-- `high`: авторизация, оплата, безопасность, создание ключевых объектов
-- `medium` / `high`: основной бизнес-флоу
-- `low` / `medium`: вспомогательный функционал, UI-детали, тексты
+Guidelines:
+- `high`: authentication, payment, security, creation of key objects
+- `medium` / `high`: main business flow
+- `low` / `medium`: auxiliary functionality, UI details, text content
 
-Не флажь, если priority спорная, но не явно ошибочная.
+Don't flag if the priority is debatable but not clearly wrong.
 
-## Как исправлять
+## How to fix
 
-Измени значение на основе критичности сценария: авторизация/оплата/безопасность → `high`, основной флоу → `medium`, UI-детали → `low`.
+Change the value based on the criticality of the scenario: authentication/payment/security → `high`, main flow → `medium`, UI details → `low`.

@@ -1,8 +1,9 @@
 from __future__ import annotations
 import logging
+import re
 from app.core.llm_client import analyze_testcase_with_llm
-from app.parsing.testit_parser import parse_testit_content
-from app.parsing.testit_workitem_mapper import normalize_testit_workitem
+from app.tms.testit.parser import parse_testit_content
+from app.tms.testit.workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import (
     AnalysisStep,
     AnalyzedTestCase,
@@ -66,10 +67,67 @@ def _complete_resolutions(
                 issue_index=idx,
                 issue_title=str(issues[idx].get("title", "") if isinstance(issues[idx], dict) else ""),
                 status="skipped",
-                reason="Не обработано LLM",
+                reason="Not processed by LLM",
             ))
     result.sort(key=lambda r: r.issue_index)
     return result
+
+
+_TEST_DATA_MENTION_RE = re.compile(r"test_data|test data|тестов(?:ые|ых) данн", re.IGNORECASE)
+
+
+def _dedupe_test_data_crossover(issues: list) -> list:
+    """The LLM sometimes raises a preconditions/steps issue for the exact same
+    missing test_data already covered by a dedicated test_data issue, despite
+    the "one cause = one issue" rule — sometimes spelled out as the literal
+    `test_data` field name, sometimes paraphrased ("тестовые данные"). Drop the
+    crossover duplicate — a legitimate preconditions/steps issue has no reason
+    to talk about test data at all."""
+    if not any(i.rule == "test_data" for i in issues):
+        return issues
+    return [
+        i for i in issues
+        if not (i.rule in ("preconditions", "steps") and _TEST_DATA_MENTION_RE.search(i.description))
+    ]
+
+
+_CLICK_ACTION_RE = re.compile(
+    r'^\s*(?:нажать|нажми|нажатие|кликнуть|клик|click|tap|press|открыть|open|'
+    r'перейти|go to|navigate|выбрать пункт|select the)\b',
+    re.IGNORECASE,
+)
+_DATA_ENTRY_WORD_RE = re.compile(
+    r'ввести|ввод|заполнить|указать|введите|enter|input\b|type\b|fill|upload|attach|'
+    r'прикрепить|загрузить',
+    re.IGNORECASE,
+)
+
+
+def _is_pure_click_step(action: str) -> bool:
+    return bool(_CLICK_ACTION_RE.search(action)) and not _DATA_ENTRY_WORD_RE.search(action)
+
+
+def _dedupe_false_positive_test_data_on_click_steps(issues: list, testcase: dict) -> list:
+    """test_data.md explicitly says click/navigation steps don't need test
+    data, but the LLM sometimes flags them anyway. Drop a `test_data` issue
+    if its description quotes a step whose action is a pure click/navigation
+    with no data-entry wording — the rule the prompt already states, enforced
+    deterministically since the model doesn't reliably follow it."""
+    click_actions = [
+        str(step.get("action"))
+        for section in ("preconditions", "steps", "postconditions")
+        for step in (testcase.get(section) or [])
+        if isinstance(step, dict) and step.get("action") and _is_pure_click_step(str(step["action"]))
+    ]
+    if not click_actions:
+        return issues
+    return [
+        i for i in issues
+        if not (
+            i.rule == "test_data"
+            and any(action.lower() in i.description.lower() for action in click_actions)
+        )
+    ]
 
 
 def analyze_raw_testcase(
@@ -94,9 +152,12 @@ def analyze_raw_testcase(
     parse_warnings = normalized.warnings or []
     all_warnings = list(dict.fromkeys(parse_warnings + llm_result.warnings))
 
+    issues = _dedupe_test_data_crossover(llm_result.issues)
+    issues = _dedupe_false_positive_test_data_on_click_steps(issues, clean_dict)
+
     return AnalyzeTestCaseResponse(
         summary=llm_result.summary,
-        issues=llm_result.issues,
+        issues=issues,
         original_normalized_testcase=clean_dict,
         warnings=all_warnings,
     )

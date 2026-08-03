@@ -113,7 +113,7 @@ def test_step_without_expected_warns_only_if_original_had_expected():
     improved = _base_improved(steps=[{"action": "Click button", "expected": None}])
     result = postprocess_improved_testcase(original, improved)
     assert result["steps"][0]["expected"] == "Button is clicked"
-    assert any("ожидаемый результат" in w for w in result["validation_warnings"])
+    assert any("expected result" in w for w in result["validation_warnings"])
 
 
 def test_step_without_expected_no_warning_if_original_also_missing():
@@ -138,13 +138,13 @@ def test_no_expected_warning_when_steps_restructured():
 def test_empty_steps_adds_validation_warning():
     improved = _base_improved(steps=[])
     result = postprocess_improved_testcase({}, improved)
-    assert any("шагов" in w.lower() for w in result["validation_warnings"])
+    assert any("no steps" in w.lower() for w in result["validation_warnings"])
 
 
 def test_step_without_action_adds_validation_warning():
     improved = _base_improved(steps=[{"action": "", "expected": "Something"}])
     result = postprocess_improved_testcase({}, improved)
-    assert any("действие" in w.lower() for w in result["validation_warnings"])
+    assert any("missing action" in w.lower() for w in result["validation_warnings"])
 
 
 def test_literal_value_stripped_from_action_when_duplicated_in_test_data():
@@ -187,3 +187,188 @@ def test_dangling_empty_quotes_after_llm_removed_value_itself():
     ])
     result = postprocess_improved_testcase({}, improved)
     assert result["steps"][0]["action"] == 'Заполнить поле "Фамилия"'
+
+
+def test_inline_placeholder_stripped_from_action_not_moved_to_test_data():
+    improved = _base_improved(steps=[
+        {"action": "Enter email [email — test accounts], click Submit", "expected": "OK", "test_data": None}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+    assert "[" not in result["steps"][0]["action"]
+    assert result["steps"][0]["action"] == "Enter email, click Submit"
+    assert result["has_stripped_placeholder"] is True
+
+
+def test_inline_placeholder_with_backticks_stripped():
+    improved = _base_improved(steps=[
+        {"action": "Enter email `[email — test accounts]` in the field", "expected": "OK", "test_data": None}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+    assert "[" not in result["steps"][0]["action"]
+
+
+def test_placeholder_in_test_data_stripped_even_when_already_set():
+    improved = _base_improved(steps=[
+        {"action": "Enter email", "expected": "OK", "test_data": "[email — test accounts]"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+    assert result["has_stripped_placeholder"] is True
+
+
+def test_real_value_in_test_data_not_stripped():
+    improved = _base_improved(steps=[
+        {"action": "Enter email", "expected": "OK", "test_data": "existing@value.com"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] == "existing@value.com"
+    assert result["has_stripped_placeholder"] is False
+
+
+def test_empty_code_span_cleaned_up():
+    improved = _base_improved(steps=[
+        {"action": "Enter email ``, click Submit", "expected": "OK", "test_data": "test@example.com"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert "`" not in result["steps"][0]["action"]
+    assert result["steps"][0]["action"] == "Enter email, click Submit"
+
+
+def test_invented_email_flagged_and_status_downgraded():
+    original = {
+        "title": "Login test",
+        "steps": [{"action": "Log in", "expected": "OK"}],
+        "preconditions": [], "postconditions": [],
+    }
+    improved = _base_improved(
+        status="Ready",
+        preconditions=[
+            {"action": "Confirmed account with email `test@example.com`", "expected": None, "test_data": None}
+        ],
+    )
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_invented_data"] is True
+    assert any("test@example.com" in w for w in result["validation_warnings"])
+
+
+def test_data_carried_over_from_source_not_flagged_as_invented():
+    original = {
+        "title": "Login test",
+        "steps": [{"action": "Enter password `NewTest12345` in both fields", "expected": "OK"}],
+        "preconditions": [], "postconditions": [],
+    }
+    improved = _base_improved(steps=[
+        {"action": "Enter password `NewTest12345` in both fields", "expected": "OK", "test_data": None}
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_invented_data"] is False
+    assert result["validation_warnings"] == []
+
+
+def test_invented_json_token_flagged():
+    original = {
+        "title": "Get profile",
+        "preconditions": [{"action": "User is authenticated (valid token)", "expected": None, "test_data": None}],
+        "steps": [], "postconditions": [],
+    }
+    improved = _base_improved(preconditions=[
+        {"action": "User is authenticated", "expected": None,
+         "test_data": '{"token": "valid_token_example"}', "comments": None}
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_invented_data"] is True
+    assert any("valid_token_example" in w for w in result["validation_warnings"])
+
+
+def test_json_value_carried_over_from_source_not_flagged():
+    original = {
+        "title": "Update profile",
+        "steps": [{"action": "POST", "expected": "200 OK",
+                   "test_data": '{"nickname": "john_doe123"}'}],
+        "preconditions": [], "postconditions": [],
+    }
+    improved = _base_improved(steps=[
+        {"action": "POST", "expected": "200 OK",
+         "test_data": '{"nickname": "john_doe123"}', "comments": None}
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_invented_data"] is False
+
+
+def test_invented_synthetic_json_value_flagged_regardless_of_key():
+    original = {
+        "title": "Add card",
+        "steps": [{"action": "POST", "expected": "200 OK",
+                   "test_data": '{"card_number": "4111111111111111"}'}],
+        "preconditions": [], "postconditions": [],
+    }
+    improved = _base_improved(steps=[
+        {"action": "POST", "expected": "200 OK",
+         "test_data": '{"card_number": "dummy_card_example"}', "comments": None}
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_invented_data"] is True
+    assert any("dummy_card_example" in w for w in result["validation_warnings"])
+
+
+def test_testit_param_token_preserved_not_flagged():
+    original = {
+        "title": "Login",
+        "steps": [{"action": "Enter email %email%, click Submit", "expected": "OK"}],
+        "preconditions": [], "postconditions": [],
+    }
+    improved = _base_improved(steps=[
+        {"action": "Enter email %email%, click Submit", "expected": "OK", "test_data": None}
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_missing_param_tokens"] is False
+    assert result["validation_warnings"] == []
+
+
+def test_testit_param_token_mangled_by_llm_flagged():
+    original = {
+        "title": "Login",
+        "steps": [{"action": "Enter email %email%, click Submit", "expected": "OK"}],
+        "preconditions": [], "postconditions": [],
+    }
+    improved = _base_improved(steps=[
+        {"action": "Enter email test@example.com, click Submit", "expected": "OK", "test_data": None}
+    ])
+    result = postprocess_improved_testcase(original, improved)
+    assert result["has_missing_param_tokens"] is True
+    assert any("%email%" in w for w in result["validation_warnings"])
+
+
+def test_ui_element_placeholder_stripped_from_click_step():
+    improved = _base_improved(steps=[
+        {"action": "Click the Log in button", "expected": "Login form opens", "test_data": "[button — test accounts]"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+
+
+def test_ui_element_placeholder_stripped_russian():
+    improved = _base_improved(steps=[
+        {"action": "Нажать кнопку Войти", "expected": "OK", "test_data": "[кнопка — тестовые учётки]"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+
+
+def test_bare_ui_element_value_stripped_without_brackets():
+    improved = _base_improved(steps=[
+        {"action": "Нажать кнопку Войти вверху страницы", "expected": "OK", "test_data": "Кнопка Войти"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+    assert result["has_stripped_placeholder"] is True
+
+
+def test_bare_ui_element_value_stripped_english():
+    improved = _base_improved(steps=[
+        {"action": "Click the Log in button", "expected": "OK", "test_data": "Log in button"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None

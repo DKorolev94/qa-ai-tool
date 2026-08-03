@@ -1,75 +1,64 @@
-## Тестовые данные (Test Data)
+## Test Data
 
-В поле `test_data` должно быть всё, что тестировщик вводит, выбирает или передаёт в запросе: email, пароль, ID, сумма, телефон, роль, дата, имя файла, payload, query params.
+The `test_data` field must contain everything the tester enters, selects, or passes in a request: email, password, ID, amount, phone, role, date, file name, payload, query params.
 
-В `test_data` также должны быть URL страниц и API endpoint'ы, если они конкретны. URL зависит от среды (dev/staging/prod) и не должен быть вписан в текст action.
+`test_data` must also contain page URLs and API endpoints, if they're concrete. A URL depends on the environment (dev/staging/prod) and must not be embedded in the action text.
 
-Цель: тестировщик, не знакомый с проектом, должен понять — ЧТО вводить и ОТКУДА взять данные. Без этого он теряет время на поиск людей, которые объяснят.
+Goal: a tester unfamiliar with the project must understand WHAT to enter. Without this, they waste time tracking down someone who can explain.
 
-Перед тем как флажить `high` из-за пустого `test_data`, проверь: данные физически присутствуют где-то ещё (в тексте `action`, в `comments`, в `preconditions`)? Если да — данные НЕ отсутствуют, они просто не в том поле. Это не «невозможно выполнить», а «данные не там, где положено» — флажь `medium` по правилу ниже, не `high`. `High` за пустой `test_data` — только когда данных нет вообще нигде в тест-кейсе.
+Before flagging `high` for an empty `test_data`, check: is the data physically present somewhere else (in the `action` text, in `comments`, in `preconditions`)? If so, the data isn't missing — it's just in the wrong field. That's not "can't be executed", it's "data isn't where it belongs" — flag `medium` per the rule below, not `high`. `high` for an empty `test_data` applies only when the data isn't anywhere in the test case at all.
 
-Флажь `high`, если:
-- данные обязательны для выполнения шага, `test_data` пустой, данных нет ни в `action`, ни в `comments`, ни в `preconditions`, И в поле `links` нет ссылок на документацию или требования. Тестировщику неоткуда взять данные.
-- в `test_data` стоит bare placeholder без источника и без формата. Примеры: `<email>`, `<password>`, `<token>`, `<id>`. Тестировщик не знает ни что именно ввести, ни откуда взять. Это равносильно отсутствию данных.
+Flag `high` if:
+- the data is required to execute the step, `test_data` is empty, and there's no data in `action`, `comments`, or `preconditions` either. The tester has nowhere to get the data from.
+- `test_data` contains a stand-in for a real value instead of one — a bare data-type label, a "TODO"-style note, a question mark. Examples: "email?", "TODO: password", "заполнить самому". The tester still doesn't know what to enter. This is equivalent to missing data.
 
-Флажь `medium` (вместо high), если:
-- данные обязательны для шага, `test_data` пустой, НО в поле `links` есть ссылки на документацию или требования. Данные могут быть в связанных документах. Укажи в recommendation: "Проверь связанные документы — там могут быть тестовые учётки или данные."
+Whether embedding data in the action text is worth flagging — and at what severity — depends on WHY it should move, not just on whether it's a literal value. Check these, in order:
 
-Флажь `medium`, если:
-- данные указаны расплывчато. Примеры: `валидный email`, `существующий пользователь`, `тестовый файл`. Неясно, какое конкретное значение использовать.
-- конкретные данные или примеры вписаны в текст action вместо поля test_data, а поле test_data пустое. Это касается: конкретных значений (`Иванов`, `+79032532525`), примеров с маркером (`например: Иванов`, `пример: test@mail.com`), URL (`https://example.com`). Тестировщик должен брать данные из test_data, а не искать их внутри текста action. URL в action — это всегда проблема: URL зависит от среды (dev/staging/prod) и должен быть в test_data, чтобы тестировщик мог менять среду без редактирования шагов. Примеры плохо: action = `Открыть https://dev.example.com/login`, action = `Ввести фамилию, например: Иванов`. Правильно: test_data = `https://dev.example.com/login`, action = `Открыть страницу входа`; test_data = `например: Иванов`, action = `Ввести фамилию`. Флажь независимо от того, пустой ли test_data — данные или URL в action-тексте всегда нарушение.
-- данные в action, test_data, preconditions и expected result противоречат друг другу.
-- в тексте action остался встроенный пример (`например: X`, `пример: Y`) при том, что в test_data уже стоит placeholder. Это противоречие: непонятно, использовать встроенный пример или данные из источника, указанного в placeholder.
+Flag `medium` if:
+- the data is stated vaguely. Examples: `a valid email`, `an existing user`, `a test file`. It's unclear which concrete value to use.
+- a URL, hostname, or API endpoint is embedded in the action text. Always flag this regardless of test_data being empty or not — a URL depends on the environment (dev/staging/prod), and keeping it in `action` forces editing every step's text to switch environments. Bad: action = `Open https://dev.example.com/login`. Correct: test_data = `https://dev.example.com/login`, action = `Open the login page`.
+- the same concrete value or example is repeated across the action text of two or more steps instead of being defined once in test_data. Duplication across steps is what test_data exists to avoid — if the value changes, every occurrence in every action would need editing.
+- the data in action, test_data, preconditions, and the expected result contradict each other.
+- an inline example (`example: X`) is left in the action text while test_data already has a value. That's a contradiction: it's unclear which one to use.
 
-Флажь `low`, если:
-- плейсхолдер указывает тип данных, но не указывает где их взять. Примеры: `<email — тестовые учётки>`, `<пароль — тестовые учётки>`. Понятно что искать, но не где.
+Flag `low` if:
+- a concrete value or example (not a URL) appears in the action text of exactly one step, isn't reused anywhere else in the case, and test_data for that step is empty. Example: action = `Enter the last name, e.g.: Smith`. This is a consistency/style nit, not something that blocks execution — the tester can still read and run the step. Don't flag it `medium`; a one-off value with no reuse and no environment dependency doesn't justify more than `low`.
 
-Не флажь, если:
-- данные конкретны: `test@example.com`, `+7 (999) 999-99-99`, `user_id: 12345`.
-- плейсхолдер содержит источник или ссылку. Примеры: `<email — документация проекта>`, `<токен — менеджер паролей>`, `<файл — тестовые данные /files/sample.jpg>`.
-- данные описаны в preconditions. Дублировать в test_data не нужно.
-- значение является названием UI-элемента, текстом кнопки или ожидаемым сообщением. Это не тестовые данные.
-- URL уже вынесен в test_data, а action содержит только описание без URL.
-- шаг описывает UI-взаимодействие без ввода данных: нажать кнопку, кликнуть по элементу, выбрать пункт меню, перейти по навигации. Для таких шагов `test_data` пустой — это норма. Примеры: `Нажать кнопку Войти`, `Кликнуть по иконке профиля`, `Открыть меню`. Не флажь отсутствие test_data у click/tap-шагов.
-- поле `test_data` (не action) содержит маркер `например:` с конкретным значением или форматом: `например: test@mail.com`, `например: +79991234567`, `например: Иванов`. Это корректный формат для генерации значения агентом — не флажь. Если тот же маркер `например:` стоит в тексте action, а test_data пустой — это нарушение, флажь `medium`.
+Don't flag if:
+- the data is concrete: `test@example.com`, `+1 (202) 555-0123`, `user_id: 12345`.
+- `test_data` names a real, retrievable source, in whatever wording the test case's author used — "test accounts", "see the password manager", "issued via API in preconditions". A human-authored pointer to a real source is fine; this rule only requires *some* usable answer to "what do I enter", not necessarily a literal value.
+- the data is described in preconditions. No need to duplicate it in test_data.
+- the value is the name of a UI element, button text, or an expected message. That's not test data.
+- the URL is already moved into test_data, and the action contains only a description with no URL.
+- the step describes a UI interaction with no data entry: click a button, click an element, select a menu item, navigate. For such steps, an empty `test_data` is normal. Examples: `Click the Log in button`, `Click the profile icon`, `Open the menu`. Don't flag the absence of test_data for click/tap steps.
+- the `test_data` field (not action) contains an `example:` marker with a concrete value or format: `example: test@mail.com`, `example: +12025550123`, `example: Smith`. This is a valid format for the agent to generate a value — don't flag it. If the same marker is in the action text while test_data is empty — flag it per the severity rules above (medium if it's a URL or reused across steps, low otherwise).
 
-В поле `recommendation` не предлагай конкретные значения данных (email, пароль, ID, токен). Пиши только тип и источник: «Указать email и пароль из тестовых учёток в поле test_data шага N».
+In the `recommendation` field, don't propose concrete data values (email, password, ID, token). State only the type and, if you can infer one from context, a source: "State an email and password from test accounts in the test_data field of step N."
 
-## Как исправлять
+## How to fix
 
-**ЗАПРЕЩЕНО**: вписывать любые конкретные значения данных — `test@mail.com`, `Password123`, `12345`, реальный ID, реальный токен. Данные не изобретай, даже если они выглядят очевидными.
+Before adding anything to `test_data`, check what the step's `action` actually does. If it's a pure UI interaction with no user-entered value — click a button, click an element, select a menu item, navigate — the step doesn't need test data at all, regardless of what the issue says. Mark the resolution `resolved` with `reason`: "Step is a UI interaction with no data entry — no test data needed", and leave `test_data` untouched.
 
-**Данные из поля `comments`:** Если в поле `comments` шага содержится конкретное значение без маркеров примера («например», «пример», «e.g.» и т.п.) — это точное тестовое значение, указанное автором шага. Перенеси его в `test_data` как есть, без добавления маркера `например:`. Расплывчатая формулировка в `action` («тестовое значение», «корректные данные» и т.п.) не делает конкретное значение из `comments` примером. После переноса обнови `action` так, чтобы он описывал действие без ссылки на конкретные данные (данные теперь в `test_data`).
+**FORBIDDEN**: writing in any concrete data values — `test@mail.com`, `Password123`, `12345`, a real ID, a real token. Don't invent data, even if it looks obvious.
 
-Если в тексте action есть данные — перенеси в `test_data` по следующим правилам:
+**Never write a placeholder or stand-in value either** — not `[email — test accounts]`, not `<email>`, not "TODO", not any other bracketed or quoted stand-in syntax. If the real value isn't in the source and you can't generate one per the rules below, the field stays exactly as it was (empty stays empty) and the issue is `manual_needed`. A placeholder gives the false impression the field is filled in; an empty field with a clear note does not.
 
-- **Конкретное значение** (без маркера «например», «пример», «пр.», «e.g.»): перенеси как есть. Применяется к любым типам данных — имени, email, телефону, паролю, ID, сумме и т.д. Пример: action = `Ввести email test@mail.com` → test_data = `test@mail.com`.
-- **Пример** (с маркером `например:`, `пример:`, `формат:`, `образец:`, `пр.:`, `e.g.`, `eg.`, `example:`, `тип:` или любым аналогом, а также описание типа «валидный X», «любой X», «корректный X»): перенеси в test_data с маркером `например:` — нормализуй к этому формату независимо от исходного написания. Всегда используй именно `например:`. Применяется к любым типам данных. Примеры: action = `Ввести email, например: test@mail.com` → test_data = `например: test@mail.com`; action = `Ввести телефон (формат: +7XXXXXXXXXX)` → test_data = `например: +79991234567`; action = `Ввести фамилию, образец: Иванов` → test_data = `например: Иванов`.
+**Data from the `comments` field:** If the step's `comments` field contains a concrete value with no example markers ("example", "e.g.", etc.) — it's an exact test value stated by the step's author. Move it into `test_data` as-is, without adding an `example:` marker. A vague wording in `action` ("a test value", "valid data", etc.) doesn't turn a concrete value from `comments` into an example. After moving it, update `action` so it describes the action without referencing concrete data (the data now lives in `test_data`).
 
-Если в action данные описаны как «валидный», «любой», «корректный», «случайный» — без конкретного значения и без явного формата в контексте (action, comments, preconditions, links), — разделяй по типу данных:
+If the action text has data, move it into `test_data` per these rules:
 
-- **Универсальный формат** (email, дата, время, обычное число, текст) — общепринятый стандарт, который невозможно перепутать: сгенерируй конкретный пример. Пример: `ввести валидный email` → test_data = `например: user@example.com`; `ввести корректную дату` → test_data = `например: 01.01.2000`.
-- **Формат зависит от бизнес-правил конкретной системы** (номер телефона: код страны, количество цифр, наличие +/8; ID, токен, артикул: длина, алфавит, префикс; любой формат, который в разных системах отличается) и в тест-кейсе нигде явно не указан — НЕ выдумывай формат. Это не «пример», а недостающая информация: пометь `manual_needed`: «Уточни формат <тип данных> для шага N — код страны/длину/допустимые символы.» Исключение делай ТОЛЬКО если формат написан текстом прямо в тест-кейсе: в action указан конкретный формат (`формат: +7XXXXXXXXXX`), или тот же тип данных уже используется в другом шаге/precondition/comments с явным примером значения. Домен сайта, язык интерфейса, название компании или другие косвенные признаки страны/системы НЕ считаются явным указанием формата — не угадывай по ним код страны или длину номера.
+- **A concrete value** (with no marker like "example", "e.g."): move it as-is. Applies to any data type — name, email, phone, password, ID, amount, etc. Example: action = `Enter the email test@mail.com` → test_data = `test@mail.com`.
+- **An example** (with a marker `example:`, `format:`, `e.g.`, `eg.`, or any equivalent, or a description of the type, "a valid X", "any X", "a correct X"): move it into test_data with the marker matching the source language, keyword only — normalize to this format regardless of the source wording. Use the word for "example" in the test case's own language, followed by a colon: `например:` for a Russian test case, `example:` for an English test case. Applies to any data type. Examples: action = `Enter an email, e.g.: test@mail.com` → test_data = `example: test@mail.com`; action = `Enter a phone number (format: +1XXXXXXXXXX)` → test_data = `example: +12025550123`; action = `Ввести фамилию, например: Иванов` → test_data = `например: Иванов`.
 
-**Важно**: маркер `например:` в test_data — это сигнал для автоматического агента, что нужно сгенерировать своё значение нужного формата, а не вводить текст буквально. Всегда используй именно `например:`, не другие формулировки.
+If the action describes the data as "valid", "any", "correct", "random" — with no concrete value and no explicit format in context (action, comments, preconditions, links) — split by data type:
 
-В обоих случаях удали данные из текста action — оставь только описание действия без значений и без маркеров. Запрещено оставлять и встроенный пример в action, и любое значение в test_data одновременно. URL из action переноси в test_data без изменений; action переформулируй без URL (например: `Открыть стартовую страницу`).
+- **Universal format** (email, date, time, plain number, plain text) — a widely accepted standard that can't be mistaken for anything else: generate a concrete example. Example: `enter a valid email` → test_data = `example: user@example.com`; `enter a valid date` → test_data = `example: 2000-01-01`.
+- **Format depends on the business rules of a specific system** (phone number: country code, digit count, +/leading-zero presence; ID, token, article number: length, alphabet, prefix; any format that differs between systems) and it's nowhere explicitly stated in the test case — don't invent the format, and don't write a placeholder for it. This is missing information: mark it `manual_needed`: "Clarify the format of <data type> for step N — country code/length/allowed characters." Make an exception ONLY if the format is stated in text directly in the test case: the action states a concrete format (`format: +1XXXXXXXXXX`), or the same data type is already used in another step/precondition/comments with an explicit example value. The site's domain, interface language, company name, or other indirect signals of country/system are NOT an explicit format statement — don't guess a country code or number length from them.
 
-**Важно про URL**: конкретный URL из исходника (реальный адрес, не описание) — это точное значение, а не пример. Переноси его в test_data БЕЗ маркера `например:`, даже если в action не было слова «конкретный» или похожего уточнения. Маркер `например:` для URL уместен только если в исходнике сам адрес не указан явно (например, `перейти на любую страницу каталога`). Неправильно: test_data = `например: https://krediska.ru/` — URL конкретный, маркер не нужен и вводит агента в заблуждение (он попытается сгенерировать другой адрес). Правильно: test_data = `https://krediska.ru/`.
+**Important**: the `example:` marker (in the case-appropriate language) in test_data is a signal to an automated agent that it needs to generate its own value of the right format, not enter the text literally. Always use exactly that marker word, not other wordings. It's the one case where you write something other than a literal value — everywhere else, either write the real value or leave the field alone.
 
-**Запрещено смешивать маркер и placeholder**: не пиши `например: <телефон>`, `например: <email>` и подобное — это одновременно и сигнал «сгенерируй пример», и голый placeholder без источника, агент не поймёт, что делать. Если нужен пример конкретного формата — пиши готовый пример: `например: +79991234567`, `например: test@mail.com`. Если значения взять неоткуда — используй только placeholder с источником и без маркера: `<телефон — тестовые учётки>`.
+In both cases, remove the data from the action text — leave only the description of the action, with no values and no markers. Never leave both an inline example in action and a value in test_data at the same time. Move a URL from action into test_data unchanged; reword the action without the URL (e.g.: `Open the landing page`).
 
-Если в action написано расплывчато («валидные данные», «тестовый пользователь») — значения в исходнике нет. Используй placeholder с источником:
-- `links` не пустой: `<email — см. связанные документы>`, `<пароль — см. связанные документы>`
-- `links` пустой: используй только известный из контекста источник, например
-  `<email — тестовые учётки>`, `<пароль — тестовые учётки>`. Если источник
-  неизвестен, пометь `manual_needed`; не пиши «см. связанные документы».
+**Important about URLs**: a concrete URL from the source (a real address, not a description) is an exact value, not an example. Move it into test_data WITHOUT the `example:` marker, even if the action didn't say "concrete" or a similar qualifier. The `example:` marker for a URL is appropriate only if the address itself isn't explicitly stated in the source (e.g., `go to any catalog page`). Wrong: test_data = `example: https://krediska.ru/` — the URL is concrete, the marker isn't needed and misleads the agent (it will try to generate a different address). Correct: test_data = `https://krediska.ru/`.
 
-Другие примеры: `<ID — создать через API>`, `<токен — менеджер паролей>`.
-
-Запрещено: голые плейсхолдеры `<email>`, `<password>` — без источника.
-
-Если удалось написать placeholder с реально существующим источником — issue
-считается решённым. Если источник неизвестен или в `links` нет ссылок, а
-данные предлагается искать в документах/требованиях → `manual_needed`:
-«Укажи тестовые данные для шага N: тип и источник.»
+If there's no data at all in the source and no way to generate a safe example (not a universal format, no explicit format given) → `manual_needed`: "State the test data for step N: <type>." Don't soften this into a placeholder — an empty field plus a clear manual_needed note is more honest than a stand-in value that looks filled in but isn't.

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from app.integrations.testit_client import TestItClient
-from app.parsing.testit_link_parser import extract_work_item_id
-from app.parsing.testit_workitem_mapper import normalize_testit_workitem
-from app.schemas.testit import FetchTestItWorkItemResponse
+from app.tms.testit.client import TestItClient
+from app.tms.testit.link_parser import extract_work_item_id
+from app.tms.testit.workitem_mapper import normalize_testit_workitem
+from app.tms.testit.schemas import FetchTestItWorkItemResponse
 
 
 async def fetch_and_normalize_work_item(input_value: str) -> FetchTestItWorkItemResponse:

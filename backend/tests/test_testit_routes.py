@@ -4,13 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.integrations.testit_client import (
+from app.tms.testit.client import (
     TestItAuthError,
     TestItConfigError,
     TestItConnectionError,
     TestItNotFoundError,
 )
-from app.schemas.testit import FetchTestItWorkItemResponse
+from app.tms.testit.schemas import FetchTestItWorkItemResponse
 
 client = TestClient(app)
 

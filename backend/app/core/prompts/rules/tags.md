@@ -1,65 +1,67 @@
-## Теги (Tags)
+## Tags
 
-Служебные теги — игнорируй полностью. Не флажь их отсутствие, не флажь их присутствие, не предлагай удалять, не включай в итоговый список рекомендуемых тегов. Служебные теги: `ai-generated`, `needs-review`.
+Service tags — ignore them completely. Don't flag their absence, don't flag their presence, don't suggest removing them, don't include them in the final recommended tag list. Service tags: `ai-generated`, `needs-review`.
 
-Теги покрывают 5 измерений. На каждое измерение — один тег. Исключение: `e2e` добавляется к технике, не заменяет её.
+Tags cover 5 dimensions. One tag per dimension. Exception: `e2e` is added on top of the technique tag, it doesn't replace it.
 
-| Измерение | Допустимые теги | Правило |
+| Dimension | Allowed tags | Rule |
 |-----------|----------------|---------|
-| Техника | `ui`, `api`, `db` | один из трёх |
-| Охват | `e2e` | только для полных пользовательских сценариев от начала до завершения бизнес-цели; подробнее ниже |
-| Набор | `smoke`, `regression` | один из двух |
-| Модуль | `auth`, `payment`, `profile`, `orders`, ... | один тег по фиче |
-| Сценарий | `positive`, `negative` | один из двух |
-| Роль | тег роли из проекта | добавь если роль влияет на поведение или результат теста; используй теги ролей, уже имеющиеся в кейсе |
+| Technique | `ui`, `api`, `db` | one of the three |
+| Scope | `e2e` | only for full user scenarios from start to completion of a business goal; details below |
+| Suite | `smoke`, `regression` | one of the two |
+| Module | `auth`, `payment`, `profile`, `orders`, ... | one tag per feature |
+| Scenario | `positive`, `negative` | one of the two |
+| Role | a role tag from the project | add if the role affects the test's behavior or result; use role tags already present in the case |
 
-### Когда ставить `e2e`
+### When to set `e2e`
 
-`e2e` = полный пользовательский сценарий, который охватывает несколько модулей или систем и приводит к завершению бизнес-цели.
+`e2e` = a full user scenario that spans several modules or systems and completes a business goal.
 
-Ставь `e2e`, если сценарий проходит через несколько модулей **и** завершает бизнес-цель пользователя. Примеры:
-- Регистрация → заполнение анкеты → подтверждение SMS → получение решения
-- Авторизация → выбор товара → оплата → подтверждение заказа
-- Загрузка документа → верификация → изменение статуса
+Set `e2e` if the scenario passes through several modules **and** completes the user's business goal. Examples:
+- Registration → filling out the questionnaire → SMS confirmation → receiving a decision
+- Login → selecting a product → payment → order confirmation
+- Uploading a document → verification → status change
 
-Не ставь `e2e`, если:
-- тест проверяет только один экран или один шаг многошагового флоу. Пример: заполнение шага 1 из 5 анкеты — это не e2e, даже если переход на следующий экран произошёл.
-- тест атомарный: один модуль, одна фича, одна проверка.
-- переход между двумя экранами — это промежуточный шаг внутри одного модуля, а не сквозной сценарий.
+Don't set `e2e` if:
+- the test checks only one screen or one step of a multi-step flow. Example: filling in step 1 of 5 of a questionnaire is not e2e, even if moving to the next screen happened.
+- the test is atomic: one module, one feature, one check.
+- moving between two screens is an intermediate step within one module, not an end-to-end scenario.
 
-Примеры правильного набора:
-- Обычный UI-кейс (один шаг флоу): `ui, smoke, onboarding, positive`
-- Полный сквозной флоу: `ui, e2e, regression, payment, positive`
-- API-тест: `api, regression, auth, negative`
+Examples of a correct tag set:
+- A regular UI case (one step of a flow): `ui, smoke, onboarding, positive`
+- A full end-to-end flow: `ui, e2e, regression, payment, positive`
+- An API test: `api, regression, auth, negative`
 
-На основе title, description, preconditions, steps и expected results составь итоговый список тегов:
-- оставь текущие теги, если они полезны и соответствуют кейсу;
-- добавь очевидно нужные теги;
-- удали лишние, неверные или дублирующиеся теги.
+Based on the title, description, preconditions, steps, and expected results, compose the final tag list:
+- keep the current tags if they're useful and fit the case;
+- add obviously needed tags;
+- remove redundant, incorrect, or duplicate tags.
 
-Флажь `medium`, если отсутствует:
-- тег техники: `ui`, `api`, `db`;
-- тег набора: `smoke`, `regression`;
-- тег модуля. Примеры: `auth`, `payment`, `profile`;
-- тег сценария: `positive`, `negative`;
-- тег роли — если из steps или preconditions явно следует, что тест выполняется от конкретной роли, но тег не указан.
+Before flagging any dimension as missing, write out the case's current `tags` list verbatim in your reasoning, then go dimension by dimension (technique, scope, suite, module, scenario, role) and check whether one of the listed tags already covers it. If a tag for that dimension is already present, it's not missing — even if the tag name is project-specific and unfamiliar to you (e.g. a module name you don't recognize). Only flag a dimension if, after this check, no tag from that dimension is present at all. Never claim a specific tag name (e.g. `ui`) is missing without first confirming it's absent from the list you just wrote out.
 
-Флажь `medium`, если неверный тег приведёт к попаданию теста не в тот набор.
+Flag `medium` if the following is missing:
+- a technique tag: `ui`, `api`, `db`;
+- a suite tag: `smoke`, `regression`;
+- a module tag. Examples: `auth`, `payment`, `profile`;
+- a scenario tag: `positive`, `negative`;
+- a role tag — if it clearly follows from the steps or preconditions that the test runs under a specific role, but the tag isn't present.
 
-Флажь `low`, если:
-- одновременно стоят `smoke` и `regression` — это разные наборы, оставь один;
-- одновременно стоят теги одного модуля разного уровня детализации. Пример: `auth` + `login` — `login` входит в `auth`, оставь один;
-- тег `e2e` стоит на кейсе, который проверяет один экран, один шаг флоу или одну фичу — убери. `e2e` только для полных сквозных сценариев с завершённой бизнес-целью.
+Flag `medium` if a wrong tag would put the test in the wrong suite.
 
-Не флажь, если:
-- текущие теги покрывают все применимые измерения.
-- теги немного отличаются от идеала, но фильтрация работает корректно.
-- в проекте используется свой известный набор тегов.
-- роль не влияет на сценарий — тег роли не обязателен.
+Flag `low` if:
+- both `smoke` and `regression` are set at once — these are different suites, keep only one;
+- tags of the same module at different levels of detail are set at once. Example: `auth` + `login` — `login` is part of `auth`, keep only one;
+- the `e2e` tag is on a case that checks one screen, one step of a flow, or one feature — remove it. `e2e` is only for full end-to-end scenarios with a completed business goal.
 
-В рекомендации всегда укажи полный итоговый список тегов.
-Формат: `Замените теги на: ui, smoke, auth, negative, model`
+Don't flag if:
+- the current tags cover all applicable dimensions.
+- the tags differ slightly from the ideal, but filtering still works correctly.
+- the project uses its own known tag set.
+- the role doesn't affect the scenario — a role tag isn't required.
 
-## Как исправлять
+In the recommendation, always state the full final tag list.
+Format: `Replace tags with: ui, smoke, auth, negative, model`
 
-Составь итоговый список по измерениям: техника (`ui`/`api`/`db`), охват (`e2e` — только если полный сквозной сценарий с завершённой бизнес-целью через несколько модулей), набор (`smoke`/`regression`), модуль (`auth`/`payment`/...), сценарий (`positive`/`negative`), роль (тег роли из проекта — если следует из шагов). Одно измерение = один тег. `smoke` и `regression` не ставить вместе. Служебные теги `ai-generated`, `needs-review` не трогай. В `improvement_notes` укажи: «Замените теги на: [итоговый список]».
+## How to fix
+
+Compose the final list by dimension: technique (`ui`/`api`/`db`), scope (`e2e` — only if it's a full end-to-end scenario with a completed business goal spanning several modules), suite (`smoke`/`regression`), module (`auth`/`payment`/...), scenario (`positive`/`negative`), role (a role tag from the project — if it follows from the steps). One dimension = one tag. Don't set `smoke` and `regression` together. Don't touch the service tags `ai-generated`, `needs-review`. In `improvement_notes` state: "Replace tags with: [final list]".

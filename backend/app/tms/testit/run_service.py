@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 import httpx
-from app.integrations.testit_client import (
+from app.tms.testit.client import (
     TestItClient,
     TestItConfigError,
     TestItConnectionError,

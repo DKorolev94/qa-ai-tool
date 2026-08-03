@@ -190,21 +190,26 @@ def map_step(step: dict) -> TestCaseStep:
     )
 
 
-def expand_steps(raw_steps: list, _depth: int = 0) -> list[TestCaseStep]:
-    """Expand steps, recursively resolving shared steps (step.workItem.steps)."""
+def expand_steps(raw_steps: list, _depth: int = 0) -> tuple[list[TestCaseStep], bool]:
+    """Expand steps, recursively resolving shared steps (step.workItem.steps).
+    Returns (steps, truncated) — truncated is True if the recursion depth cap
+    was hit, meaning some deeply nested shared steps were dropped."""
     if _depth > 10:
-        return []
+        return [], True
     result: list[TestCaseStep] = []
+    truncated = False
     for step in raw_steps:
         if not isinstance(step, dict):
             continue
         work_item = step.get("workItem")
         if work_item and isinstance(work_item, dict):
             nested = work_item.get("steps") or []
-            result.extend(expand_steps(nested, _depth + 1))
+            nested_steps, nested_truncated = expand_steps(nested, _depth + 1)
+            result.extend(nested_steps)
+            truncated = truncated or nested_truncated
         else:
             result.append(map_step(step))
-    return result
+    return result, truncated
 
 
 def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
@@ -216,13 +221,13 @@ def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
     description = _clean(description_raw)
 
     raw_steps = work_item.get("steps") or []
-    steps = expand_steps(raw_steps)
+    steps, steps_truncated = expand_steps(raw_steps)
 
     raw_pre = work_item.get("precondition_steps") or work_item.get("preconditionSteps") or []
-    preconditions = expand_steps(raw_pre)
+    preconditions, pre_truncated = expand_steps(raw_pre)
 
     raw_post = work_item.get("postcondition_steps") or work_item.get("postconditionSteps") or []
-    postconditions = expand_steps(raw_post)
+    postconditions, post_truncated = expand_steps(raw_post)
 
     raw_atts = work_item.get("attachments") or []
     attachments = [_map_attachment(a) for a in raw_atts if isinstance(a, dict)]
@@ -283,6 +288,9 @@ def normalize_testit_workitem(work_item: dict) -> NormalizedTestCase:
 
     if not steps:
         warnings.append("Could not confidently extract steps from raw content")
+
+    if steps_truncated or pre_truncated or post_truncated:
+        warnings.append("Some shared steps were too deeply nested and could not be fully expanded")
 
     # Section name — prefer nested object, fallback to None (service resolves via API)
     section_obj = work_item.get("section") or {}

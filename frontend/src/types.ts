@@ -1,4 +1,3 @@
-export type SourceMode = 'testit' | 'manual'
 export type ReviewRuleId =
   | 'title'
   | 'description'
@@ -69,20 +68,6 @@ export interface ReviewIssue {
   recommendation: string
 }
 
-export interface SuggestedTestCase {
-  type: string
-  priority: string
-  title: string
-  steps: Step[]
-}
-
-export interface ReviewResult {
-  summary: string
-  issues: ReviewIssue[]
-  suggested_test_cases: SuggestedTestCase[]
-  warnings?: string[]
-}
-
 export interface IssueResolution {
   issue_index: number
   issue_title: string
@@ -127,6 +112,7 @@ export interface DraftResult {
   global_id?: string
   title: string
   testit_url?: string
+  section_name?: string
 }
 
 export interface OpStatus {

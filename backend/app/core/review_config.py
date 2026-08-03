@@ -53,7 +53,6 @@ _DEFAULT_RULES = [
 _CONFIG = ReviewConfig(
     sources=[
         ReviewSourceConfig(id="testit", label="TestIT", enabled=True),
-        ReviewSourceConfig(id="manual", label="Manual", enabled=False, badge="soon"),
         ReviewSourceConfig(id="testops", label="TestOps", enabled=False, badge="soon"),
     ],
     profiles=[
@@ -82,7 +81,7 @@ _CONFIG = ReviewConfig(
         ReviewRuleConfig(id="independence", label="Independence", description="Case runs in any order without dependency on other tests.", group="Case quality", enabled=True, order=70),
         ReviewRuleConfig(id="reproducibility", label="Reproducibility", description="Case can be run without verbal explanations from the author. Flags implicit assumptions and vague wording.", group="Case quality", enabled=True, order=90),
     ],
-    defaults={"testit": _DEFAULT_RULES, "manual": _DEFAULT_RULES},
+    defaults={"testit": _DEFAULT_RULES},
 )
 
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, Check, CheckCircle2, EyeOff, FilePlus, Loader2, X,
-  ExternalLink, FolderOpen, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
+  ExternalLink, Link2, Paperclip, RotateCcw, Sparkles, Wand2, Wrench,
 } from 'lucide-react'
 import { api, humanizeDraftError } from '../api'
 import { ActionBanner } from './ActionBanner'
@@ -22,9 +22,14 @@ interface Props {
   onBack: () => void
 }
 
+// Marker warning from _FALLBACK_REVIEW (llm_client.py) — analyze returned a fake
+// "issue" describing a tooling failure, not a real test case defect. Improving it
+// would ask the LLM to "fix" a meta-error instead of the actual test case.
+const LLM_UNAVAILABLE_WARNING = 'LLM is unavailable, fallback response returned'
+
 const PRIORITY_LABELS: Record<string, string> = {
-  Highest: 'Highest', High: 'High', Medium: 'Medium', Low: 'Low',
-  highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low',
+  Critical: 'Critical', Highest: 'Highest', High: 'High', Medium: 'Medium', Low: 'Low',
+  critical: 'Critical', highest: 'Highest', high: 'High', medium: 'Medium', low: 'Low',
 }
 
 // TestIT returns status values in English; map to Russian and badge class
@@ -44,6 +49,11 @@ const STATUS_PILL: Record<string, string> = {
   Obsolete: 'pill-neutral',
   InProgress: 'pill-warn',
 }
+
+// Statuses the edit form lets you pick. Any other status a test case already
+// has (Draft/Obsolete/InProgress from TestIT) gets an extra option injected so
+// it stays selected and isn't silently overwritten on save.
+const EDITABLE_STATUSES = new Set(['Ready', 'NotReady', 'NeedsWork'])
 
 const FIELD_LABELS: Record<string, string> = {
   title: 'Title', description: 'Description',
@@ -180,7 +190,6 @@ function linkLabel(link: WorkItemLink): string {
 
 // Tags that trigger warning-style chip
 const WARN_TAGS = new Set(['needs-review', 'needs_review'])
-const SERVICE_TAGS = new Set(['ai-generated', 'needs-review'])
 const SOURCE_TAG_RE = /^source-(\d+)$/
 
 // Service footer markers that indicate unprocessed LLM response
@@ -205,7 +214,7 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
   const priorityKey = (priority ?? '').toLowerCase()
   const statusLabel = tc.status ? (STATUS_LABELS[tc.status] ?? tc.status) : null
   const priorityDotClass =
-    priorityKey === 'highest' || priorityKey === 'high' ? 'pdot-high' :
+    priorityKey === 'critical' || priorityKey === 'highest' || priorityKey === 'high' ? 'pdot-high' :
     priorityKey === 'medium' ? 'pdot-medium' :
     priorityKey === 'low' ? 'pdot-low' : 'pdot-neutral'
   const statusPill = tc.status ? (STATUS_PILL[tc.status] ?? 'pill-neutral') : 'pill-neutral'
@@ -294,7 +303,11 @@ function TestCaseView({ tc, partialFields }: { tc: TestCase; partialFields?: Set
             {hasAny ? (
               <div className="tag-chips">
                 {regularTags.map(tag => (
-                  <span key={tag} className={`tag-chip${WARN_TAGS.has(tag) ? ' tag-chip-warn' : ''}`}>
+                  <span
+                    key={tag}
+                    className={`tag-chip${WARN_TAGS.has(tag) ? ' tag-chip-warn' : ''}`}
+                    title={WARN_TAGS.has(tag) ? 'Flagged for manual QA review before use' : undefined}
+                  >
                     {tag}
                   </span>
                 ))}
@@ -523,6 +536,7 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
             onChange={e => onChange({ ...tc, priority: e.target.value || null })}
           >
             <option value="">— not set —</option>
+            <option value="Critical">Critical</option>
             <option value="Highest">Highest</option>
             <option value="High">High</option>
             <option value="Medium">Medium</option>
@@ -539,10 +553,10 @@ function EditableTestCaseView({ tc, onChange }: { tc: TestCase; onChange: (updat
             <option value="">— not set —</option>
             <option value="Ready">Ready</option>
             <option value="NotReady">Not ready</option>
-            <option value="Draft">Draft</option>
             <option value="NeedsWork">Needs work</option>
-            <option value="Obsolete">Obsolete</option>
-            <option value="InProgress">In progress</option>
+            {tc.status && !EDITABLE_STATUSES.has(tc.status) && (
+              <option value={tc.status}>{STATUS_LABELS[tc.status] ?? tc.status}</option>
+            )}
           </select>
         </div>
       </div>
@@ -784,24 +798,26 @@ function DiffView({ changes }: { changes: NonNullable<ImproveResult['diff']>['ch
   )
 }
 
-const ISSUE_TITLE_RU: Record<string, string> = {
-  'test_data': 'Test data',
-  'steps': 'Steps',
-  'preconditions': 'Preconditions',
-  'postconditions': 'Postconditions',
-  'duration': 'Duration',
-  'tags': 'Tags',
-  'links': 'Links',
-  'title': 'Title',
-  'description': 'Description',
-  'priority': 'Priority',
-  'status': 'Status',
-  'expected_result': 'Expected result',
+// issue.title from the backend is a fixed English label derived from issue.rule
+// (see _RULE_LABELS in app/schemas/analysis.py) — never free text.
+// Map by rule id instead of parsing the title text.
+const RULE_LABEL: Record<string, string> = {
+  title: 'Title',
+  description: 'Description',
+  preconditions: 'Preconditions',
+  steps: 'Steps',
+  postconditions: 'Postconditions',
+  priority: 'Priority',
+  expected_results: 'Expected results',
+  test_data: 'Test data',
+  tags: 'Tags',
+  atomicity: 'Atomicity',
+  independence: 'Independence',
+  reproducibility: 'Reproducibility',
 }
 
-function issueTitleRu(title: string): string {
-  const key = title.toLowerCase().replace(/\s+/g, '_')
-  return ISSUE_TITLE_RU[key] ?? title
+function issueTitle(issue: ReviewIssue): string {
+  return (issue.rule && RULE_LABEL[issue.rule]) ?? issue.title
 }
 
 function parseIssueDescription(description: string): { text: string; evidence: string | null } {
@@ -810,10 +826,11 @@ function parseIssueDescription(description: string): { text: string; evidence: s
   return { text: match[1].trim(), evidence: match[2].trim() || null }
 }
 
-function IssueRow({ issue, resolution, hasImprovement, onDismiss }: {
+function IssueRow({ issue, resolution, hasImprovement, ruleDescription, onDismiss }: {
   issue: ReviewIssue
   resolution: IssueResolution | undefined
   hasImprovement: boolean
+  ruleDescription?: string
   onDismiss?: () => void
 }) {
   const isResolved = resolution?.status === 'resolved'
@@ -824,19 +841,27 @@ function IssueRow({ issue, resolution, hasImprovement, onDismiss }: {
   return (
     <div className={`issue-row ${borderClass}${isResolved ? ' issue-row-resolved' : ''}`}>
       <div className="issue-body">
-        <div className="issue-title-text">{issueTitleRu(issue.title)}</div>
+        <div className="issue-title-text" title={ruleDescription}>{issueTitle(issue)}</div>
         {description && <div className="issue-loc">{description}</div>}
         {evidence && <div className="issue-evidence">{evidence}</div>}
         {resolution?.status === 'manual_needed' && resolution.reason && (
           <div className="issue-reason">{resolution.reason}</div>
         )}
       </div>
-      {resolution?.status === 'resolved' && <span className="issue-badge ib-resolved">Resolved</span>}
-      {resolution?.status === 'manual_needed' && <span className="issue-badge ib-manual">Manual</span>}
-      {resolution?.status === 'skipped' && <span className="issue-badge ib-skipped">Skipped</span>}
-      {hasImprovement && !resolution && <span className="issue-badge ib-skipped">Not processed</span>}
+      {resolution?.status === 'resolved' && (
+        <span className="issue-badge ib-resolved" title="Fixed by AI Improve">Resolved</span>
+      )}
+      {resolution?.status === 'manual_needed' && (
+        <span className="issue-badge ib-manual" title="AI Improve couldn't fix this automatically — needs a person to edit it">Manual</span>
+      )}
+      {resolution?.status === 'skipped' && (
+        <span className="issue-badge ib-skipped" title="Already fine in the improved version — no change was needed">Skipped</span>
+      )}
+      {hasImprovement && !resolution && (
+        <span className="issue-badge ib-skipped" title="Not included in the last Improve run">Not processed</span>
+      )}
       {onDismiss && (
-        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title="Dismiss issue">
+        <button type="button" className="issue-dismiss-btn" onClick={onDismiss} title="Exclude from Improve — this issue won't be auto-fixed">
           <X size={11} />
         </button>
       )}
@@ -858,63 +883,8 @@ function RailLoading() {
   )
 }
 
-// TODO: fetch from GET /testit/sections once backend endpoint is added
-const MOCK_SECTIONS = [
-  { id: 'ai-review-drafts', name: 'AI Review / Drafts' },
-]
-
-function SectionPickerModal({
-  onConfirm,
-  onCancel,
-}: {
-  onConfirm: (sectionName: string) => void
-  onCancel: () => void
-}) {
-  const [selectedId, setSelectedId] = useState(MOCK_SECTIONS[0].id)
-
-  return (
-    <div className="action-modal-overlay" onClick={onCancel}>
-      <div className="action-modal" onClick={e => e.stopPropagation()}>
-        <div className="action-modal-header">
-          <span className="action-modal-icon"><FolderOpen size={16} strokeWidth={1.75} /></span>
-          <span className="action-modal-title">Create draft</span>
-        </div>
-        <div className="action-modal-body">
-          <label className="action-modal-label">Save to section</label>
-          <div className="action-modal-options">
-            {MOCK_SECTIONS.map(s => (
-              <button
-                key={s.id}
-                type="button"
-                className={`action-modal-option${selectedId === s.id ? ' selected' : ''}`}
-                onClick={() => setSelectedId(s.id)}
-              >
-                <span className="action-modal-option-radio" />
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="action-modal-footer">
-          <button type="button" className="wb-btn wb-btn-sec" onClick={onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="wb-btn wb-btn-pri"
-            onClick={() => {
-              const section = MOCK_SECTIONS.find(s => s.id === selectedId)
-              onConfirm(section?.name ?? MOCK_SECTIONS[0].name)
-            }}
-          >
-            <CheckCircle2 size={13} />
-            Create
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+// TODO: source from backend once GET /testit/sections (or create-draft response) exposes it
+const DRAFT_SECTION_NAME = 'AI Review / Drafts'
 
 function ConfirmApplyModal({
   workItemId,
@@ -972,7 +942,6 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [draftResult, setDraftResult] = useState<DraftResult | null>(null)
   const [draftLoading, setDraftLoading] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
-  const [draftSectionName] = useState<string>(MOCK_SECTIONS[0].name)
   const [applyResult, setApplyResult] = useState<ApplyResult | null>(null)
   const [applyLoading, setApplyLoading] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
@@ -985,9 +954,16 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const [isEditing, setIsEditing] = useState(false)
   const [editSnapshot, setEditSnapshot] = useState<TestCase | null>(null)
   const [manualOverride, setManualOverride] = useState(false)
+  // Snapshot of the issues actually sent to /improve-testcase — issue_resolutions[].issue_index
+  // refers to positions in THIS array. Must not be recomputed from live enabledRules/dismissedIndices,
+  // which can change after the request was sent and silently misattribute resolutions to the wrong issue.
+  const [improveSelectedIssues, setImproveSelectedIssues] = useState<ReviewIssue[]>([])
 
   const tc = fetchResult.normalized_testcase
   const initialEnabledRules = useRef(enabledRules)
+  // What each rule actually checks — shown as a tooltip on the issue's short label,
+  // since e.g. "Independence" alone doesn't say what independence means here.
+  const ruleDescriptions = Object.fromEntries(reviewConfig.rules.map(r => [r.id, r.description]))
 
   useEffect(() => {
     let cancelled = false
@@ -1000,6 +976,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       setImproveError(null)
       setDraftResult(null)
       setDismissedIndices(new Set())
+      setImproveSelectedIssues([])
       setActiveTab('original')
       try {
         const result = await api.analyzeTestCase({
@@ -1026,6 +1003,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     setImproveError(null)
     setDraftResult(null)
     setDismissedIndices(new Set())
+    setImproveSelectedIssues([])
     setApplyResult(null)
     setActiveTab('original')
     try {
@@ -1056,6 +1034,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       const issuesToFix = analyzeResult.issues.filter((i, idx) =>
         (i.rule ? enabledRuleSet.has(i.rule) : true) && !dismissedIndices.has(idx)
       )
+      setImproveSelectedIssues(issuesToFix)
       const result = await api.improveTestCase({
         work_item: fetchResult.raw_work_item,
         selected_issues: issuesToFix,
@@ -1118,21 +1097,14 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     return Math.max(0, s)
   }
 
-  // Reconstruct the same filter used in runImprove so resolution indices match.
-  // Backend numbers issues 0..N from selected_issues, not from analyzeResult.issues.
-  const _enabledRuleSet = new Set<string>(enabledRules)
-  const selectedIssuesForImprove = (analyzeResult?.issues ?? []).filter((i, idx) =>
-    (i.rule ? _enabledRuleSet.has(i.rule) : true) && !dismissedIndices.has(idx)
-  )
-
   function getResolution(issue: ReviewIssue): IssueResolution | undefined {
-    const selectedIdx = selectedIssuesForImprove.indexOf(issue)
+    const selectedIdx = improveSelectedIssues.indexOf(issue)
     if (selectedIdx === -1) return undefined
     return improveResult?.issue_resolutions?.find(r => r.issue_index === selectedIdx)
   }
 
   const unresolvedIssues = analyzeResult?.issues.filter(issue => {
-    const selectedIdx = selectedIssuesForImprove.indexOf(issue)
+    const selectedIdx = improveSelectedIssues.indexOf(issue)
     if (selectedIdx === -1) return true
     return !improveResult?.issue_resolutions?.some(r => r.issue_index === selectedIdx && r.status === 'resolved')
   }) ?? analyzeResult?.issues
@@ -1163,8 +1135,17 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     return 'Poor'
   }
 
+  const SCORE_BADGE_TOOLTIP = '85+ Excellent · 70+ Good · 50+ Fair · below 50 Poor'
+
+  function scoreBadgeClass(s: number) {
+    if (s >= 70) return 'score-good'
+    if (s >= 50) return 'score-fair'
+    return 'score-poor'
+  }
+
   const hasImprove = !!improveResult
   const hasDraft = !!draftResult
+  const analyzeFailed = (analyzeResult?.warnings ?? []).includes(LLM_UNAVAILABLE_WARNING)
 
   const hasApply = !!applyResult
   const diffCount = improveResult?.diff?.changes?.length
@@ -1205,6 +1186,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     if (m.includes('500') || m.includes('internal')) return 'Internal AI server error'
     if (m.includes('429') || m.includes('rate')) return 'Too many requests — try again later'
     if (m.includes('503') || m.includes('unavailable')) return 'AI service temporarily unavailable'
+    if (m.includes('502')) return 'AI returned an invalid response — try again'
     return 'Request processing error'
   }
 
@@ -1217,7 +1199,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   const openCriticalCount = analyzeResult?.issues.filter((issue, absIdx) => {
     if (issue.severity !== 'high') return false
     if (dismissedIndices.has(absIdx)) return false
-    const selectedIdx = selectedIssuesForImprove.indexOf(issue)
+    const selectedIdx = improveSelectedIssues.indexOf(issue)
     if (selectedIdx === -1) return true
     return !improveResult?.issue_resolutions?.some(r => r.issue_index === selectedIdx && r.status === 'resolved')
   }).length ?? 0
@@ -1283,7 +1265,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
       type: 'draft' as const,
       id: draftResult.global_id != null ? String(draftResult.global_id) : draftResult.work_item_id,
       testit_url: draftResult.testit_url,
-      sectionName: draftSectionName,
+      sectionName: draftResult.section_name ?? DRAFT_SECTION_NAME,
       isPartial: improveStatus === 'partial' || effectiveManualCount > 0,
     }] : []),
     ...(applyResult ? [{
@@ -1390,18 +1372,23 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 Improving...
               </button>
             ) : improveStatus === 'error' ? (
-              <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}>
+              <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}
+                disabled={analyzeFailed}
+                title={analyzeFailed ? 'AI analysis failed — re-run review before improving' : undefined}>
                 <RotateCcw size={13} />
                 Retry
               </button>
             ) : hasImprove ? (
               <button type="button" className="wb-btn wb-btn-sec" onClick={runImprove}
-                disabled={improveLoading || analyzeLoading}>
+                disabled={improveLoading || analyzeLoading || analyzeFailed}
+                title={analyzeFailed ? 'AI analysis failed — re-run review before improving' : undefined}>
                 <Wand2 size={13} />
                 Improve again
               </button>
             ) : (
-              <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}>
+              <button type="button" className="wb-btn wb-btn-pri" onClick={runImprove}
+                disabled={analyzeFailed}
+                title={analyzeFailed ? 'AI analysis failed — re-run review before improving' : undefined}>
                 <Wand2 size={13} />
                 Improve
               </button>
@@ -1573,17 +1560,17 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                 </div>
                 {isEditing && editedTestCase
                   ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
-                  : <TestCaseView tc={mergedEdited} partialFields={partialFields} />
+                  : <div className="tc-fade-in"><TestCaseView tc={mergedEdited} partialFields={partialFields} /></div>
                 }
               </>
             )}
             {activeTab === 'improved' && improveStatus === 'success' && mergedEdited && (
               isEditing && editedTestCase
                 ? <EditableTestCaseView tc={editedTestCase} onChange={setEditedTestCase} />
-                : <TestCaseView tc={mergedEdited} />
+                : <div className="tc-fade-in"><TestCaseView tc={mergedEdited} /></div>
             )}
             {activeTab === 'diff' && (
-              <DiffView changes={improveResult?.diff?.changes ?? []} />
+              <div className="tc-fade-in"><DiffView changes={improveResult?.diff?.changes ?? []} /></div>
             )}
             {activeTab === 'json' && (
               <pre className="wb-json-pre">
@@ -1607,7 +1594,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
               </div>
             )}
             {analyzeResult && (
-              <>
+              <div className="rail-result">
                 {/* Score card */}
                 {score !== null && (
                   <div className="score-card">
@@ -1629,7 +1616,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                         </div>
                       </div>
                       <div className="score-copy">
-                        <span className="score-badge score-good">{scoreBadge(score)}</span>
+                        <span className={`score-badge ${scoreBadgeClass(score)}`} title={SCORE_BADGE_TOOLTIP}>{scoreBadge(score)}</span>
                         <div className="score-ctrs">
                           {hasImprove && resolvedCount > 0 && (
                             <span className="score-ctr sctr-ok">
@@ -1682,6 +1669,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     <div className="issues-section-label isl-high">Critical · {highIssues.length}</div>
                     {highIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
                     ))}
                   </div>
@@ -1691,6 +1679,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     <div className="issues-section-label isl-medium">Medium · {medIssues.length}</div>
                     {medIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
                     ))}
                   </div>
@@ -1700,6 +1689,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     <div className="issues-section-label isl-low">Low · {lowIssues.length}</div>
                     {lowIssues.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
                     ))}
                   </div>
@@ -1716,6 +1706,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     </button>
                     {showResolved && resolvedVisible.map(({ issue, idx }) => (
                       <IssueRow key={idx} issue={issue} resolution={getResolution(issue)} hasImprovement={hasImprove}
+                        ruleDescription={issue.rule ? ruleDescriptions[issue.rule] : undefined}
                         onDismiss={() => setDismissedIndices(prev => new Set([...prev, idx]))} />
                     ))}
                   </div>
@@ -1731,7 +1722,10 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                     {showDismissed && dismissedIssuesList.map(({ issue, idx }) => (
                       <div key={idx} className="issue-row iborder-resolved issue-row-dismissed">
                         <div className="issue-body">
-                          <div className="issue-title-text issue-title-dismissed">{issueTitleRu(issue.title)}</div>
+                          <div
+                            className="issue-title-text issue-title-dismissed"
+                            title={issue.rule ? ruleDescriptions[issue.rule] : undefined}
+                          >{issueTitle(issue)}</div>
                         </div>
                         <button type="button" className="issue-restore-btn"
                           onClick={() => setDismissedIndices(prev => { const s = new Set(prev); s.delete(idx); return s })}
@@ -1757,7 +1751,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
                   </div>
                 )}
 
-              </>
+              </div>
             )}
           </div>
         </div>

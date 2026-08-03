@@ -1,5 +1,16 @@
+from unittest.mock import patch
+
 import pytest
-from app.parsing.testit_parser import parse_testit_content
+from app.tms.testit.parser import parse_testit_content
+
+
+@pytest.fixture(autouse=True)
+def _no_llm():
+    # This suite exercises the regex-based fallback parser, not the LLM path —
+    # without a mock every call hits the real LLM_BASE_URL and blocks for
+    # LLM_TIMEOUT_SECONDS (120s default) per test when no LLM is reachable.
+    with patch("app.core.llm_client.parse_testcase_with_llm", return_value=None):
+        yield
 
 
 def test_returns_description_for_plain_text():

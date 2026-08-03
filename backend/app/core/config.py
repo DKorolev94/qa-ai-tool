@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE_REVIEW: float | None = None
     LLM_TEMPERATURE_IMPROVE: float | None = None
     LLM_TIMEOUT_SECONDS: int = 120
+    LLM_NUM_CTX: int | None = None
 
     TESTIT_BASE_URL: str = ""
     TESTIT_PRIVATE_TOKEN: str = ""

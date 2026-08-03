@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.integrations.testit_client import (
+from app.tms.testit.client import (
     TestItApiError,
     TestItAuthError,
     TestItClient,

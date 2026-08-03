@@ -1,27 +1,27 @@
-## Постусловия (Postconditions)
+## Postconditions
 
-Postcondition = конечное состояние системы после теста.
+Postcondition = the system's final state after the test.
 
-Флажь `medium`, если:
-- тест создаёт, изменяет или удаляет данные, но postconditions не описаны. Оставшееся состояние мешает повторному запуску и другим кейсам.
+Flag `medium` if:
+- the test creates, modifies, or deletes data, but postconditions aren't described. The leftover state gets in the way of re-running the test and other cases.
 
-Флажь `low`, если:
-- поле `action` смешивает состояние системы и наблюдаемый результат в одной строке. Пример плохо: `Заказ отменён, статус изменён на Отменён`. Правильно: action = `Заказ отменён`, expected = `В интерфейсе отображается статус "Отменён"`.
-- postcondition дублирует ожидаемый результат последнего шага. Постусловие должно описывать устойчивое состояние системы после теста, а не повторять то, что уже зафиксировано в expected result финального шага.
+Flag `low` if:
+- the `action` field mixes system state and observed result in one line. Bad example: `Order canceled, status changed to Canceled`. Correct: action = `Order canceled`, expected = `The UI shows status "Canceled"`.
+- the postcondition duplicates the expected result of the last step. A postcondition should describe the durable system state after the test, not repeat what's already captured in the final step's expected result.
 
-Не флажь, если postconditions отсутствуют и тест не меняет состояние системы (read-only сценарий).
+Don't flag if postconditions are missing and the test doesn't change system state (a read-only scenario).
 
-Не флажь, если postconditions описаны корректно: `action` = конечное состояние системы, `expected` = наблюдаемое подтверждение.
+Don't flag if postconditions are described correctly: `action` = the system's final state, `expected` = the observable confirmation.
 
-## Как исправлять
+## How to fix
 
-Поле `action` = конечное состояние системы (факт). Примеры: «Запись удалена», «Заказ отменён», «Данные не изменены».
-Поле `expected` = наблюдаемое подтверждение. Примеры: «GET /items/{id} возвращает 404», «В интерфейсе статус "Отменён"».
+The `action` field = the system's final state (a fact). Examples: "Record is deleted", "Order is canceled", "Data is unchanged".
+The `expected` field = the observable confirmation. Examples: "GET /items/{id} returns 404", "The UI shows status \"Canceled\"".
 
-Если `action` смешивает состояние и наблюдаемый результат — раздели. Поле `expected` обязательно, не оставляй пустым.
+If `action` mixes state and observable result, split them. The `expected` field is required — don't leave it empty.
 
-Если postconditions отсутствуют и тест read-only — не добавляй ничего.
+If postconditions are missing and the test is read-only — don't add anything.
 
-Если postconditions отсутствуют и тест меняет данные → `manual_needed`: «Опиши конечное состояние системы после выполнения теста.» Не выдумывай API endpoint, SQL-запрос или действие по очистке данных — их нет в тест-кейсе.
+If postconditions are missing and the test changes data → `manual_needed`: "Describe the system's final state after the test runs." Don't invent an API endpoint, SQL query, or cleanup action — they aren't in the test case.
 
-Если postcondition дублирует expected result последнего шага: переформулируй как устойчивое состояние системы, которое сохраняется после теста. `action` = факт изменения состояния (`Заявка создана`, `Пользователь авторизован`), `expected` = наблюдаемое подтверждение этого состояния. Если устойчивое состояние из контекста неопределимо → удали postcondition и пометь `manual_needed`.
+If a postcondition duplicates the expected result of the last step: reword it as the durable system state that persists after the test. `action` = the fact that the state changed ("Application created", "User authenticated"), `expected` = the observable confirmation of that state. If the durable state can't be determined from context → remove the postcondition and mark it `manual_needed`.

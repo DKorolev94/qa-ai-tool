@@ -1,4 +1,4 @@
-from app.parsing.testit_draft_mapper import build_draft_payload
+from app.tms.testit.draft_mapper import build_draft_payload
 
 IMPROVED = {
     "title": "Ошибка при вводе неверного пароля",
@@ -76,8 +76,13 @@ def test_priority_case_insensitive():
 def test_tags_ready_no_needs_review():
     p = payload()
     tag_names = [t["name"] for t in p["tags"]]
-    assert "ai-generated" in tag_names
     assert "needs-review" not in tag_names
+
+
+def test_draft_does_not_force_ai_generated_tag():
+    p = payload()
+    tag_names = [t["name"] for t in p["tags"]]
+    assert "ai-generated" not in tag_names
 
 
 def test_tags_needs_work_has_needs_review():
