@@ -50,6 +50,7 @@ def _make_client(create_return=None, sections=None, section_created=None, attrib
     mock_client.get_project = AsyncMock(return_value={"globalId": None})
     mock_client.get_section = AsyncMock(return_value=section or {"name": "AI Review / Drafts"})
     mock_client.list_attributes = AsyncMock(return_value=attributes if attributes is not None else [])
+    mock_client.create_work_item_comment = AsyncMock(return_value={})
     return mock_client
 
 
@@ -167,3 +168,42 @@ def test_attributes_kept_unfiltered_when_attribute_fetch_fails():
         run(create_draft_in_testit(IMPROVED, "6109", source_attributes=source_attributes))
     payload = mock_client.create_work_item.call_args[0][0]
     assert payload["attributes"] == {"some-attr": "val-1"}
+
+
+def test_no_comment_posted_when_ready():
+    with _patch_settings(), patch("app.tms.testit.draft_service.TestItClient") as MockClient:
+        mock_client = _make_client()
+        MockClient.return_value = mock_client
+        run(create_draft_in_testit({**IMPROVED, "status": "Ready"}, "6109"))
+    mock_client.create_work_item_comment.assert_not_called()
+
+
+def test_provenance_comment_posted_when_needs_review():
+    with _patch_settings(), patch("app.tms.testit.draft_service.TestItClient") as MockClient:
+        mock_client = _make_client()
+        MockClient.return_value = mock_client
+        run(create_draft_in_testit({**IMPROVED, "status": "NeedsWork"}, "6109"))
+    texts = [call.args[1] for call in mock_client.create_work_item_comment.call_args_list]
+    assert any("6109" in t for t in texts)
+
+
+def test_manual_notes_posted_as_separate_comments():
+    with _patch_settings(), patch("app.tms.testit.draft_service.TestItClient") as MockClient:
+        mock_client = _make_client()
+        MockClient.return_value = mock_client
+        run(create_draft_in_testit(
+            {**IMPROVED, "status": "NeedsWork"}, "6109",
+            manual_notes=["Clarify step 2", "Missing test data"],
+        ))
+    texts = [call.args[1] for call in mock_client.create_work_item_comment.call_args_list]
+    assert "Clarify step 2" in texts
+    assert "Missing test data" in texts
+
+
+def test_comment_failure_does_not_break_draft_creation():
+    with _patch_settings(), patch("app.tms.testit.draft_service.TestItClient") as MockClient:
+        mock_client = _make_client()
+        mock_client.create_work_item_comment = AsyncMock(side_effect=RuntimeError("boom"))
+        MockClient.return_value = mock_client
+        result = run(create_draft_in_testit({**IMPROVED, "status": "NeedsWork"}, "6109"))
+    assert result.work_item_id == "new-uuid-1234"

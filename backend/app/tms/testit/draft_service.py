@@ -124,11 +124,9 @@ async def create_draft_in_testit(
 
     payload = build_draft_payload(
         improved=improved_testcase,
-        source_id=source_work_item_id,
         project_id=settings.TESTIT_PROJECT_UUID,
         section_id=section_id,
         source_attributes=filtered_attributes,
-        manual_notes=manual_notes or [],
     )
 
     logger.info(
@@ -142,6 +140,16 @@ async def create_draft_in_testit(
     work_item_id = created.get("id", "")
     global_id = created.get("globalId")
     title = created.get("name", payload["name"])
+
+    needs_review = payload.get("state") != "Ready"
+    if work_item_id and needs_review:
+        provenance = f"🤖 Сгенерировано qa-ai-tool из #{source_work_item_id}. Требуется проверка QA перед заменой оригинала."
+        try:
+            await client.create_work_item_comment(work_item_id, provenance)
+            for note in manual_notes or []:
+                await client.create_work_item_comment(work_item_id, note)
+        except Exception:
+            logger.exception("Failed to post draft comment(s) for work_item_id=%s", work_item_id)
 
     testit_url: str | None = None
     if global_id and settings.TESTIT_BASE_URL:

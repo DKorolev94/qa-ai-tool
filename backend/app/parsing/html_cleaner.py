@@ -11,7 +11,10 @@ def clean_html(raw: str) -> str:
 
     soup = BeautifulSoup(raw, "html.parser")
 
-    for tag in soup.find_all(["script", "style"]):
+    # Strikethrough marks content the author voided (e.g. "no longer a bug,
+    # kept as history") — keeping that text would hand the LLM a step whose
+    # action reads like a live instruction while actually meaning the opposite.
+    for tag in soup.find_all(["script", "style", "s", "del", "strike"]):
         tag.decompose()
 
     for tag in soup.find_all(["br", "p", "div", "li", "tr"]):

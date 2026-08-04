@@ -13,6 +13,7 @@ Flag `medium` if:
 Don't flag if:
 - preconditions describe concrete setup actions: "Go to https://...", "Log in with the credentials in test_data", "Go to section Z". This is the correct format.
 - preconditions describe external system conditions that aren't achieved by user actions in the browser: "A test user account has been created", "Test loan #123 exists in the DB". This is acceptable.
+- preconditions describe a browser/environment reset done before the test starts: "Cookies are cleared", "Cache and local storage are cleared", "No active session/logged out". These are standard environment setup, not an ambiguous state — treat them like the DB/external-system conditions above, not like "User is authenticated".
 - preconditions reference another test case. That's a violation of the `independence` rule, not `preconditions`.
 - in an API case, preconditions describe request headers. Example: `Request headers: Content-Type: application/json`. Don't flag it.
 - a precondition step is missing test data (email, password, an ID, etc.). That's a violation of the `test_data` rule, not `preconditions`. Don't create a `preconditions` issue for it, even if `test_data` is also enabled.

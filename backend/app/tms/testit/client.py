@@ -299,6 +299,32 @@ class TestItClient:
 
         return data
 
+    async def create_work_item_comment(self, work_item_id: str, text: str) -> dict:
+        self._check_config()
+        url = f"{self._base_url}/api/v2/workItems/comments"
+        try:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                resp = await client.post(
+                    url,
+                    headers={**self._headers(), "Content-Type": "application/json"},
+                    json={"workItemId": work_item_id, "text": text[:1024]},
+                )
+        except httpx.TimeoutException:
+            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
+        except httpx.RequestError as exc:
+            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+
+        if resp.status_code in (401, 403):
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
+        try:
+            data = resp.json()
+        except Exception:
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+        if not resp.is_success:
+            msg = data.get("message") or data.get("detail") or data.get("title") or f"HTTP {resp.status_code}"
+            raise TestItApiError(str(msg), status_code=resp.status_code)
+        return data
+
     async def update_work_item(self, work_item_id: str, payload: dict) -> dict:
         """PUT /api/v2/workItems — id must be in body, returns 204 No Content."""
         self._check_config()

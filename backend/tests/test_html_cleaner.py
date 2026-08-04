@@ -70,6 +70,17 @@ def test_no_excessive_blank_lines():
     assert blank_lines <= 2
 
 
+def test_strikethrough_content_dropped():
+    result = clean_html('<p><s>Voided step</s></p><p>Live note</p>')
+    assert "Voided step" not in result
+    assert "Live note" in result
+
+
+def test_del_and_strike_tags_dropped():
+    assert "Old" not in clean_html("<del>Old</del>New")
+    assert "Old" not in clean_html("<strike>Old</strike>New")
+
+
 def test_complex_testcase_html():
     html = "<p>Шаг 1<br>Открыть страницу</p><p>Ожидаемый результат: страница открыта</p>"
     result = clean_html(html)
