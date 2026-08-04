@@ -15,7 +15,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+    let detail = text
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed.detail === 'string') detail = parsed.detail
+    } catch { /* not JSON, use raw text */ }
+    throw new Error(`HTTP ${res.status}: ${detail.slice(0, 300)}`)
   }
   return res.json() as Promise<T>
 }
@@ -24,7 +29,12 @@ async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`)
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`)
+    let detail = text
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed.detail === 'string') detail = parsed.detail
+    } catch { /* not JSON, use raw text */ }
+    throw new Error(`HTTP ${res.status}: ${detail.slice(0, 300)}`)
   }
   return res.json() as Promise<T>
 }

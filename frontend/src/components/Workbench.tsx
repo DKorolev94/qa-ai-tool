@@ -850,7 +850,7 @@ function issueTitle(t: TFunction, issue: ReviewIssue): string {
 }
 
 function parseIssueDescription(description: string): { text: string; evidence: string | null } {
-  const match = description.match(/^([\s\S]*?)\s*Example:\s*([\s\S]*)$/i)
+  const match = description.match(/^([\s\S]*?)\s*(?:Example|Пример):\s*([\s\S]*)$/i)
   if (!match) return { text: description.trim(), evidence: null }
   return { text: match[1].trim(), evidence: match[2].trim() || null }
 }

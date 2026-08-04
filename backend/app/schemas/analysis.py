@@ -147,7 +147,8 @@ class _LLMIssue(BaseModel):
     def to_issue(self, language: str = "ru") -> AnalysisIssue:
         desc = self.problem
         if _has_meaningful_evidence(self.evidence):
-            desc = f"{self.problem}\n\nПример: {self.evidence}"
+            example_label = "Example" if language == "en" else "Пример"
+            desc = f"{self.problem}\n\n{example_label}: {self.evidence}"
         labels = _RULE_LABELS.get(language, _RULE_LABELS["ru"])
         return AnalysisIssue(
             rule=self.rule,
