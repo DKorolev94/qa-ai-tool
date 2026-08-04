@@ -138,6 +138,32 @@ def test_non_json_raises_response_error():
             run(client.get_work_item("6109"))
 
 
+def test_non_dict_error_body_raises_api_error_not_attribute_error():
+    # A gateway/proxy error page can return a JSON array or bare string —
+    # data.get(...) on that would raise AttributeError instead of a typed error.
+    client = TestItClient(_cfg())
+    mock_client = _make_async_client(_mock_resp(502, ["Bad Gateway"]))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(TestItApiError):
+            run(client.get_work_item("6109"))
+
+
+def test_list_sections_non_dict_error_body_raises_api_error():
+    client = TestItClient(_cfg())
+    mock_client = _make_async_client(_mock_resp(502, "gateway error"))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(TestItApiError):
+            run(client.list_sections("proj-uuid"))
+
+
+def test_list_sections_success_still_returns_list():
+    client = TestItClient(_cfg())
+    mock_client = _make_async_client(_mock_resp(200, [{"id": "s1"}]))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = run(client.list_sections("proj-uuid"))
+    assert result == [{"id": "s1"}]
+
+
 # ── Network errors ────────────────────────────────────────────────────────────
 
 def test_timeout_raises_connection_error():

@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from app.schemas.analysis import AnalysisIssue, ReviewResult
-from app.services.testcase_analyzer import analyze_raw_testcase
+from app.services.testcase_analyzer import _coerce_testcase, analyze_raw_testcase
 
 SAMPLE_WORK_ITEM = {
     "name": "Login test",
@@ -22,6 +22,36 @@ def test_analyze_returns_response_with_issues():
     assert result.summary == "Found 1 issue"
     assert len(result.issues) == 1
     assert result.issues[0].severity == "high"
+
+
+def test_coerce_testcase_exception_fallback_preserves_all_original_fields():
+    # tags=12345 makes list(raw.get("tags")) raise TypeError, forcing the
+    # except branch — every field must still fall back to `original`, not
+    # just the ones the fallback happened to cover before.
+    original = {
+        "title": "Original title",
+        "description": "Original description",
+        "preconditions": [{"action": "Pre 1"}],
+        "steps": [{"action": "Step 1"}],
+        "postconditions": [{"action": "Post 1"}],
+        "tags": ["smoke", "auth"],
+        "priority": "High",
+        "status": "Ready",
+        "duration": 60000,
+        "attributes": {"key": "value"},
+    }
+    result = _coerce_testcase({"tags": 12345}, original)
+
+    assert result.title == "Original title"
+    assert result.description == "Original description"
+    assert [s.action for s in result.preconditions] == ["Pre 1"]
+    assert [s.action for s in result.steps] == ["Step 1"]
+    assert [s.action for s in result.postconditions] == ["Post 1"]
+    assert result.tags == ["smoke", "auth"]
+    assert result.priority == "High"
+    assert result.status == "Ready"
+    assert result.duration == 60000
+    assert result.attributes == {"key": "value"}
 
 
 def test_analyze_passes_enabled_rules_to_llm():

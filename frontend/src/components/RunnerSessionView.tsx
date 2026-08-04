@@ -851,7 +851,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
       const runId = session.result.run_id
       const path = stepsApiPath ?? `/runner/sessions/${runId}/steps`
       fetch(`/api${path}`)
-        .then(res => res.json() as Promise<{ steps: HistoricalStep[] }>)
+        .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() as Promise<{ steps: HistoricalStep[] }> })
         .then(data => { if (!cancelled) setHistoricalSteps(data.steps ?? []) })
         .catch(() => { if (!cancelled) setHistoricalSteps([]) })
 
@@ -859,7 +859,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
       if (historicalLogs === null) {
         setLogsLoading(true)
         fetch(`/api/runner/sessions/${runId}/logs`)
-          .then(res => res.json() as Promise<{ logs: Array<{ level: string; category: string; message: string; elapsed_sec: number }> }>)
+          .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() as Promise<{ logs: Array<{ level: string; category: string; message: string; elapsed_sec: number }> }> })
           .then(data => {
             if (cancelled) return
             setHistoricalLogs(data.logs.map(l => ({ ...l, type: 'log' as const, level: l.level as WsLogEvent['level'], source: 'session' as const })))
@@ -912,14 +912,19 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
         if (abort.signal.aborted || !mountedRef.current) return
         activeRunIdRef.current = runId
 
+        let receivedDone = false
+        let reconnectAttempts = 0
+        const MAX_RECONNECT_ATTEMPTS = 3
+
+        const connectWebSocket = () => {
         const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
         const wsPrefix = wsPathPrefix ?? '/runner/ws'
         const ws = new WebSocket(`${proto}://${window.location.host}/api${wsPrefix}/${runId}`)
         wsRef.current = ws
-        let receivedDone = false
 
         ws.onmessage = (ev) => {
           if (!mountedRef.current) return
+          reconnectAttempts = 0 // we're receiving data again — reset backoff
           let event: WsEvent
           try { event = JSON.parse(ev.data) } catch { return }
 
@@ -976,17 +981,26 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
         }
 
         ws.onclose = () => {
-          if (!mountedRef.current || receivedDone) return
+          if (!mountedRef.current || receivedDone || abort.signal.aborted) return
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts += 1
+            setTimeout(() => {
+              if (!mountedRef.current || receivedDone || abort.signal.aborted) return
+              connectWebSocket()
+            }, 1000 * reconnectAttempts)
+            return
+          }
           setWsError(tRef.current('runnerSession.wsErrors.connectionLost'))
           onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
         }
 
-        ws.onerror = () => {
-          if (!mountedRef.current) return
-          receivedDone = true
-          setWsError(tRef.current('runnerSession.wsErrors.connectionError'))
-          onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
+        // onerror carries no useful detail and is always followed by onclose
+        // for a WebSocket — let onclose's reconnect/give-up logic handle it,
+        // rather than declaring the run dead on the first blip.
+        ws.onerror = () => {}
         }
+
+        connectWebSocket()
 
       } catch (err) {
         if (abort.signal.aborted) return

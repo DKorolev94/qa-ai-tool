@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     RUNNER_TIMEOUT_SEC: int = 180
     RUNNER_RUNS_DIR: str = ""
 
+    # Comma-separated allowed origins for the frontend, or "*" for any (dev default).
+    # Lock this down to the real frontend origin(s) before a production deployment.
+    CORS_ORIGINS: str = "*"
+
     @field_validator("TESTIT_BASE_URL", mode="after")
     @classmethod
     def strip_trailing_slash(cls, v: str) -> str:

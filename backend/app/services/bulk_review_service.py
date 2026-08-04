@@ -56,6 +56,11 @@ def stop_bulk_review(job_id: str) -> bool:
 
 
 def _prune_old_jobs() -> None:
+    # Only evicts done=True jobs — evicting one still in flight would delete
+    # _JOBS[job_id] out from under its own running task, which indexes into
+    # it on every _update_item call. This is a hard cap in practice, not just
+    # a soft one: _RUN_LOCK allows at most one non-done job at a time
+    # backend-wide, so the store can never exceed _MAX_STORED_JOBS + 1.
     if len(_JOBS) <= _MAX_STORED_JOBS:
         return
     for old_id in list(_JOBS.keys()):

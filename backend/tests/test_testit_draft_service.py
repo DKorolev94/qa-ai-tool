@@ -178,6 +178,20 @@ def test_no_comment_posted_when_ready():
     mock_client.create_work_item_comment.assert_not_called()
 
 
+def test_one_failed_comment_does_not_block_the_others():
+    with _patch_settings(), patch("app.tms.testit.draft_service.TestItClient") as MockClient:
+        mock_client = _make_client()
+        mock_client.create_work_item_comment = AsyncMock(
+            side_effect=[RuntimeError("boom"), {}]  # provenance fails, the note still posts
+        )
+        MockClient.return_value = mock_client
+        run(create_draft_in_testit(
+            {**IMPROVED, "status": "NeedsWork"}, "6109",
+            manual_notes=["Clarify step 2"],
+        ))
+    assert mock_client.create_work_item_comment.await_count == 2
+
+
 def test_provenance_comment_posted_when_needs_review():
     with _patch_settings(), patch("app.tms.testit.draft_service.TestItClient") as MockClient:
         mock_client = _make_client()

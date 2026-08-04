@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
@@ -112,6 +113,12 @@ def env_float(name: str, default: float) -> float:
     if value is None or value == '':
         return default
     return float(value)
+
+
+# Caps how many browser sessions run at once — an unbounded burst of requests
+# (e.g. from bulk review) would otherwise spawn one Chromium per item and
+# exhaust host CPU/RAM.
+_SESSION_SEMAPHORE = asyncio.Semaphore(env_int('RUNNER_MAX_CONCURRENT_SESSIONS', 3))
 
 
 _DEFAULT_SYSTEM_INSTRUCTIONS = """
@@ -416,9 +423,27 @@ def create_llm(request: RunRequest) -> Any:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-def create_browser(request: RunRequest) -> Browser:
+def create_browser(request: RunRequest, start_url: str | None = None) -> Browser:
     cfg = request.browser_profile
     profile_kwargs: dict[str, Any] = {'headless': request.headless}
+
+    # Opt-in SSRF guard: off by default because a real, legitimate target here
+    # can be a local/staging/internal environment addressed by bare IP (no
+    # DNS set up yet) — this tool needs to reach whatever the user points it
+    # at. Turn on if the agent should never be steerable (e.g. via an
+    # on-page prompt injection) toward cloud metadata (169.254.169.254),
+    # localhost, or other internal addresses.
+    profile_kwargs['block_ip_addresses'] = env_bool('RUNNER_BLOCK_IP_ADDRESSES', False)
+
+    if request.sensitive_data:
+        # browser-use itself warns that sensitive_data with no allowed_domains
+        # exposes credentials to prompt injection from any page the agent
+        # navigates to — lock it to the task's own host when we know it.
+        host = urlparse(start_url).hostname if start_url else None
+        if host:
+            profile_kwargs['allowed_domains'] = [host, f'*.{host}']
+        else:
+            logger.warning('sensitive_data provided with no start_url to lock allowed_domains to')
 
     if cfg.is_mobile:
         profile_kwargs['user_agent'] = cfg.user_agent or _MOBILE_UA
@@ -1087,6 +1112,7 @@ async def run_test_case(request: RunRequest) -> RunResponse:
     log_handler = attach_run_log(run_dir)
     browser: Browser | None = None
 
+    await _SESSION_SEMAPHORE.acquire()
     try:
         original_request = request
         request = apply_runner_settings(request)
@@ -1121,7 +1147,7 @@ async def run_test_case(request: RunRequest) -> RunResponse:
             if not ok:
                 return fail_run(run_dir, request.test_case_id, started_at, 'PreflightError', message)
 
-        browser = create_browser(request)
+        browser = create_browser(request, start_url)
         task = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
 
         agent = Agent(
@@ -1196,8 +1222,12 @@ async def run_test_case(request: RunRequest) -> RunResponse:
         return fail_run(run_dir, request.test_case_id, started_at, type(exc).__name__, str(exc))
     finally:
         if browser is not None:
-            await browser.stop()
+            try:
+                await asyncio.wait_for(browser.stop(), timeout=5.0)
+            except Exception as _e:
+                logger.debug(f'browser.stop() error (non-fatal): {_e}')
         detach_run_log(log_handler)
+        _SESSION_SEMAPHORE.release()
 
 
 # ---------------------------------------------------------------------------
@@ -1215,6 +1245,21 @@ async def start_run_stream(request: RunRequest) -> dict[str, str]:
     return {'run_id': run_id}
 
 
+async def _hard_stop_after_grace(task: asyncio.Task, grace_sec: float = 5.0) -> None:
+    """agent.stop() is cooperative — it can be ignored by a step stuck on a wedged
+    page/action for up to step_timeout (default 180s). Give it a short grace
+    period, then cancel the run task outright. _stream_run already handles
+    CancelledError by writing a proper 'stopped' result, so this is a safe
+    hard-kill, not a crash."""
+    try:
+        await asyncio.wait_for(asyncio.shield(task), timeout=grace_sec)
+    except asyncio.TimeoutError:
+        if not task.done():
+            task.cancel()
+    except Exception:
+        pass
+
+
 @app.post('/runs/{run_id}/stop')
 async def stop_run(run_id: str) -> dict[str, str]:
     """Cancel an active streaming run."""
@@ -1225,6 +1270,7 @@ async def stop_run(run_id: str) -> dict[str, str]:
         agent.stop()  # graceful: sets state.stopped=True, breaks after current step
     task = _active_tasks.get(run_id)
     if task and not task.done():
+        asyncio.create_task(_hard_stop_after_grace(task))
         return {'status': 'stopping'}
     if agent is not None:
         return {'status': 'stopping'}
@@ -1365,6 +1411,8 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
     screencast_task: asyncio.Task[None] | None = None
     _orig_tz: str | None = os.environ.get('TZ')
 
+    await _SESSION_SEMAPHORE.acquire()
+
     async def push(event: dict) -> None:
         await queue.put(event)
 
@@ -1425,7 +1473,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
         if request.browser_profile.timezone_id:
             os.environ['TZ'] = request.browser_profile.timezone_id
 
-        browser = create_browser(request)
+        browser = create_browser(request, start_url)
         task_text = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
 
         async def on_step(state: Any, output: Any, step_num: int) -> None:
@@ -1681,6 +1729,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
         _active_tasks.pop(run_id, None)
         _active_agents.pop(run_id, None)
         await queue.put(None)  # sentinel → WS close
+        _SESSION_SEMAPHORE.release()
 
 
 # ---------------------------------------------------------------------------

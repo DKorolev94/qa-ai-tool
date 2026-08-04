@@ -166,6 +166,25 @@ class _LLMReviewResult(BaseModel):
     issues: list[_LLMIssue] = []
     warnings: list[str] = []
 
+    @field_validator("issues", mode="before")
+    @classmethod
+    def drop_invalid_issues(cls, v: object) -> object:
+        # One malformed issue (e.g. an unrecognized `rule` value the model
+        # invented) would otherwise fail the whole list — and analyze_testcase_with_llm
+        # falls back to a generic "AI analysis failed" result, discarding every
+        # issue that DID validate. Drop only the bad one instead.
+        if not isinstance(v, list):
+            return v
+        valid = []
+        for item in v:
+            try:
+                _LLMIssue.model_validate(item)
+            except Exception as exc:
+                logger.warning("Dropping one invalid LLM issue instead of discarding the whole review: %s", exc)
+                continue
+            valid.append(item)
+        return valid
+
 
 class _SummaryRewrite(BaseModel):
     """Internal model for the summary-language-fix retry call."""

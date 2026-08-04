@@ -159,6 +159,8 @@ async def update_testit_original(body: UpdateOriginalRequest) -> UpdateOriginalR
             source_work_item_id=body.source_work_item_id,
             source_attributes=body.source_attributes,
         )
+    except InvalidWorkItemInputError as exc:
+        raise HTTPException(status_code=400, detail=localize(exc.code, body.language, **exc.params))
     except TestItConfigError as exc:
         raise HTTPException(status_code=503, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItAuthError as exc:
@@ -345,7 +347,14 @@ async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
                     msg = message if isinstance(message, str) else message.decode()
                     await websocket.send_text(msg)
             except WebSocketDisconnect:
-                pass
+                # The frontend went away mid-run, not the runner finishing
+                # normally (that path ends the `async for` without raising) —
+                # stop the run instead of letting it keep burning LLM/browser
+                # time with nobody watching.
+                try:
+                    await runner_service.stop_session(run_id)
+                except Exception:
+                    pass
     except WebSocketDisconnect:
         pass
     except Exception as exc:
@@ -395,7 +404,7 @@ async def runner_screenshot(path: str) -> FileResponse:
     runs_root = pathlib.Path(runs_dir).resolve()
     target = pathlib.Path(path).resolve()
 
-    if not str(target).startswith(str(runs_root)):
+    if not target.is_relative_to(runs_root):
         raise HTTPException(status_code=403, detail="Access denied")
 
     if not target.exists() or not target.is_file():

@@ -50,7 +50,13 @@ def _coerce_testcase(raw: dict, original: dict) -> AnalyzedTestCase:
         return AnalyzedTestCase(
             title=str(original.get("title") or ""),
             description=str(original.get("description") or ""),
+            preconditions=[s for r in (original.get("preconditions") or []) for s in [_coerce_step(r)] if s],
             steps=[s for r in (original.get("steps") or []) for s in [_coerce_step(r)] if s],
+            postconditions=[s for r in (original.get("postconditions") or []) for s in [_coerce_step(r)] if s],
+            tags=list(original.get("tags") or []),
+            priority=original.get("priority"),
+            status=original.get("status"),
+            duration=original.get("duration"),
             attributes=original.get("attributes") or {},
         )
 

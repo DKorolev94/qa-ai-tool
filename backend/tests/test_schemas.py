@@ -7,6 +7,7 @@ from app.schemas.analysis import (
     AnalyzedTestCase,
     IssueResolution,
     _LLMIssue,
+    _LLMReviewResult,
 )
 from app.tms.testit.schemas import CreateDraftRequest, FetchTestItWorkItemRequest, UpdateOriginalRequest
 
@@ -148,3 +149,29 @@ def test_invalid_language_rejected():
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
         AnalyzeTestCaseRequest(raw_content="x", language="fr")
+
+
+def test_one_invalid_issue_dropped_not_whole_result():
+    # A `rule` value the model invented (not in ReviewRuleId, not in
+    # _RULE_ALIASES) used to fail list[_LLMIssue] validation entirely,
+    # discarding every issue that DID validate.
+    result = _LLMReviewResult(
+        reasoning="r",
+        summary="s",
+        issues=[
+            {"rule": "title", "severity": "high", "problem": "p1", "recommendation": "r1"},
+            {"rule": "not_a_real_rule", "severity": "high", "problem": "p2", "recommendation": "r2"},
+            {"rule": "steps", "severity": "low", "problem": "p3", "recommendation": "r3"},
+        ],
+    )
+    assert len(result.issues) == 2
+    assert {i.rule for i in result.issues} == {"title", "steps"}
+
+
+def test_all_valid_issues_survive_unchanged():
+    result = _LLMReviewResult(
+        reasoning="r",
+        summary="s",
+        issues=[{"rule": "title", "severity": "high", "problem": "p1", "recommendation": "r1"}],
+    )
+    assert len(result.issues) == 1

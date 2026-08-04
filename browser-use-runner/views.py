@@ -54,7 +54,12 @@ class RunRequest(BaseModel):
 	llm: LLMConfig = Field(default_factory=LLMConfig)
 	sensitive_data: dict[str, str] | None = Field(
 		default=None,
-		description='Placeholder → real value. Use {placeholder} in task. Values are redacted from logs/screenshots by browser-use.',
+		description=(
+			'Placeholder → real value. Use {placeholder} in task. Values are redacted '
+			'from text logs by browser-use, but NOT from screenshots/video/live frames — '
+			'the real value is visible wherever it was typed on screen. Only use test '
+			'credentials, never production secrets.'
+		),
 	)
 	browser_profile: BrowserProfileConfig = Field(default_factory=BrowserProfileConfig)
 

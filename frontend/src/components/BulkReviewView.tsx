@@ -30,6 +30,13 @@ function ItemRow({
   const isRunning = item.status !== 'done' && item.status !== 'error' && item.status !== 'cancelled'
   const hasNotes = item.status === 'done' && item.manual_notes.length > 0
   const isRetryable = canRetry && (item.status === 'error' || item.status === 'cancelled')
+
+  // canRetry (job-level "done") flips true→false the instant any retry
+  // starts and back to true once it resolves — that's exactly when a
+  // previously-clicked retry on this row (if any) is over.
+  useEffect(() => {
+    if (canRetry) setRetrying(false)
+  }, [canRetry])
   return (
     <div className={`bulk-review-row-wrap${expanded ? ' bulk-review-row-wrap--open' : ''}`}>
       <div

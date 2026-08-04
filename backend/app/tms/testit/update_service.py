@@ -4,6 +4,7 @@ import logging
 
 from app.core.config import settings
 from app.tms.testit.client import TestItClient, TestItConfigError
+from app.tms.testit.link_parser import extract_work_item_id
 from app.tms.testit.update_mapper import build_update_payload
 from app.tms.testit.schemas import UpdateOriginalResponse
 
@@ -17,6 +18,10 @@ async def apply_to_original_in_testit(
 ) -> UpdateOriginalResponse:
     if not settings.TESTIT_PROJECT_UUID:
         raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env", code="testit_project_uuid_missing")
+
+    # Normalize/validate like the fetch flow does — without this, an
+    # unvalidated id reaches the URL path built in client.get_work_item.
+    source_work_item_id = extract_work_item_id(source_work_item_id)
 
     client = TestItClient()
 

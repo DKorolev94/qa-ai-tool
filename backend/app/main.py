@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.core.config import settings
 
 _LOG_DIR = Path(__file__).parent.parent / "logs"
 _LOG_DIR.mkdir(exist_ok=True)
@@ -31,15 +32,23 @@ async def lifespan(app: FastAPI):
     app_logger = logging.getLogger("app")
     app_logger.setLevel(logging.DEBUG)
     app_logger.addHandler(_file_handler)
+    # Surface the active LLM config at startup — a misconfigured .env
+    # otherwise only shows up as a generic "LLM unavailable" deep inside the
+    # first analyze/improve request, with /health still reporting ok.
+    app_logger.info("LLM config: base_url=%s model=%s", settings.LLM_BASE_URL, settings.LLM_MODEL)
+    if not settings.TESTIT_BASE_URL or not settings.TESTIT_PRIVATE_TOKEN:
+        app_logger.warning("TestIT is not configured (TESTIT_BASE_URL/TESTIT_PRIVATE_TOKEN) — TestIT-backed endpoints will fail")
     yield
     app_logger.removeHandler(_file_handler)
 
 
 app = FastAPI(title="QA AI Tool", version="0.1.0", lifespan=lifespan)
 
+_cors_origins = ["*"] if settings.CORS_ORIGINS.strip() == "*" else [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

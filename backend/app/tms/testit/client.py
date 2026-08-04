@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from typing import Awaitable, Callable
 
 import httpx
 
@@ -61,21 +63,30 @@ class TestItClient:
             "Authorization": f"{self._auth_scheme} {self._token}",
         }
 
+    async def _with_retry(self, send: Callable[[], Awaitable[httpx.Response]]) -> httpx.Response:
+        """One retry with a short backoff on transient network failures — a
+        flaky TestIT instance shouldn't turn a single blip into a hard failure."""
+        for attempt in (0, 1):
+            try:
+                return await send()
+            except httpx.TimeoutException:
+                if attempt == 1:
+                    raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
+            except httpx.RequestError as exc:
+                if attempt == 1:
+                    raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+            await asyncio.sleep(0.5)
+        raise AssertionError("unreachable")  # loop always returns or raises above
+
     async def get_work_item(self, work_item_id: str) -> dict:
         self._check_config()
         url = f"{self._base_url}/api/v2/workItems/{work_item_id}"
         logger.debug("GET TestIT work item id=%s", work_item_id)
 
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.get(url, headers=self._headers())
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.get(url, headers=self._headers())
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError(
@@ -97,6 +108,8 @@ class TestItClient:
                 code="testit_response_error",
                 status_code=resp.status_code,
             )
+        if not isinstance(data, dict):
+            data = {}
 
         if not resp.is_success:
             msg = (
@@ -112,16 +125,10 @@ class TestItClient:
     async def get_project(self, project_id: str) -> dict:
         self._check_config()
         url = f"{self._base_url}/api/v2/projects/{project_id}"
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.get(url, headers=self._headers())
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.get(url, headers=self._headers())
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -130,6 +137,8 @@ class TestItClient:
             data = resp.json()
         except Exception:
             raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+        if not isinstance(data, dict):
+            data = {}
 
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or "TestIT API error"
@@ -140,16 +149,10 @@ class TestItClient:
     async def list_sections(self, project_id: str) -> list[dict]:
         self._check_config()
         url = f"{self._base_url}/api/v2/projects/{project_id}/sections"
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.get(url, headers=self._headers())
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.get(url, headers=self._headers())
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -160,7 +163,8 @@ class TestItClient:
             raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
 
         if not resp.is_success:
-            msg = data.get("message") or data.get("detail") or "TestIT API error"
+            err = data if isinstance(data, dict) else {}
+            msg = err.get("message") or err.get("detail") or "TestIT API error"
             raise TestItApiError(str(msg), status_code=resp.status_code)
 
         return data if isinstance(data, list) else data.get("items", [])
@@ -168,16 +172,10 @@ class TestItClient:
     async def list_attributes(self, project_id: str) -> list[dict]:
         self._check_config()
         url = f"{self._base_url}/api/v2/projects/{project_id}/attributes"
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.get(url, headers=self._headers())
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.get(url, headers=self._headers())
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -188,7 +186,8 @@ class TestItClient:
             raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
 
         if not resp.is_success:
-            msg = data.get("message") or data.get("detail") or "TestIT API error"
+            err = data if isinstance(data, dict) else {}
+            msg = err.get("message") or err.get("detail") or "TestIT API error"
             raise TestItApiError(str(msg), status_code=resp.status_code)
 
         return data if isinstance(data, list) else data.get("items", [])
@@ -217,20 +216,14 @@ class TestItClient:
         payload: dict = {"name": name, "projectId": project_id}
         if parent_id:
             payload["parentId"] = parent_id
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.post(
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.post(
                     url,
                     headers={**self._headers(), "Content-Type": "application/json"},
                     json=payload,
                 )
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -239,6 +232,8 @@ class TestItClient:
             data = resp.json()
         except Exception:
             raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+        if not isinstance(data, dict):
+            data = {}
 
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or "TestIT API error"
@@ -258,16 +253,10 @@ class TestItClient:
             [t["name"] for t in payload.get("tags", [])],
         )
 
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.post(url, headers={**self._headers(), "Content-Type": "application/json"}, json=payload)
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.post(url, headers={**self._headers(), "Content-Type": "application/json"}, json=payload)
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -280,6 +269,8 @@ class TestItClient:
                 code="testit_response_error",
                 status_code=resp.status_code,
             )
+        if not isinstance(data, dict):
+            data = {}
 
         if not resp.is_success:
             logger.error(
@@ -302,17 +293,14 @@ class TestItClient:
     async def create_work_item_comment(self, work_item_id: str, text: str) -> dict:
         self._check_config()
         url = f"{self._base_url}/api/v2/workItems/comments"
-        try:
+        async def _do() -> httpx.Response:
             async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
-                resp = await client.post(
+                return await client.post(
                     url,
                     headers={**self._headers(), "Content-Type": "application/json"},
                     json={"workItemId": work_item_id, "text": text[:1024]},
                 )
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -320,6 +308,8 @@ class TestItClient:
             data = resp.json()
         except Exception:
             raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+        if not isinstance(data, dict):
+            data = {}
         if not resp.is_success:
             msg = data.get("message") or data.get("detail") or data.get("title") or f"HTTP {resp.status_code}"
             raise TestItApiError(str(msg), status_code=resp.status_code)
@@ -331,20 +321,14 @@ class TestItClient:
         url = f"{self._base_url}/api/v2/workItems"
         logger.debug("PUT TestIT update work item id=%s", work_item_id)
 
-        try:
-            async with httpx.AsyncClient(
-                verify=self._verify_ssl,
-                timeout=float(self._timeout),
-            ) as client:
-                resp = await client.put(
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.put(
                     url,
                     headers={**self._headers(), "Content-Type": "application/json"},
                     json=payload,
                 )
-        except httpx.TimeoutException:
-            raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
-        except httpx.RequestError as exc:
-            raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+        resp = await self._with_retry(_do)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -371,6 +355,8 @@ class TestItClient:
                 code="testit_response_error",
                 status_code=resp.status_code,
             )
+        if not isinstance(data, dict):
+            data = {}
 
         if not resp.is_success:
             logger.error(

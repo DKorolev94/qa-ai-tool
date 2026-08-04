@@ -994,6 +994,14 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
 
   const tc = fetchResult.normalized_testcase
   const initialEnabledRules = useRef(enabledRules)
+  // Guards the four user-triggered handlers below (runAnalyze/runImprove/
+  // runCreateDraft/runApplyToOriginal) against applying a resolved
+  // response's state after the user has navigated away (onBack unmounts
+  // this component) mid-request.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    return () => { mountedRef.current = false }
+  }, [])
   // What each rule actually checks — shown as a tooltip on the issue's short label,
   // since e.g. "Independence" alone doesn't say what independence means here.
   const ruleDescriptions = Object.fromEntries(reviewConfig.rules.map(r => [r.id, r.description]))
@@ -1029,6 +1037,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   }, []) // initial mount only; rule changes handled by runAnalyze
 
   async function runAnalyze() {
+    if (analyzeLoading) return // guards a fast double-click before the disabled-button re-render lands
     setAnalyzeLoading(true)
     setAnalyzeError(null)
     setAnalyzeResult(null)
@@ -1044,18 +1053,20 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         work_item: fetchResult.raw_work_item,
         enabled_rules: enabledRules,
       })
+      if (!mountedRef.current) return
       setAnalyzeResult(result)
     } catch (err) {
+      if (!mountedRef.current) return
       setAnalyzeError((err as Error).message)
     } finally {
-      setAnalyzeLoading(false)
+      if (mountedRef.current) setAnalyzeLoading(false)
     }
   }
   // Note: initial analysis on mount uses the useEffect below with cancel-flag
   // to prevent React StrictMode double-invocation from firing two LLM requests
 
   async function runImprove() {
-    if (!analyzeResult) return
+    if (!analyzeResult || improveLoading) return
     setImproveLoading(true)
     setImproveError(null)
     setImproveResult(null)
@@ -1073,20 +1084,22 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         selected_issues: issuesToFix,
         enabled_rules: enabledRules,
       })
+      if (!mountedRef.current) return
       setImproveResult(result)
       setEditedTestCase(result.improved_testcase)
       setIsEditing(false)
       setActiveTab('improved')
     } catch (err) {
+      if (!mountedRef.current) return
       setImproveError((err as Error).message)
       setActiveTab('improved')
     } finally {
-      setImproveLoading(false)
+      if (mountedRef.current) setImproveLoading(false)
     }
   }
 
   async function runCreateDraft() {
-    if (!improveResult) return
+    if (!improveResult || draftLoading) return
     setDraftLoading(true)
     setDraftError(null)
     try {
@@ -1096,16 +1109,18 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         source_attributes: (fetchResult.raw_work_item.attributes ?? {}) as Record<string, unknown>,
         manual_notes: improveResult.manual_notes ?? [],
       })
+      if (!mountedRef.current) return
       setDraftResult(result)
     } catch (err) {
+      if (!mountedRef.current) return
       setDraftError(humanizeDraftError((err as Error).message))
     } finally {
-      setDraftLoading(false)
+      if (mountedRef.current) setDraftLoading(false)
     }
   }
 
   async function runApplyToOriginal() {
-    if (!improveResult) return
+    if (!improveResult || applyLoading) return
     setApplyLoading(true)
     setApplyError(null)
     setApplyResult(null)
@@ -1115,12 +1130,16 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
         source_work_item_id: fetchResult.work_item_id,
         source_attributes: (fetchResult.raw_work_item.attributes ?? {}) as Record<string, unknown>,
       })
+      if (!mountedRef.current) return
       setApplyResult(result)
     } catch (err) {
+      if (!mountedRef.current) return
       setApplyError((err as Error).message)
     } finally {
-      setApplyLoading(false)
-      setShowConfirmApply(false)
+      if (mountedRef.current) {
+        setApplyLoading(false)
+        setShowConfirmApply(false)
+      }
     }
   }
 
@@ -1292,7 +1311,7 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
     { id: 'json' as const, label: t('workbench.tabs.json'), disabled: false, count: null },
   ]
 
-  const isLoading = analyzeLoading || improveLoading || draftLoading
+  const isLoading = analyzeLoading || improveLoading || draftLoading || applyLoading
   const bannerNotifications: ActionNotification[] = [
     ...(draftResult ? [{
       type: 'draft' as const,

@@ -144,12 +144,22 @@ async def create_draft_in_testit(
     needs_review = payload.get("state") != "Ready"
     if work_item_id and needs_review:
         provenance = f"🤖 Сгенерировано qa-ai-tool из #{source_work_item_id}. Требуется проверка QA перед заменой оригинала."
-        try:
-            await client.create_work_item_comment(work_item_id, provenance)
-            for note in manual_notes or []:
-                await client.create_work_item_comment(work_item_id, note)
-        except Exception:
-            logger.exception("Failed to post draft comment(s) for work_item_id=%s", work_item_id)
+        comments = [provenance, *(manual_notes or [])]
+        posted = 0
+        for comment in comments:
+            try:
+                await client.create_work_item_comment(work_item_id, comment)
+                posted += 1
+            except Exception:
+                logger.exception(
+                    "Failed to post one draft comment for work_item_id=%s (comment: %.80s)",
+                    work_item_id, comment,
+                )
+        if posted < len(comments):
+            logger.warning(
+                "Draft work_item_id=%s only got %d/%d comments posted — some manual-review notes may be missing in TestIT",
+                work_item_id, posted, len(comments),
+            )
 
     testit_url: str | None = None
     if global_id and settings.TESTIT_BASE_URL:
