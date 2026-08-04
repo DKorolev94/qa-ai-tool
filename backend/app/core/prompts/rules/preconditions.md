@@ -9,6 +9,7 @@ Flag `high` if:
 Flag `medium` if:
 - preconditions only say "Browser is open" — this carries no information, better to remove it or replace it with a real setup step that has a URL.
 - preconditions describe a state without an action: "User is authenticated" instead of "Log in with account X" — it's unclear how to reach that state.
+- the title, steps, or expected results reference a specific browser, OS, device, or screen size (mobile layout, a responsive breakpoint, a cross-browser CSS check, an app-specific gesture), but preconditions don't state which environment to run in. Don't flag this for ordinary functional/business-logic checks that don't depend on the environment — only when the case is plausibly about the environment itself.
 
 Don't flag if:
 - preconditions describe concrete setup actions: "Go to https://...", "Log in with the credentials in test_data", "Go to section Z". This is the correct format.
@@ -36,3 +37,5 @@ Example of a correct structure:
 If the setup steps are hard to separate from the test, or the boundary is unclear → `manual_needed`: "Specify where setup ends and the actual test begins — which steps to move into preconditions."
 
 If a precondition references another test case → `manual_needed`: "Replace the reference to the test case with concrete setup steps."
+
+If the environment (browser/OS/device/screen size) is missing but the case plausibly depends on it → `manual_needed`: "State the required browser/device/screen size for this test." Don't guess a specific browser or device — that's a business decision, not something derivable from the test case text.

@@ -18,6 +18,7 @@ Flag `low` if:
 - the first step is navigation to a URL, and preconditions already describe the state "Page X is open" or "User is on page X". The navigation step duplicates the precondition.
 - steps 1–N are a login flow (entering a username, entering a password, clicking the login button), and preconditions already describe the state "User is authenticated" or "Valid credentials are entered / User is successfully authenticated". The login steps duplicate the precondition. Flag only if the precondition explicitly describes a state AFTER login — don't flag if the precondition only describes "The login page is open".
 - the action contains automation-technical terms: `by locator`, `selector`, `xpath`, `css selector`, `element id`. Such terms aren't allowed in a manual test case.
+- the case has an unusually large number of steps (rough guideline: more than ~20) and a chunk of them is generic setup/navigation (login, getting to a section, filling an unrelated form) rather than the scenario itself. That setup is a candidate for a shared step, reused across cases — flag it as a maintainability observation, not a correctness problem with this specific case.
 
 Don't flag if:
 - the actions are physically inseparable. Example: `press and hold`. That's one atomic operation.
@@ -50,3 +51,5 @@ If the issue is about automation-technical terms: remove the technical term, kee
 If the issue is about a step duplicating the expected result: remove the step. Its content is already in the expected result of the previous step.
 
 If the issue is about a navigation step duplicating a precondition: remove the navigation step. The precondition already describes the needed state.
+
+If the issue is about a large step count with extractable setup → `manual_needed`: "Steps N-M are generic setup — consider extracting them into a shared step reused across cases." Don't restructure it yourself; creating a shared step is a TestIT-level action outside what this improve pass can do.
