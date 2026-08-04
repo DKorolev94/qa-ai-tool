@@ -384,3 +384,30 @@ def test_bare_ui_element_value_stripped_english():
     ])
     result = postprocess_improved_testcase({}, improved)
     assert result["steps"][0]["test_data"] is None
+
+
+def test_literal_null_string_stripped_from_test_data():
+    improved = _base_improved(steps=[
+        {"action": "Open the login page", "expected": "Page loaded", "test_data": "null"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+    assert result["has_stripped_placeholder"] is True
+
+
+def test_literal_none_and_na_strings_stripped_from_test_data():
+    improved = _base_improved(steps=[
+        {"action": "Step one", "expected": "OK", "test_data": "None"},
+        {"action": "Step two", "expected": "OK", "test_data": "N/A"},
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] is None
+    assert result["steps"][1]["test_data"] is None
+
+
+def test_real_value_containing_null_substring_not_stripped():
+    improved = _base_improved(steps=[
+        {"action": "Enter username", "expected": "OK", "test_data": "annullment_test_user"}
+    ])
+    result = postprocess_improved_testcase({}, improved)
+    assert result["steps"][0]["test_data"] == "annullment_test_user"

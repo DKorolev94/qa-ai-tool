@@ -51,6 +51,13 @@ _UI_ELEMENT_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Some models (especially grammar-constrained JSON_SCHEMA mode on local/Ollama
+# providers) write the literal word "null"/"none"/"n/a" as a string value when
+# they mean "no test data", instead of actually leaving the field empty — the
+# schema's `str | None` gets serialized as the text "null" rather than the
+# JSON null it represents. Treat the whole field as empty in that case.
+_NULL_LITERAL_RE = re.compile(r'^\s*(?:null|none|n/?a|nil|undefined)\s*$', re.IGNORECASE)
+
 _EMAIL_RE = re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+')
 
 # Field/action context that signals a secret-like value (password, token) so
@@ -70,7 +77,9 @@ def _strip_placeholder_syntax(step: dict) -> bool:
     stripped = False
     test_data = step.get("test_data")
     if isinstance(test_data, str) and (
-        _PLACEHOLDER_SYNTAX_RE.search(test_data) or _UI_ELEMENT_VALUE_RE.search(test_data)
+        _PLACEHOLDER_SYNTAX_RE.search(test_data)
+        or _UI_ELEMENT_VALUE_RE.search(test_data)
+        or _NULL_LITERAL_RE.match(test_data)
     ):
         step["test_data"] = None
         stripped = True
