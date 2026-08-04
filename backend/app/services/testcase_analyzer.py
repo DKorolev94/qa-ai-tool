@@ -2,6 +2,7 @@ from __future__ import annotations
 import logging
 import re
 from app.core.llm_client import analyze_testcase_with_llm
+from app.core.service_i18n import localize as _localize
 from app.tms.testit.parser import parse_testit_content
 from app.tms.testit.workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import (
@@ -57,6 +58,7 @@ def _coerce_testcase(raw: dict, original: dict) -> AnalyzedTestCase:
 def _complete_resolutions(
     resolutions: list[IssueResolution],
     issues: list[dict],
+    language: str = "ru",
 ) -> list[IssueResolution]:
     valid_resolutions = [r for r in resolutions if 0 <= r.issue_index < len(issues)]
     seen = {r.issue_index for r in valid_resolutions}
@@ -67,7 +69,7 @@ def _complete_resolutions(
                 issue_index=idx,
                 issue_title=str(issues[idx].get("title", "") if isinstance(issues[idx], dict) else ""),
                 status="skipped",
-                reason="Not processed by LLM",
+                reason=_localize("not_processed_by_llm", language),
             ))
     result.sort(key=lambda r: r.issue_index)
     return result

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 
+from app.core.service_i18n import localize as _localize
 from app.core.time_utils import format_duration_ms as _format_duration_ms
 
 # LLM often confuses ms/s/min; discard improved duration if suspiciously small
@@ -270,6 +271,7 @@ def _process_duration(improved: dict) -> tuple[str | None, int | None]:
 def postprocess_improved_testcase(
     original: dict,
     improved: dict,
+    language: str = "ru",
 ) -> dict:
     result = dict(improved)
     for _section in ("steps", "preconditions", "postconditions"):
@@ -303,7 +305,7 @@ def postprocess_improved_testcase(
     original_steps = original.get("steps") or []
     steps_restructured = len(steps) != len(original_steps)
     if not steps:
-        validation_warnings.append("Improved test case has no steps")
+        validation_warnings.append(_localize("no_steps", language))
     else:
         for i, step in enumerate(steps):
             if not isinstance(step, dict):
@@ -312,7 +314,7 @@ def postprocess_improved_testcase(
                 placeholder_found = True
             _dedupe_action_test_data(step)
             if not step.get("action"):
-                validation_warnings.append(f"Step {i + 1}: missing action")
+                validation_warnings.append(_localize("step_missing_action", language, n=i + 1))
             # Only warn if original had expected result but improved lost it.
             # Skip index-based check when step count changed — LLM restructured
             # steps (split/merge) and expected results may have moved to other indices.
@@ -320,7 +322,7 @@ def postprocess_improved_testcase(
                 orig_expected = original_steps[i].get("expected") if i < len(original_steps) else None
                 if not step.get("expected") and orig_expected:
                     step["expected"] = orig_expected
-                    validation_warnings.append(f"Step {i + 1}: expected result restored from original")
+                    validation_warnings.append(_localize("step_expected_restored", language, n=i + 1))
 
     # Duration — discard LLM value if suspiciously small (LLM confused ms with seconds/minutes).
     # Floor is 60 000 ms (1 min) — any test shorter than that is likely a unit confusion.

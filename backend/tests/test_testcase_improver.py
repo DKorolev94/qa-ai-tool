@@ -152,7 +152,15 @@ def test_improve_strips_placeholder_and_marks_case_needs_work():
 
     assert result.improved_testcase.steps[0].test_data is None
     assert result.improved_testcase.status == "NeedsWork"
-    assert any("stand-in value" in n for n in result.manual_notes)
+    assert any("заглушку" in n for n in result.manual_notes)
+
+    with patch("app.services.testcase_improver.improve_testcase_with_llm", return_value=llm_result):
+        result_en = improve_testcase(
+            work_item=SAMPLE_WORK_ITEM, raw_content=None, selected_issues=issues, language="en",
+        )
+
+    assert result_en.improved_testcase.status == "NeedsWork"
+    assert any("stand-in value" in n for n in result_en.manual_notes)
 
 
 def test_improve_passes_language_to_llm(monkeypatch):

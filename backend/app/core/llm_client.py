@@ -11,6 +11,7 @@ from openai import OpenAI
 
 from app.core.config import settings
 from app.core.prompt_builder import build_improve_prompt, build_review_prompt
+from app.core.service_i18n import localize as _localize
 from app.schemas.analysis import (
     AnalysisIssue,
     ImproveResult,
@@ -39,18 +40,19 @@ def _root_cause(exc: Exception) -> str:
     return f"{type(cause).__name__}: {msg}"
 
 
-_FALLBACK_REVIEW = ReviewResult(
-    summary="LLM is unavailable. The test case was parsed, but analysis could not run.",
-    issues=[
-        AnalysisIssue(
-            severity="medium",
-            title="AI analysis failed",
-            description="The LLM endpoint is unavailable or returned invalid data.",
-            recommendation="Check the LLM_BASE_URL and LLM_MODEL settings in .env.",
-        )
-    ],
-    warnings=["LLM is unavailable, fallback response returned"],
-)
+def _fallback_review(language: str) -> ReviewResult:
+    return ReviewResult(
+        summary=_localize("fallback_summary", language),
+        issues=[
+            AnalysisIssue(
+                severity="medium",
+                title=_localize("fallback_issue_title", language),
+                description=_localize("fallback_issue_description", language),
+                recommendation=_localize("fallback_issue_recommendation", language),
+            )
+        ],
+        warnings=["LLM is unavailable, fallback response returned"],
+    )
 
 
 def _make_client(mode: instructor.Mode) -> instructor.Instructor:
@@ -177,7 +179,7 @@ def analyze_testcase_with_llm(
         )
     except Exception as exc:
         logger.error("LLM analyze failed (%.1fs) [%s]: %s", time.perf_counter() - t0, type(exc).__name__, _root_cause(exc))
-        return _FALLBACK_REVIEW
+        return _fallback_review(language)
 
 
 def improve_testcase_with_llm(

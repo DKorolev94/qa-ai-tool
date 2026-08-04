@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 from app.core.llm_client import improve_testcase_with_llm
+from app.core.service_i18n import localize as _localize
 from app.tms.testit.parser import parse_testit_content
 from app.tms.testit.workitem_mapper import normalize_testit_workitem
 from app.schemas.analysis import ImproveResult, ImproveTestCaseResponse, IssueResolution
@@ -41,11 +42,6 @@ _LINKED_DOC_PLACEHOLDERS = (
 _CONTEXT_DEPENDENT_RULES = {
     "test_data",
     "reproducibility",
-}
-
-_CONTEXT_DEPENDENT_TITLES = {
-    "Test data",
-    "Reproducibility",
 }
 
 
@@ -122,6 +118,7 @@ def _validate_resolutions(
     improved: dict,
     original: dict,
     selected_issues: list[dict],
+    language: str = "ru",
 ) -> list[IssueResolution]:
     result = []
     has_bad_linked_docs_placeholder = _uses_linked_docs_without_links(improved, original)
@@ -129,19 +126,16 @@ def _validate_resolutions(
         if r.status == "resolved":
             issue = selected_issues[r.issue_index] if 0 <= r.issue_index < len(selected_issues) else None
             issue_rule = _issue_rule(issue)
-            is_context_dependent = (
-                issue_rule in _CONTEXT_DEPENDENT_RULES
-                or r.issue_title in _CONTEXT_DEPENDENT_TITLES
-            )
+            is_context_dependent = issue_rule in _CONTEXT_DEPENDENT_RULES
             if has_bad_linked_docs_placeholder and is_context_dependent:
                 r = r.model_copy(update={
                     "status": "manual_needed",
-                    "reason": "Improvement references linked documents, but links is empty — a real data source is needed",
+                    "reason": _localize("linked_docs_placeholder", language),
                 })
             elif not _rule_field_changed(issue_rule, original, improved):
                 r = r.model_copy(update={
                     "status": "skipped",
-                    "reason": "Field unchanged — improvement not applied",
+                    "reason": _localize("field_unchanged", language),
                 })
         result.append(r)
     return result
@@ -170,7 +164,7 @@ def improve_testcase(
 
     improved_raw = llm_result.improved_testcase.model_dump()
     improved_raw = _restore_untouched_fields(improved_raw, clean_dict, selected_issues)
-    processed = postprocess_improved_testcase(clean_dict, improved_raw)
+    processed = postprocess_improved_testcase(clean_dict, improved_raw, language)
     validation_warnings: list[str] = processed.pop("validation_warnings", [])
     _proc_notes = processed.pop("improvement_notes", None)
     improvement_notes = _proc_notes if _proc_notes else llm_result.improvement_notes
@@ -179,25 +173,16 @@ def improve_testcase(
     processed.pop("warnings", None)
     has_invented_data = processed.pop("has_invented_data", False)
     if has_invented_data:
-        manual_notes = list(manual_notes) + [
-            "The LLM wrote test data (email/password/token) not present in the source test case — "
-            "verify or replace it with a real value before using this test case."
-        ]
+        manual_notes = list(manual_notes) + [_localize("invented_test_data", language)]
     has_stripped_placeholder = processed.pop("has_stripped_placeholder", False)
     if has_stripped_placeholder:
-        manual_notes = list(manual_notes) + [
-            "Test data is missing for at least one step and no real value could be determined — "
-            "state it manually rather than leaving a stand-in value."
-        ]
+        manual_notes = list(manual_notes) + [_localize("stripped_placeholder", language)]
     has_missing_param_tokens = processed.pop("has_missing_param_tokens", False)
     if has_missing_param_tokens:
-        manual_notes = list(manual_notes) + [
-            "A TestIT parameter reference (%param%) from the source test case appears to be "
-            "missing or altered — check the diff and restore it if needed."
-        ]
+        manual_notes = list(manual_notes) + [_localize("missing_param_tokens", language)]
 
-    issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues)
-    issue_resolutions = _validate_resolutions(issue_resolutions, processed, clean_dict, selected_issues)
+    issue_resolutions = _complete_resolutions(llm_result.issue_resolutions, selected_issues, language)
+    issue_resolutions = _validate_resolutions(issue_resolutions, processed, clean_dict, selected_issues, language)
 
     has_manual_needed = (
         any(r.status == "manual_needed" for r in issue_resolutions)

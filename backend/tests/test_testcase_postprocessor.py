@@ -113,7 +113,7 @@ def test_step_without_expected_warns_only_if_original_had_expected():
     improved = _base_improved(steps=[{"action": "Click button", "expected": None}])
     result = postprocess_improved_testcase(original, improved)
     assert result["steps"][0]["expected"] == "Button is clicked"
-    assert any("expected result" in w for w in result["validation_warnings"])
+    assert any("ожидаемый результат восстановлен" in w for w in result["validation_warnings"])
 
 
 def test_step_without_expected_no_warning_if_original_also_missing():
@@ -138,12 +138,24 @@ def test_no_expected_warning_when_steps_restructured():
 def test_empty_steps_adds_validation_warning():
     improved = _base_improved(steps=[])
     result = postprocess_improved_testcase({}, improved)
+    assert any("нет шагов" in w.lower() for w in result["validation_warnings"])
+
+
+def test_empty_steps_adds_validation_warning_english():
+    improved = _base_improved(steps=[])
+    result = postprocess_improved_testcase({}, improved, "en")
     assert any("no steps" in w.lower() for w in result["validation_warnings"])
 
 
 def test_step_without_action_adds_validation_warning():
     improved = _base_improved(steps=[{"action": "", "expected": "Something"}])
     result = postprocess_improved_testcase({}, improved)
+    assert any("отсутствует действие" in w.lower() for w in result["validation_warnings"])
+
+
+def test_step_without_action_adds_validation_warning_english():
+    improved = _base_improved(steps=[{"action": "", "expected": "Something"}])
+    result = postprocess_improved_testcase({}, improved, "en")
     assert any("missing action" in w.lower() for w in result["validation_warnings"])
 
 
