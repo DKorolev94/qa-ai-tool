@@ -36,6 +36,7 @@ class RunRequest(BaseModel):
 	model_config = ConfigDict(extra='forbid')
 
 	test_case_id: str | None = None
+	language: Literal['ru', 'en'] = 'ru'
 	task: str = Field(min_length=1, description='Full browser-use task prompt')
 	start_url: str | None = Field(default=None, description='Open this URL before starting the task')
 	preflight_url: bool = Field(default=True, description='Check start_url availability before browser-use starts')

@@ -146,6 +146,7 @@ async def start_manual_streaming(body: RunnerManualStartRequest) -> dict:
     payload: dict = {
         'test_case_id': body.test_case_id or 'manual',
         'task': _build_manual_task_prompt(body.task),
+        'language': body.language,
     }
     start_url = body.start_url
     if not start_url:
@@ -170,13 +171,13 @@ async def start_manual_streaming(body: RunnerManualStartRequest) -> dict:
         return response.json()
 
 
-async def start_testit_streaming(work_item_id: str, iteration_index: int = 0) -> dict:
+async def start_testit_streaming(work_item_id: str, iteration_index: int = 0, language: str = 'ru') -> dict:
     fetch_result = await fetch_and_normalize_work_item(work_item_id)
     testcase = NormalizedTestCase(**fetch_result.normalized_testcase)
     params = _params_row(testcase, iteration_index)
     task = _build_task_prompt(testcase, params)
     start_url = _extract_url(testcase, params)
-    payload: dict = {'test_case_id': work_item_id, 'task': task}
+    payload: dict = {'test_case_id': work_item_id, 'task': task, 'language': language}
     if start_url:
         payload['start_url'] = start_url
     async with httpx.AsyncClient() as client:

@@ -37,6 +37,24 @@ RUNS_DIR = RUNNER_DIR / 'runs'
 RUN_SCHEMA_VERSION = '2026-05-18.1'
 RUN_FOLDERS = ('raw', 'logs', 'ui', 'metrics', 'media/screenshots')
 
+# User-facing labels for streamed WS 'log' events — keyed by RunRequest.language
+_RUNNER_LOG_STRINGS = {
+    'ru': {
+        'model': 'Модель', 'browser': 'Браузер', 'device': 'Устройство',
+        'max_steps': 'Шагов макс', 'locale': 'Локаль', 'step': 'Шаг',
+        'total': 'итого', 'cache': 'кэш', 'summary_total': 'Итого',
+        'steps_word': 'шагов', 'all_tokens': 'всего', 'tokens_word': 'токенов',
+        'sec_suffix': 'с',
+    },
+    'en': {
+        'model': 'Model', 'browser': 'Browser', 'device': 'Device',
+        'max_steps': 'Max steps', 'locale': 'Locale', 'step': 'Step',
+        'total': 'total', 'cache': 'cache', 'summary_total': 'Total',
+        'steps_word': 'steps', 'all_tokens': 'total', 'tokens_word': 'tokens',
+        'sec_suffix': 's',
+    },
+}
+
 # Live run queues: run_id → asyncio.Queue of WS events
 _live_runs: dict[str, asyncio.Queue] = {}
 # Active run tasks: run_id → asyncio.Task (for cancellation)
@@ -1352,6 +1370,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
 
     try:
         request = apply_runner_settings(original_request)
+        L = _RUNNER_LOG_STRINGS.get(request.language, _RUNNER_LOG_STRINGS['ru'])
         write_json(run_dir / 'raw' / 'api_request.json', redact_request(original_request))
         write_json(run_dir / 'raw' / 'request.json', redact_request(request))
         append_event(run_dir, 'started', {
@@ -1364,13 +1383,13 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
 
         profile_cfg = request.browser_profile
         info_parts = [
-            f'Модель: {request.llm.model}',
-            f'Браузер: Chromium',
-            f'Устройство: {"Mobile" if profile_cfg.is_mobile else "Desktop"}',
-            f'Шагов макс: {request.max_steps}',
+            f'{L["model"]}: {request.llm.model}',
+            f'{L["browser"]}: Chromium',
+            f'{L["device"]}: {"Mobile" if profile_cfg.is_mobile else "Desktop"}',
+            f'{L["max_steps"]}: {request.max_steps}',
         ]
         if profile_cfg.locale:
-            info_parts.append(f'Локаль: {profile_cfg.locale}')
+            info_parts.append(f'{L["locale"]}: {profile_cfg.locale}')
         if profile_cfg.timezone_id:
             info_parts.append(f'TZ: {profile_cfg.timezone_id}')
         await push({
@@ -1450,7 +1469,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
             elif actions:
                 summary = summarize_actions(actions)
             else:
-                summary = next_goal_val or f'Шаг {step_num}'
+                summary = next_goal_val or f'{L["step"]} {step_num}'
 
             screenshot_b64 = getattr(state, 'screenshot', None) or None
 
@@ -1481,7 +1500,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
                     c = int(getattr(last.usage, 'completion_tokens', 0) or 0)
                     await push({
                         'type': 'log', 'level': 'info', 'category': 'tokens', 'source': 'session',
-                        'message': f'Шаг {step_num} — prompt: {p:,} · completion: {c:,} · итого: {p+c:,}',
+                        'message': f'{L["step"]} {step_num} — prompt: {p:,} · completion: {c:,} · {L["total"]}: {p+c:,}',
                         'elapsed_sec': round(time.monotonic() - started_at, 1),
                     })
             except Exception:
@@ -1547,15 +1566,15 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
         response = finish_run(run_dir, response, history, request)
 
         cached = usage.prompt_cached_tokens or 0
-        cache_str = f' · кэш: {cached:,}' if cached else ''
+        cache_str = f' · {L["cache"]}: {cached:,}' if cached else ''
         await push({
             'type': 'log', 'level': 'info', 'category': 'summary', 'source': 'session',
             'message': (
-                f'Итого: {response.steps_count} шагов · '
+                f'{L["summary_total"]}: {response.steps_count} {L["steps_word"]} · '
                 f'prompt: {usage.prompt_tokens:,}{cache_str} · '
                 f'completion: {usage.completion_tokens:,} · '
-                f'всего: {usage.total_tokens:,} токенов · '
-                f'{round(time.monotonic() - started_at, 1)}с'
+                f'{L["all_tokens"]}: {usage.total_tokens:,} {L["tokens_word"]} · '
+                f'{round(time.monotonic() - started_at, 1)}{L["sec_suffix"]}'
             ),
             'elapsed_sec': round(time.monotonic() - started_at, 1),
         })

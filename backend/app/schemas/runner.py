@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, StringConstraints
 class RunnerStartRequest(BaseModel):
     work_item_id: str = Field(..., min_length=1)
     iteration_index: int = Field(default=0, ge=0)
+    language: Literal['ru', 'en'] = 'ru'
 
 
 class BrowserProfileRequest(BaseModel):
@@ -25,6 +26,7 @@ class RunnerManualStartRequest(BaseModel):
     test_case_id: str | None = None
     sensitive_data: dict[str, str] | None = None
     browser_profile: BrowserProfileRequest | None = None
+    language: Literal['ru', 'en'] = 'ru'
 
 
 class RunnerScreenshot(BaseModel):

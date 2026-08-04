@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import i18n from '../i18n'
 import type {
   ActionDetail, HistoricalStep, RunnerSession, RunnerSessionStatus,
   WsDoneEvent, WsEvent, WsFrameEvent, WsLogEvent, WsStepEvent, WsStepPendingEvent, WsStepUpdateEvent,
@@ -608,7 +609,7 @@ function LogsPane({
   const visible = sessionLogs.filter(filterLog)
 
   // First runner config log (model · browser · steps)
-  const configLog = visible.find(l => l.category === 'runner' && l.message.startsWith('Модель:') || l.message.startsWith('Model:'))
+  const configLog = visible.find(l => l.category === 'runner' && (l.message.startsWith('Модель:') || l.message.startsWith('Model:')))
 
   useEffect(() => {
     if (running && scrollRef.current) {
@@ -882,14 +883,16 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
           runId = externalRunId
         } else {
           const path = session.source === 'manual' ? '/api/runner/start-manual' : '/api/runner/start-testit'
+          const language = i18n.language === 'en' ? 'en' : 'ru'
           const body = session.source === 'manual'
             ? {
                 task: session.task!,
                 start_url: session.startUrl,
+                language,
                 ...(session.sensitiveData ? { sensitive_data: session.sensitiveData } : {}),
                 ...(session.browserProfile ? { browser_profile: session.browserProfile } : {}),
               }
-            : { work_item_id: session.workItemId!, iteration_index: session.iterationIndex ?? 0 }
+            : { work_item_id: session.workItemId!, iteration_index: session.iterationIndex ?? 0, language }
 
           const res = await fetch(path, {
             method: 'POST',

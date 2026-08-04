@@ -189,7 +189,9 @@ function fmtDate(iso: string, t: TFunction): string {
   const hm = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
   if (diffDays === 0) return t('runnerView.time.today', { time: hm })
   if (diffDays === 1) return t('runnerView.time.yesterday', { time: hm })
-  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '') + '., ' + hm
+  const datePart = d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace(/\.$/, '')
+  const suffix = i18n.language === 'en' ? ', ' : '., '
+  return datePart + suffix + hm
 }
 
 // ── Session history ───────────────────────────────────────────────────────
