@@ -348,22 +348,18 @@ def postprocess_improved_testcase(
     invented = _find_invented_data_values(result, original)
     if invented:
         validation_warnings.append(
-            "Possible invented test data not present in the source (verify before use): "
-            + ", ".join(invented)
+            _localize("invented_data_warning", language, items=", ".join(invented))
         )
     result["has_invented_data"] = bool(invented)
 
     if placeholder_found:
-        validation_warnings.append(
-            "LLM tried to write a placeholder instead of real test data — removed; check manual_notes for what's missing"
-        )
+        validation_warnings.append(_localize("stripped_placeholder_warning", language))
     result["has_stripped_placeholder"] = placeholder_found
 
     missing_params = _find_missing_param_tokens(result, original)
     if missing_params:
         validation_warnings.append(
-            "TestIT parameter reference(s) from the source are missing after improve — verify they weren't altered: "
-            + ", ".join(missing_params)
+            _localize("missing_param_tokens_warning", language, items=", ".join(missing_params))
         )
     result["has_missing_param_tokens"] = bool(missing_params)
 

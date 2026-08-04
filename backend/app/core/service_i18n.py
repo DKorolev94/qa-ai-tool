@@ -87,6 +87,18 @@ SERVICE_MESSAGES: dict[str, dict[str, str]] = {
         "en": "Check the LLM_BASE_URL and LLM_MODEL settings in .env.",
         "ru": "Проверьте настройки LLM_BASE_URL и LLM_MODEL в .env.",
     },
+    "invented_data_warning": {
+        "en": "Possible invented test data not present in the source (verify before use): {items}",
+        "ru": "Возможно придуманные тестовые данные, которых не было в исходнике (проверьте перед использованием): {items}",
+    },
+    "stripped_placeholder_warning": {
+        "en": "LLM tried to write a placeholder instead of real test data — removed; check manual_notes for what's missing",
+        "ru": "LLM попытался написать заглушку вместо реальных тестовых данных — удалена; чего не хватает, см. manual_notes",
+    },
+    "missing_param_tokens_warning": {
+        "en": "TestIT parameter reference(s) from the source are missing after improve — verify they weren't altered: {items}",
+        "ru": "После улучшения пропали ссылки на параметры TestIT из исходника — проверьте, что они не были изменены: {items}",
+    },
 }
 
 
