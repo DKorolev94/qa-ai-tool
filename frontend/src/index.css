@@ -185,7 +185,8 @@ body { padding: 20px; }
 .sidebar.sb-collapsed .sb-brand,
 .sidebar.sb-collapsed .sb-section,
 .sidebar.sb-collapsed .sb-copy,
-.sidebar.sb-collapsed .sb-badge { display: none; }
+.sidebar.sb-collapsed .sb-badge,
+.sidebar.sb-collapsed .sb-item-lang { display: none; }
 .sidebar.sb-collapsed .sb-logo { justify-content: center; padding: 12px 0; }
 .sidebar.sb-collapsed .sb-item { justify-content: center; padding: 5px 0; }
 .sidebar.sb-collapsed .sb-nav { padding: 4px 6px; overflow-x: hidden; }
