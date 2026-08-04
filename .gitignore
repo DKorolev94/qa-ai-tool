@@ -41,3 +41,8 @@ node_modules/
 frontend/node_modules/
 .pids/
 .superpowers/
+
+# Local-only docs/agent instructions
+AGENTS.md
+CLAUDE.md
+docs/
