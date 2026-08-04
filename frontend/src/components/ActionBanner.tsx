@@ -51,18 +51,18 @@ function BannerRow({ notification: n }: { notification: ActionNotification }) {
           ? <>{t('actionBanner.appliedToOriginal')} · <strong>#{n.id}</strong></>
           : <>{t('actionBanner.draftCreatedIn', { sectionName: n.sectionName })} · <strong>#{n.id}</strong></>}
         {n.isPartial && <span className="action-banner-partial"> · {t('actionBanner.stillNeedsWork')}</span>}
-        {n.testit_url && (
-          <a
-            className="action-banner-link"
-            href={n.testit_url}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {' · '}{t('actionBanner.openInTestIt')}
-            <ExternalLink size={11} strokeWidth={2} style={{ marginLeft: 3, verticalAlign: 'middle' }} />
-          </a>
-        )}
       </span>
+      {n.testit_url && (
+        <a
+          className="action-banner-link"
+          href={n.testit_url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t('actionBanner.openInTestIt')}
+          <ExternalLink size={11} strokeWidth={2} />
+        </a>
+      )}
       <button
         type="button"
         className="action-banner-close"

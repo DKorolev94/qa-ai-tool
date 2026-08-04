@@ -1449,9 +1449,10 @@ body { padding: 20px; }
 }
 .action-banner-text strong { font-weight: 600; color: var(--tx-primary); }
 .action-banner-link {
-  display: inline-flex; align-items: center; vertical-align: middle;
+  display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
   font-size: 11px; color: var(--accent); text-decoration: none; white-space: nowrap;
 }
+.action-banner-link::before { content: '·'; margin-right: 4px; color: var(--tx-muted); }
 .action-banner-link:hover { text-decoration: underline; }
 .action-banner-close {
   display: flex; align-items: center; justify-content: center;
