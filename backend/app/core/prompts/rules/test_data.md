@@ -30,14 +30,14 @@ Don't flag if:
 - the data is described in preconditions. No need to duplicate it in test_data.
 - the value is the name of a UI element, button text, or an expected message. That's not test data.
 - the URL is already moved into test_data, and the action contains only a description with no URL.
-- the step describes a UI interaction with no data entry: click a button, click an element, select a menu item, navigate. For such steps, an empty `test_data` is normal. Examples: `Click the Log in button`, `Click the profile icon`, `Open the menu`. Don't flag the absence of test_data for click/tap steps.
+- the step describes an action with no data entry — either a UI interaction (click a button, click an element, select a menu item, navigate) or a pure verification/observation (check that an element is present/visible/enabled/disabled, confirm a displayed state, read a value without entering one). For such steps, an empty `test_data` is normal. Examples: `Click the Log in button`, `Click the profile icon`, `Open the menu`, `Check that the "Add geozone" button is present and disabled`. Only flag when the step itself requires entering, selecting, or passing a value — not when it merely observes or verifies UI state.
 - the `test_data` field (not action) contains an `example:` marker with a concrete value or format: `example: test@mail.com`, `example: +12025550123`, `example: Smith`. This is a valid format for the agent to generate a value — don't flag it. If the same marker is in the action text while test_data is empty — flag it per the severity rules above (medium if it's a URL or reused across steps, low otherwise).
 
 In the `recommendation` field, don't propose concrete data values (email, password, ID, token). State only the type and, if you can infer one from context, a source: "State an email and password from test accounts in the test_data field of step N."
 
 ## How to fix
 
-Before adding anything to `test_data`, check what the step's `action` actually does. If it's a pure UI interaction with no user-entered value — click a button, click an element, select a menu item, navigate — the step doesn't need test data at all, regardless of what the issue says. Mark the resolution `resolved` with `reason`: "Step is a UI interaction with no data entry — no test data needed", and leave `test_data` untouched.
+Before adding anything to `test_data`, check what the step's `action` actually does. If it's a pure UI interaction or verification with no user-entered value — click a button, click an element, select a menu item, navigate, check/verify an element's presence or state — the step doesn't need test data at all, regardless of what the issue says. Mark the resolution `resolved` with `reason`: "Step is a UI interaction/verification with no data entry — no test data needed", and leave `test_data` untouched.
 
 **FORBIDDEN**: writing in any concrete data values — `test@mail.com`, `Password123`, `12345`, a real ID, a real token. Don't invent data, even if it looks obvious.
 

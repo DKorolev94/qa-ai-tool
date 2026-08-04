@@ -1,8 +1,8 @@
-import { ChevronLeft, ChevronRight, FileCheck2, MonitorPlay, Sparkles, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileCheck2, ListChecks, MonitorPlay, Sparkles, Settings } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import i18n, { setLanguage } from '../i18n'
 
-type Tool = 'review' | 'runner'
+type Tool = 'review' | 'runner' | 'bulk'
 
 interface SidebarProps {
   collapsed: boolean
@@ -48,6 +48,17 @@ export function Sidebar({ collapsed, onToggle, activeTool, onToolChange }: Sideb
           <div className="sb-copy">
             <span className="sb-title">{t('sidebar.testRunner')}</span>
             <span className="sb-sub">{t('sidebar.testRunnerSub')}</span>
+          </div>
+        </div>
+        <div
+          className={`sb-item${activeTool === 'bulk' ? ' sb-item-active' : ''}`}
+          onClick={() => onToolChange('bulk')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="sb-icon"><ListChecks size={16} strokeWidth={1.75} /></div>
+          <div className="sb-copy">
+            <span className="sb-title">{t('sidebar.bulkReview')}</span>
+            <span className="sb-sub">{t('sidebar.bulkReviewSub')}</span>
           </div>
         </div>
         <div className="sb-item sb-item-soon">

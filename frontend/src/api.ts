@@ -1,4 +1,4 @@
-import type { AnalyzeResult, ApplyResult, DraftResult, FetchResult, HistoricalStep, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId, RunnerRunResponse, SessionListItem } from './types'
+import type { AnalyzeResult, ApplyResult, BulkReviewJobStatus, DraftResult, FetchResult, HistoricalStep, ImproveResult, ReviewConfig, ReviewIssue, ReviewRuleId, RunnerRunResponse, SessionListItem } from './types'
 import i18n from './i18n'
 
 const BASE = '/api'
@@ -86,6 +86,21 @@ export const api = {
 
   listSessions: () =>
     get<{ sessions: SessionListItem[] }>('/runner/sessions'),
+
+  startBulkReview: (body: { work_item_ids: string[]; enabled_rules?: ReviewRuleId[] }) =>
+    post<{ job_id: string }>('/bulk-review/start', { ...body, language: currentLanguage() }),
+
+  getBulkReviewStatus: (jobId: string) =>
+    get<BulkReviewJobStatus>(`/bulk-review/${jobId}`),
+
+  stopBulkReview: (jobId: string) =>
+    post<{ stopped: boolean }>(`/bulk-review/${jobId}/stop`, {}),
+
+  retryBulkReviewItem: (jobId: string, index: number) =>
+    post<{ retried: boolean }>(`/bulk-review/${jobId}/retry/${index}`, {}),
+
+  listBulkReviewJobs: () =>
+    get<BulkReviewJobStatus[]>('/bulk-review'),
 
   getSessionSteps: (runId: string) =>
     get<{ steps: HistoricalStep[] }>(`/runner/sessions/${runId}/steps`),

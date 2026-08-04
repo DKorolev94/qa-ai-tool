@@ -172,6 +172,25 @@ export interface Section {
   name: string
 }
 
+export type BulkReviewItemStatus = 'pending' | 'reviewing' | 'improving' | 'creating_draft' | 'done' | 'error' | 'cancelled'
+
+export interface BulkReviewItemResult {
+  work_item_id: string
+  status: BulkReviewItemStatus
+  issues_count: number
+  draft_work_item_id?: string | null
+  testit_url?: string | null
+  error?: string | null
+  needs_manual_review: boolean
+  manual_notes: string[]
+}
+
+export interface BulkReviewJobStatus {
+  job_id: string
+  done: boolean
+  items: BulkReviewItemResult[]
+}
+
 export type RunnerStatus = 'passed' | 'failed' | 'blocked' | 'stopped'
 export type RunnerSessionStatus = 'running' | RunnerStatus
 

@@ -45,6 +45,8 @@ from app.tms.testit.workitem_service import fetch_and_normalize_work_item
 from app.tms.testit.update_service import apply_to_original_in_testit
 from app.schemas.runner import RunnerManualStartRequest, RunnerRunResponse, RunnerStartRequest, WriteTestItResultRequest
 from app.services import runner_service
+from app.schemas.bulk_review import BulkReviewJobStatus, BulkReviewRequest
+from app.services import bulk_review_service
 from app.core.config import settings
 from pydantic import BaseModel
 
@@ -169,6 +171,57 @@ async def update_testit_original(body: UpdateOriginalRequest) -> UpdateOriginalR
         raise HTTPException(status_code=502, detail=localize(exc.code, body.language, **exc.params) if exc.code else str(exc))
     except TestItApiError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.get("/bulk-review", response_model=list[BulkReviewJobStatus])
+async def bulk_review_list() -> list[BulkReviewJobStatus]:
+    return bulk_review_service.list_jobs()
+
+
+@router.post("/bulk-review/start")
+async def bulk_review_start(body: BulkReviewRequest) -> dict:
+    # Draft creation needs this for every item that has issues — fail the whole
+    # batch upfront rather than burning an LLM analyze+improve call per item
+    # only to hit the same config error at the last step for each of them.
+    if not settings.TESTIT_PROJECT_UUID:
+        raise HTTPException(
+            status_code=503,
+            detail=localize("testit_project_uuid_missing", body.language),
+        )
+    job_id = bulk_review_service.start_bulk_review(body.work_item_ids, body.enabled_rules, body.language)
+    return {"job_id": job_id}
+
+
+@router.get("/bulk-review/{job_id}", response_model=BulkReviewJobStatus)
+async def bulk_review_status(job_id: str) -> BulkReviewJobStatus:
+    job = bulk_review_service.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Bulk review job not found")
+    return job
+
+
+@router.post("/bulk-review/{job_id}/stop")
+async def bulk_review_stop(job_id: str) -> dict:
+    if bulk_review_service.get_job(job_id) is None:
+        raise HTTPException(status_code=404, detail="Bulk review job not found")
+    stopped = bulk_review_service.stop_bulk_review(job_id)
+    return {"stopped": stopped}
+
+
+@router.post("/bulk-review/{job_id}/retry/{index}")
+async def bulk_review_retry(job_id: str, index: int) -> dict:
+    job = bulk_review_service.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Bulk review job not found")
+    if not settings.TESTIT_PROJECT_UUID:
+        raise HTTPException(
+            status_code=503,
+            detail=localize("testit_project_uuid_missing", job.language),
+        )
+    retried = bulk_review_service.retry_item(job_id, index)
+    if not retried:
+        raise HTTPException(status_code=409, detail="Item is not in a retryable state")
+    return {"retried": True}
 
 
 @router.post("/runner/run", response_model=RunnerRunResponse)

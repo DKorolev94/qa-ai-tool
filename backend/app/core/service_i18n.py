@@ -99,6 +99,10 @@ SERVICE_MESSAGES: dict[str, dict[str, str]] = {
         "en": "TestIT parameter reference(s) from the source are missing after improve — verify they weren't altered: {items}",
         "ru": "После улучшения пропали ссылки на параметры TestIT из исходника — проверьте, что они не были изменены: {items}",
     },
+    "cancelled_by_user": {
+        "en": "Cancelled by user",
+        "ru": "Отменено пользователем",
+    },
 }
 
 
