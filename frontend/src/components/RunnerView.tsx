@@ -6,6 +6,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { api, humanizeFetchError } from '../api'
+import i18n from '../i18n'
 import { RunnerSessionView, StatusBadge } from './RunnerSessionView'
 import { SectionHeader } from './SectionHeader'
 import type { FetchResult, RunnerRunResponse, RunnerSession, SessionListItem, Step } from '../types'
@@ -181,13 +182,14 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
 // ── Date formatting ───────────────────────────────────────────────────────
 
 function fmtDate(iso: string, t: TFunction): string {
+  const locale = i18n.language === 'en' ? 'en-US' : 'ru-RU'
   const d = new Date(iso)
   const now = new Date()
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000)
-  const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  const hm = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
   if (diffDays === 0) return t('runnerView.time.today', { time: hm })
   if (diffDays === 1) return t('runnerView.time.yesterday', { time: hm })
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }).replace('.', '') + '., ' + hm
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '') + '., ' + hm
 }
 
 // ── Session history ───────────────────────────────────────────────────────

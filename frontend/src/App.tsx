@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api, humanizeFetchError } from './api'
 import { Sidebar } from './components/Sidebar'
@@ -67,12 +67,16 @@ export default function App() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTool, setActiveTool] = useState<'review' | 'runner'>('review')
+  const hasLoadedRulesRef = useRef(false)
 
   useEffect(() => {
     api.getReviewConfig()
       .then(config => {
         setReviewConfig(config)
-        setEnabledRules(config.defaults['testit'] ?? DEFAULT_RULES)
+        if (!hasLoadedRulesRef.current) {
+          setEnabledRules(config.defaults['testit'] ?? DEFAULT_RULES)
+          hasLoadedRulesRef.current = true
+        }
       })
       .catch(() => {
         setReviewConfig(buildFallbackConfig(i18n.language))
