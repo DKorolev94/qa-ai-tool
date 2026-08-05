@@ -782,6 +782,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
           retry_step_count: session.result.retry_step_count,
           errors: session.result.errors,
           run_id: session.result.run_id,
+          replayed: session.result.replayed,
         }
       : null
   )
