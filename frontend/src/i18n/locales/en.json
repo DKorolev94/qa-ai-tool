@@ -314,6 +314,7 @@
       "limitsDialogs": "OS system dialogs, file upload, iframes, drag & drop"
     },
     "run": "Run",
+    "forceRegenerate": "Force regenerate",
     "history": {
       "recentRuns_one": "{{count}} recent run",
       "recentRuns_other": "{{count}} recent runs",

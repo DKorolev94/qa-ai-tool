@@ -334,6 +334,7 @@
       "limitsDialogs": "Системные диалоги ОС, загрузка файлов, iframe, drag & drop"
     },
     "run": "Запустить",
+    "forceRegenerate": "Пересобрать заново",
     "history": {
       "recentRuns_one": "{{count}} недавний запуск",
       "recentRuns_few": "{{count}} недавних запуска",

@@ -314,6 +314,7 @@ export interface RunnerSession {
   startUrl?: string
   workItemId?: string
   iterationIndex?: number
+  forceRegenerate?: boolean
   status: RunnerSessionStatus
   result?: RunnerRunResponse
   startedAt: number

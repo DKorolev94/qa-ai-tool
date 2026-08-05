@@ -24,7 +24,7 @@ function fmtElapsed(s: number, t: TFunction) {
 
 function mkSession(
   base: Pick<RunnerSession, 'title' | 'source'> &
-    Partial<Pick<RunnerSession, 'task' | 'startUrl' | 'workItemId' | 'iterationIndex' | 'sensitiveData' | 'browserProfile'>>
+    Partial<Pick<RunnerSession, 'task' | 'startUrl' | 'workItemId' | 'iterationIndex' | 'forceRegenerate' | 'sensitiveData' | 'browserProfile'>>
 ): RunnerSession {
   return {
     id: crypto.randomUUID(),
@@ -69,7 +69,7 @@ function StepBlock({ label, steps }: { label: string; steps?: Step[] | null }) {
 interface WorkbenchProps {
   fetchResult: FetchResult
   onBack: () => void
-  onRun: (iterationIndex: number) => void
+  onRun: (iterationIndex: number, forceRegenerate: boolean) => void
 }
 
 function IterationPicker({
@@ -105,6 +105,7 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
   const pt = tc.parameter_table
   const hasIterations = pt && pt.rows.length > 1
   const [selectedIteration, setSelectedIteration] = useState(0)
+  const [forceRegenerate, setForceRegenerate] = useState(false)
   return (
     <div className="workspace-inner-wb">
       <SectionHeader title={t('sidebar.testRunner')} onBack={onBack} />
@@ -118,7 +119,15 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
           </div>
         </div>
         <div className="wb-actions">
-          <button type="button" className="source-fetch-btn" onClick={() => onRun(selectedIteration)}>
+          <label className="wb-force-regen-label">
+            <input
+              type="checkbox"
+              checked={forceRegenerate}
+              onChange={e => setForceRegenerate(e.target.checked)}
+            />
+            {t('runnerView.forceRegenerate')}
+          </label>
+          <button type="button" className="source-fetch-btn" onClick={() => onRun(selectedIteration, forceRegenerate)}>
             <Play size={13} /> {t('runnerView.run')}
           </button>
         </div>
@@ -562,13 +571,13 @@ export function RunnerView() {
     startSession(mkSession({ title: manualTitle(task), source: 'manual', task }))
   }
 
-  function handleRunTestIt(iterationIndex = 0) {
+  function handleRunTestIt(iterationIndex = 0, forceRegenerate = false) {
     if (!fetchResult) return
     const tc = fetchResult.normalized_testcase
     const title = tc.title
       ? `${tc.title} #${fetchResult.work_item_id}`
       : t('runnerView.history.testCaseHash', { id: fetchResult.work_item_id })
-    startSession(mkSession({ title, source: 'testit', workItemId: fetchResult.work_item_id, iterationIndex }))
+    startSession(mkSession({ title, source: 'testit', workItemId: fetchResult.work_item_id, iterationIndex, forceRegenerate }))
   }
 
   function updateSession(id: string, update: Partial<RunnerSession>) {

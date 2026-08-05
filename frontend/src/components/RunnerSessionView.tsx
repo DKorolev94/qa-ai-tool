@@ -892,7 +892,12 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
                 ...(session.sensitiveData ? { sensitive_data: session.sensitiveData } : {}),
                 ...(session.browserProfile ? { browser_profile: session.browserProfile } : {}),
               }
-            : { work_item_id: session.workItemId!, iteration_index: session.iterationIndex ?? 0, language }
+            : {
+                work_item_id: session.workItemId!,
+                iteration_index: session.iterationIndex ?? 0,
+                language,
+                ...(session.forceRegenerate ? { force_regenerate: true } : {}),
+              }
 
           const res = await fetch(path, {
             method: 'POST',
