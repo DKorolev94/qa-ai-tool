@@ -1000,6 +1000,12 @@ export function Workbench({ fetchResult, reviewConfig, selectedPreset, enabledRu
   // this component) mid-request.
   const mountedRef = useRef(true)
   useEffect(() => {
+    // StrictMode double-invokes this effect on initial mount (mount → cleanup →
+    // mount) in dev; without resetting to true here, the interim cleanup leaves
+    // mountedRef permanently false, so every later runAnalyze/runImprove/
+    // runCreateDraft/runApplyToOriginal call silently drops its result and never
+    // clears its loading flag — the button looks stuck forever after first use.
+    mountedRef.current = true
     return () => { mountedRef.current = false }
   }, [])
   // What each rule actually checks — shown as a tooltip on the issue's short label,
