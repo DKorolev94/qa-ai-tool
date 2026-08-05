@@ -2,12 +2,18 @@
 
 AI-powered test case review and improvement tool. Integrates with TestIT, uses any OpenAI-compatible LLM endpoint.
 
+## Features
+
+- Single test case review and improvement, with a diff view before applying changes back to TestIT
+- Bulk review: submit a list of TestIT work item IDs, run the review pipeline over all of them as one tracked job, retry failed items individually
+- AI browser agent runner: execute a test case as a live browser session, with streaming logs and screenshots
+
 ## Architecture
 
 | Service | Port | Description |
 |---|---|---|
-| `backend` | 8000 | FastAPI — TestIT proxy, LLM review/improve pipeline |
-| `browser-use-runner` | 8008 | FastAPI — AI browser agent runner |
+| `backend` | 8000 | FastAPI, TestIT proxy, LLM review/improve pipeline |
+| `browser-use-runner` | 8008 | FastAPI, AI browser agent runner |
 | `frontend` | 3000 | Vite + React UI |
 
 ---
@@ -22,9 +28,9 @@ git clone git@github.com:DKorolev94/qa-ai-tool.git && cd qa-ai-tool
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — set at minimum: LLM_API_KEY, LLM_MODEL, TESTIT_BASE_URL, TESTIT_PRIVATE_TOKEN
+# Edit .env, set at minimum: LLM_API_KEY, LLM_MODEL, TESTIT_BASE_URL, TESTIT_PRIVATE_TOKEN
 
-# 3. Start dev (hot-reload, bind mounts — works on Linux + macOS incl. Apple Silicon)
+# 3. Start dev (hot-reload, bind mounts, works on Linux + macOS incl. Apple Silicon)
 docker compose up --build
 
 # 4. Open
@@ -39,7 +45,7 @@ docker compose -f docker-compose.prod.yml up --build
 docker compose down
 ```
 
-> **Apple Silicon note:** `platform: linux/amd64` is already set for `browser-use-runner` in both compose files — Rosetta handles the emulation automatically.
+> **Apple Silicon note:** `platform: linux/amd64` is already set for `browser-use-runner` in both compose files. Rosetta handles the emulation automatically.
 
 ---
 
@@ -90,7 +96,7 @@ Copy `.env.example` to `.env` in the project root and fill in the values.
 | `TESTIT_PRIVATE_TOKEN` | `your_token` | TestIT private token |
 | `TESTIT_PROJECT_UUID` | `uuid` | Default project UUID |
 
-Everything else (timeouts, preflight, temperature, browser runner tuning) has working defaults — see `.env.example`.
+Everything else (timeouts, preflight, temperature, browser runner tuning) has working defaults, see `.env.example`.
 
 ### LLM provider examples
 
