@@ -32,6 +32,7 @@ from views import (
     SessionUsageReport,
     TokenUsageReport,
 )
+from cache_store import load_cached, save_cached
 
 RUNNER_DIR = Path(__file__).resolve().parent
 RUNS_DIR = RUNNER_DIR / 'runs'
@@ -1104,6 +1105,58 @@ def get_run(run_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Main run flow
 # ---------------------------------------------------------------------------
+
+async def _try_replay(
+    request: RunRequest,
+    run_dir: Path,
+    started_at: float,
+    task: str,
+    llm: Any,
+    browser: Browser,
+    cached_path: Path,
+) -> RunResponse | None:
+    agent = Agent(
+        task=task,
+        llm=llm,
+        browser=browser,
+        use_vision=request.use_vision,
+        extend_system_message=request.system_instructions,
+        llm_timeout=request.llm_timeout_sec,
+        step_timeout=int(request.action_timeout_sec),
+        sensitive_data=request.sensitive_data or None,
+        calculate_cost=True,
+    )
+    try:
+        results = await agent.load_and_rerun(cached_path, skip_failures=False)
+    except Exception as exc:
+        logger.warning(f'Cache replay failed for test_case_id={request.test_case_id}: {exc}')
+        return None
+
+    write_json(run_dir / 'raw' / 'rerun_results.json', [r.model_dump(mode='json') for r in results])
+    final = results[-1] if results else None
+    summary_text = ((final.extracted_content if final else None) or (final.long_term_memory if final else None) or '').strip()
+    success = final.success if final else None
+    if success is True:
+        status = RunStatus.passed
+    elif success is False:
+        status = RunStatus.blocked if summary_text.lower().startswith('blocked') else RunStatus.failed
+    else:
+        status = RunStatus.blocked
+
+    errors = [r.error for r in results if r.error]
+    return RunResponse(
+        test_case_id=request.test_case_id,
+        status=status,
+        summary=summary_text or 'Replayed from cache.',
+        steps_count=max(len(results) - 1, 0),
+        errors=errors,
+        artifacts=ArtifactReport(),
+        duration_sec=round(time.monotonic() - started_at, 2),
+        run_id=run_dir.name,
+        run_dir=str(run_dir),
+        replayed=True,
+    )
+
 
 @app.post('/run', response_model=RunResponse)
 async def run_test_case(request: RunRequest) -> RunResponse:
