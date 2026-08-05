@@ -1549,6 +1549,39 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
         browser = create_browser(request, start_url)
         task_text = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
 
+        replay_response: RunResponse | None = None
+        if request.cache_key and not request.force_regenerate and request.test_case_id:
+            try:
+                cached_path = load_cached(request.test_case_id, request.cache_key)
+            except Exception as exc:
+                logger.warning(f'Cache lookup failed for test_case_id={request.test_case_id}: {exc}')
+                cached_path = None
+            if cached_path is not None:
+                await push({
+                    'type': 'log', 'level': 'info', 'category': 'runner', 'source': 'session',
+                    'message': 'Replaying from cached run…',
+                    'elapsed_sec': round(time.monotonic() - started_at, 1),
+                })
+                replay_response = await _try_replay(request, run_dir, started_at, task_text, llm, browser, cached_path)
+                if replay_response is None:
+                    browser = create_browser(request, start_url)
+
+        if replay_response is not None:
+            finish_run(run_dir, replay_response, history=None, request=request)
+            await push({
+                'type': 'done',
+                'status': replay_response.status.value,
+                'summary': replay_response.summary,
+                'duration_sec': replay_response.duration_sec,
+                'steps_count': replay_response.steps_count,
+                'instability_step_count': 0,
+                'retry_step_count': 0,
+                'errors': replay_response.errors,
+                'run_id': replay_response.run_id,
+                'replayed': True,
+            })
+            return
+
         async def on_step(state: Any, output: Any, step_num: int) -> None:
             # Extract planned actions from AgentOutput
             raw_actions = getattr(output, 'action', None) or []
@@ -1647,6 +1680,11 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
         append_event(run_dir, 'agent_finished', {'history_steps': len(history.history)})
 
         history.save_to_file(run_dir / 'raw' / 'history.json')
+        if request.cache_key and request.test_case_id:
+            try:
+                save_cached(request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
+            except Exception as exc:
+                logger.warning(f'Cache save failed for test_case_id={request.test_case_id}: {exc}')
         usage, llm_usage = collect_usage(agent, history)
         write_json(run_dir / 'raw' / 'usage.json', {
             'session': usage.model_dump(mode='json'),
