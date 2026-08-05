@@ -102,6 +102,13 @@ def _build_task_prompt(testcase: NormalizedTestCase, params: dict[str, str] | No
     return "\n".join(lines)
 
 
+def _cache_fields(testcase: NormalizedTestCase, force_regenerate: bool) -> dict:
+    fields: dict = {"force_regenerate": force_regenerate}
+    modified_date = testcase.attributes.get("modifiedDate")
+    if "cache-ok" in testcase.tags and modified_date:
+        fields["cache_key"] = modified_date
+    return fields
+
 
 async def _call_runner(payload: dict, timeout: float) -> RunnerRunResponse:
     async with httpx.AsyncClient() as client:

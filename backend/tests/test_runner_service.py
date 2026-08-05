@@ -73,3 +73,26 @@ def test_extract_url_from_steps_if_no_precondition_url():
 def test_extract_url_returns_none_when_no_url():
     tc = _tc(steps=[TestCaseStep(action="Click the button")])
     assert _extract_url(tc) is None
+
+
+from app.services.runner_service import _cache_fields
+
+
+def test_cache_fields_absent_without_tag():
+    tc = _tc(tags=[], attributes={"modifiedDate": "2026-01-01"})
+    assert _cache_fields(tc, False) == {"force_regenerate": False}
+
+
+def test_cache_fields_present_with_tag_and_modified_date():
+    tc = _tc(tags=["cache-ok"], attributes={"modifiedDate": "2026-01-01"})
+    assert _cache_fields(tc, False) == {"force_regenerate": False, "cache_key": "2026-01-01"}
+
+
+def test_cache_fields_absent_without_modified_date():
+    tc = _tc(tags=["cache-ok"], attributes={})
+    assert _cache_fields(tc, False) == {"force_regenerate": False}
+
+
+def test_cache_fields_force_regenerate_passthrough():
+    tc = _tc(tags=["cache-ok"], attributes={"modifiedDate": "2026-01-01"})
+    assert _cache_fields(tc, True) == {"force_regenerate": True, "cache_key": "2026-01-01"}
