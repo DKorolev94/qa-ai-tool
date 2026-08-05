@@ -36,6 +36,8 @@ class RunRequest(BaseModel):
 	model_config = ConfigDict(extra='forbid')
 
 	test_case_id: str | None = None
+	cache_key: str | None = Field(default=None, description='Cache-replay key (TestIT modifiedDate); set only when the test case is tagged cache-ok')
+	force_regenerate: bool = Field(default=False, description='Skip cache lookup and force a fresh AI run, overwriting any cached entry')
 	language: Literal['ru', 'en'] = 'ru'
 	task: str = Field(min_length=1, description='Full browser-use task prompt')
 	start_url: str | None = Field(default=None, description='Open this URL before starting the task')
@@ -109,3 +111,4 @@ class RunResponse(BaseModel):
 	run_dir: str | None = None
 	usage: SessionUsageReport | None = None
 	llm_usage: list[LLMCallUsageReport] = Field(default_factory=list)
+	replayed: bool = False
