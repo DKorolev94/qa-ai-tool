@@ -230,6 +230,7 @@ export interface WsDoneEvent {
   retry_step_count?: number
   errors: string[]
   run_id: string | null
+  replayed?: boolean
 }
 export interface WsErrorEvent {
   type: 'error'
@@ -338,4 +339,5 @@ export interface RunnerRunResponse {
   screenshots: RunnerScreenshot[]
   duration_sec: number
   run_id: string | null
+  replayed?: boolean
 }

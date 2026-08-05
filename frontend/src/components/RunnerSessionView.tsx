@@ -708,6 +708,12 @@ function SessionFooter({
         <span className="session-footer-meta">{fmtSec(Math.round(doneEvent.duration_sec))}</span>
         <span className="session-footer-div" />
         <span className="session-footer-meta">{pluralSteps(stepsCount ?? doneEvent.steps_count, t)}</span>
+        {doneEvent.replayed && (
+          <>
+            <span className="session-footer-div" />
+            <span className="session-footer-meta">{t('runnerSession.replayedBadge')}</span>
+          </>
+        )}
         {unstableReason && (
           <>
             <span className="session-footer-div" />
@@ -968,6 +974,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
                 errors: de.errors,
                 screenshots: [],
                 run_id: de.run_id,
+                replayed: de.replayed,
               },
             })
           } else if (event.type === 'frame') {

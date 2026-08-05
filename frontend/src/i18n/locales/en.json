@@ -363,6 +363,7 @@
     "stepsCount_one": "{{count}} step",
     "stepsCount_other": "{{count}} steps",
     "stepFallback": "Step {{num}}",
+    "replayedBadge": "From cache",
     "timeShort": "{{s}}s",
     "detail": {
       "previous": "previous",

@@ -389,6 +389,7 @@
     "stepsCount_many": "{{count}} шагов",
     "stepsCount_other": "{{count}} шага",
     "stepFallback": "Шаг {{num}}",
+    "replayedBadge": "Из кэша",
     "timeShort": "{{s}} с",
     "detail": {
       "previous": "предыдущее",
