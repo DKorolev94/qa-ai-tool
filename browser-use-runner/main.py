@@ -1205,7 +1205,11 @@ async def run_test_case(request: RunRequest) -> RunResponse:
 
         replay_response: RunResponse | None = None
         if request.cache_key and not request.force_regenerate and request.test_case_id:
-            cached_path = load_cached(request.test_case_id, request.cache_key)
+            try:
+                cached_path = load_cached(request.test_case_id, request.cache_key)
+            except Exception as exc:
+                logger.warning(f'Cache lookup failed for test_case_id={request.test_case_id}: {exc}')
+                cached_path = None
             if cached_path is not None:
                 replay_response = await _try_replay(request, run_dir, started_at, task, llm, browser, cached_path)
                 if replay_response is None:
@@ -1232,7 +1236,10 @@ async def run_test_case(request: RunRequest) -> RunResponse:
 
         history.save_to_file(run_dir / 'raw' / 'history.json')
         if request.cache_key and request.test_case_id:
-            save_cached(request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
+            try:
+                save_cached(request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
+            except Exception as exc:
+                logger.warning(f'Cache save failed for test_case_id={request.test_case_id}: {exc}')
         usage, llm_usage = collect_usage(agent, history)
         write_json(
             run_dir / 'raw' / 'usage.json',
