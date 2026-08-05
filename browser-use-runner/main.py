@@ -1203,6 +1203,17 @@ async def run_test_case(request: RunRequest) -> RunResponse:
         browser = create_browser(request, start_url)
         task = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
 
+        replay_response: RunResponse | None = None
+        if request.cache_key and not request.force_regenerate and request.test_case_id:
+            cached_path = load_cached(request.test_case_id, request.cache_key)
+            if cached_path is not None:
+                replay_response = await _try_replay(request, run_dir, started_at, task, llm, browser, cached_path)
+                if replay_response is None:
+                    browser = create_browser(request, start_url)
+
+        if replay_response is not None:
+            return finish_run(run_dir, replay_response, history=None, request=request)
+
         agent = Agent(
             task=task,
             llm=llm,
@@ -1220,6 +1231,8 @@ async def run_test_case(request: RunRequest) -> RunResponse:
         append_event(run_dir, 'agent_finished', {'history_steps': len(history.history)})
 
         history.save_to_file(run_dir / 'raw' / 'history.json')
+        if request.cache_key and request.test_case_id:
+            save_cached(request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
         usage, llm_usage = collect_usage(agent, history)
         write_json(
             run_dir / 'raw' / 'usage.json',
