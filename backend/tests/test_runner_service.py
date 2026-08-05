@@ -96,3 +96,53 @@ def test_cache_fields_absent_without_modified_date():
 def test_cache_fields_force_regenerate_passthrough():
     tc = _tc(tags=["cache-ok"], attributes={"modifiedDate": "2026-01-01"})
     assert _cache_fields(tc, True) == {"force_regenerate": True, "cache_key": "2026-01-01"}
+
+
+import asyncio
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def test_run_test_case_includes_cache_key_when_tagged(monkeypatch):
+    from app.services import runner_service
+
+    tc = _tc(tags=["cache-ok"], attributes={"modifiedDate": "2026-01-01"})
+    fetch_result = MagicMock(normalized_testcase=tc.model_dump())
+
+    captured_payload = {}
+
+    async def fake_call_runner(payload, timeout):
+        captured_payload.update(payload)
+        return RunnerRunResponse(status="passed", summary="ok", steps_count=1, errors=[], screenshots=[], duration_sec=1.0, run_id="r1")
+
+    monkeypatch.setattr(runner_service, "fetch_and_normalize_work_item", AsyncMock(return_value=fetch_result))
+    monkeypatch.setattr(runner_service, "_call_runner", fake_call_runner)
+
+    body = RunnerStartRequest(work_item_id="6110")
+    run(runner_service.run_test_case(body))
+
+    assert captured_payload["cache_key"] == "2026-01-01"
+    assert captured_payload["force_regenerate"] is False
+
+
+def test_run_test_case_omits_cache_key_without_tag(monkeypatch):
+    from app.services import runner_service
+
+    tc = _tc(tags=[], attributes={"modifiedDate": "2026-01-01"})
+    fetch_result = MagicMock(normalized_testcase=tc.model_dump())
+
+    captured_payload = {}
+
+    async def fake_call_runner(payload, timeout):
+        captured_payload.update(payload)
+        return RunnerRunResponse(status="passed", summary="ok", steps_count=1, errors=[], screenshots=[], duration_sec=1.0, run_id="r1")
+
+    monkeypatch.setattr(runner_service, "fetch_and_normalize_work_item", AsyncMock(return_value=fetch_result))
+    monkeypatch.setattr(runner_service, "_call_runner", fake_call_runner)
+
+    body = RunnerStartRequest(work_item_id="6110")
+    run(runner_service.run_test_case(body))
+
+    assert "cache_key" not in captured_payload

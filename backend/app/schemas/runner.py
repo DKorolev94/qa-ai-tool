@@ -8,6 +8,7 @@ class RunnerStartRequest(BaseModel):
     work_item_id: str = Field(..., min_length=1)
     iteration_index: int = Field(default=0, ge=0)
     language: Literal['ru', 'en'] = 'ru'
+    force_regenerate: bool = False
 
 
 class BrowserProfileRequest(BaseModel):
@@ -42,6 +43,7 @@ class RunnerRunResponse(BaseModel):
     screenshots: list[RunnerScreenshot]
     duration_sec: float
     run_id: str | None = None
+    replayed: bool = False
 
 
 class WriteTestItResultRequest(BaseModel):

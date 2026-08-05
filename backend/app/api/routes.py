@@ -269,7 +269,9 @@ async def runner_start_manual(body: RunnerManualStartRequest) -> dict:
 @router.post("/runner/start-testit")
 async def runner_start_testit(body: RunnerStartRequest) -> dict:
     try:
-        return await runner_service.start_testit_streaming(body.work_item_id, body.iteration_index, body.language)
+        return await runner_service.start_testit_streaming(
+            body.work_item_id, body.iteration_index, body.language, body.force_regenerate,
+        )
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Runner timeout — could not start test")
     except httpx.RequestError as exc:

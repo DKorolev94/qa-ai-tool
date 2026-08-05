@@ -133,6 +133,7 @@ async def _call_runner(payload: dict, timeout: float) -> RunnerRunResponse:
         screenshots=screenshots,
         duration_sec=data.get("duration_sec", 0.0),
         run_id=data.get("run_id"),
+        replayed=data.get("replayed", False),
     )
 
 
@@ -178,13 +179,16 @@ async def start_manual_streaming(body: RunnerManualStartRequest) -> dict:
         return response.json()
 
 
-async def start_testit_streaming(work_item_id: str, iteration_index: int = 0, language: str = 'ru') -> dict:
+async def start_testit_streaming(
+    work_item_id: str, iteration_index: int = 0, language: str = 'ru', force_regenerate: bool = False,
+) -> dict:
     fetch_result = await fetch_and_normalize_work_item(work_item_id)
     testcase = NormalizedTestCase(**fetch_result.normalized_testcase)
     params = _params_row(testcase, iteration_index)
     task = _build_task_prompt(testcase, params)
     start_url = _extract_url(testcase, params)
     payload: dict = {'test_case_id': work_item_id, 'task': task, 'language': language}
+    payload.update(_cache_fields(testcase, force_regenerate))
     if start_url:
         payload['start_url'] = start_url
     async with httpx.AsyncClient() as client:
@@ -259,6 +263,7 @@ async def run_test_case(body: RunnerStartRequest) -> RunnerRunResponse:
     start_url = _extract_url(testcase, params)
 
     payload: dict = {"test_case_id": body.work_item_id, "task": task}
+    payload.update(_cache_fields(testcase, body.force_regenerate))
     if start_url:
         payload["start_url"] = start_url
     return await _call_runner(payload, float(settings.RUNNER_TIMEOUT_SEC))
