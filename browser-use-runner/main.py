@@ -132,12 +132,24 @@ _SESSION_SEMAPHORE = asyncio.Semaphore(env_int('RUNNER_MAX_CONCURRENT_SESSIONS',
 _DEFAULT_SYSTEM_INSTRUCTIONS = """
 QA agent rules:
 
+Action output format (CRITICAL):
+- Every action is an object whose value is an object of named parameters, even when an action has only ONE parameter. The parameter object is ALWAYS required.
+  CORRECT: {"evaluate": {"code": "document.querySelectorAll('table tr').length"}}
+  CORRECT: {"click": {"index": 5}}
+  WRONG:   {"evaluate": "document.title"}  ← evaluate's value must be an object with a "code" key, never a bare string
+  WRONG:   {"index": 5}                    ← always wrap parameters inside the action object
+- An action's value is NEVER a bare string or number. Always nest it as {"param_name": value}.
+
 Verification:
 - NEVER use search_page to verify that a feed, list, collection of posts, or any repeating content is populated — use evaluate() with document.querySelectorAll() instead and count matching elements.
 - search_page is only for finding specific known text strings (exact error messages, exact labels, exact headings). If you use | in the query you MUST set regex: True, otherwise | is a literal character, not OR.
 - Always search in the language the page is currently displayed in.
 - Never call done() immediately after an action. First observe the result: use evaluate() or take a screenshot, then report based on what you actually see.
 - If verifying that a social feed, post list, article list, or card grid is displayed: use evaluate() to count items (e.g. document.querySelectorAll('[class*="post"], [class*="feed"], [class*="card"], article, .item').length) before concluding it is empty.
+
+Off-screen content (tables, columns):
+- Table columns or cells outside the visible viewport (e.g. a column that requires horizontal scrolling) still exist in the DOM. Verify them with evaluate() reading the table directly — e.g. document.querySelectorAll('table thead th') for headers and document.querySelectorAll('table tbody tr td') for cells — do NOT mark a test failed just because a column is not visible in the screenshot.
+- To horizontally scroll a scrollable table/container, use evaluate(): e.g. const el = document.querySelector('<selector>'); el.scrollLeft = el.scrollWidth; (or call .scrollIntoView() on a specific cell).
 
 Dynamic content and load states:
 - After navigation or form submission, check for loading indicators (spinners, skeletons, progress bars) using evaluate(). If present, wait() 2-3 seconds and recheck before asserting.
@@ -1419,7 +1431,7 @@ async def run_test_case(request: RunRequest) -> RunResponse:
 
         replay_response: RunResponse | None = None
         replay_history: AgentHistoryList | None = None
-        if request.cache_key and not request.force_regenerate and request.test_case_id:
+        if request.cache_key and not request.force_regenerate and request.test_case_id and not env_bool('RUNNER_DISABLE_CACHE_REPLAY', False):
             try:
                 cached_path = load_cached(request.test_case_id, request.cache_key)
             except Exception as exc:
@@ -1778,7 +1790,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
 
         replay_response: RunResponse | None = None
         replay_history: AgentHistoryList | None = None
-        if request.cache_key and not request.force_regenerate and request.test_case_id:
+        if request.cache_key and not request.force_regenerate and request.test_case_id and not env_bool('RUNNER_DISABLE_CACHE_REPLAY', False):
             try:
                 cached_path = load_cached(request.test_case_id, request.cache_key)
             except Exception as exc:
