@@ -212,6 +212,24 @@ def test_complete_resolutions_fills_missing():
     assert statuses[2] == "skipped"
 
 
+def test_complete_resolutions_dedupes_duplicate_issue_index():
+    from app.schemas.analysis import IssueResolution
+    from app.services.testcase_analyzer import _complete_resolutions
+
+    # The LLM occasionally returns two resolutions for the same issue_index —
+    # both used to survive, showing up as a duplicated resolution in the UI.
+    existing = [
+        IssueResolution(issue_index=0, issue_title="T0", status="resolved", reason="First"),
+        IssueResolution(issue_index=0, issue_title="T0", status="resolved", reason="Second"),
+    ]
+    issues = [{"title": "T0"}]
+
+    result = _complete_resolutions(existing, issues)
+
+    assert len(result) == 1
+    assert result[0].reason == "First"
+
+
 def test_analyze_raw_testcase_passes_language(monkeypatch):
     captured = {}
     def fake_llm(clean_testcase, enabled_rules=None, language="ru"):

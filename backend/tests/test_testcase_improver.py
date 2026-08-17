@@ -163,6 +163,83 @@ def test_improve_strips_placeholder_and_marks_case_needs_work():
     assert any("stand-in value" in n for n in result_en.manual_notes)
 
 
+def test_improve_test_data_only_reverts_unrequested_action_reword():
+    # Selecting only a test_data issue must not let the LLM's unrequested
+    # rewrite of the step's action text slip through — only test_data should
+    # actually change; action must come back as the original.
+    llm_result = ImproveResult(
+        improved_testcase=AnalyzedTestCase(
+            title=SAMPLE_WORK_ITEM["name"],
+            description=SAMPLE_WORK_ITEM["description"],
+            steps=[
+                AnalysisStep(action="Open login page", expected="Page loaded", test_data=None),
+                AnalysisStep(
+                    action="Rewritten action nobody asked for",
+                    expected="Fields filled",
+                    test_data="login=qa@example.com, password=hunter2",
+                ),
+            ],
+        ),
+        issue_resolutions=[
+            IssueResolution(
+                issue_index=0,
+                issue_title="Тестовые данные",
+                status="resolved",
+                action_taken="Добавлены тестовые данные",
+            )
+        ],
+    )
+    issues = [
+        {"rule": "test_data", "severity": "medium", "title": "Тестовые данные", "description": "D", "recommendation": "R"}
+    ]
+
+    with patch("app.services.testcase_improver.improve_testcase_with_llm", return_value=llm_result):
+        result = improve_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, selected_issues=issues)
+
+    step = result.improved_testcase.steps[1]
+    assert step.test_data == "login=qa@example.com, password=hunter2"
+    assert step.action == "Enter credentials"  # reverted to original, not the LLM's reword
+
+
+def test_improve_test_data_only_discards_step_when_llm_adds_extra_step():
+    # A test_data-only rule has no license to change the step count. If the LLM
+    # does it anyway, index-based pairing between original/improved steps can't
+    # be trusted (misattribution, or a step with no original counterpart ending
+    # up with action=None, which the schema rejects) — the whole steps list
+    # must fall back to the original rather than risk either.
+    llm_result = ImproveResult(
+        improved_testcase=AnalyzedTestCase(
+            title=SAMPLE_WORK_ITEM["name"],
+            description=SAMPLE_WORK_ITEM["description"],
+            steps=[
+                AnalysisStep(action="Open login page", expected="Page loaded", test_data=None),
+                AnalysisStep(action="Enter credentials", expected="Fields filled", test_data="login=qa@example.com"),
+                AnalysisStep(action="An extra step nobody asked for", expected="Something"),
+            ],
+        ),
+        issue_resolutions=[
+            IssueResolution(
+                issue_index=0,
+                issue_title="Тестовые данные",
+                status="resolved",
+                action_taken="Добавлены тестовые данные",
+            )
+        ],
+    )
+    issues = [
+        {"rule": "test_data", "severity": "medium", "title": "Тестовые данные", "description": "D", "recommendation": "R"}
+    ]
+
+    with patch("app.services.testcase_improver.improve_testcase_with_llm", return_value=llm_result):
+        result = improve_testcase(work_item=SAMPLE_WORK_ITEM, raw_content=None, selected_issues=issues)
+
+    steps = result.improved_testcase.steps
+    assert len(steps) == 2  # extra step discarded, original count preserved
+    assert steps[0].action == "Open login page"
+    assert steps[1].action == "Enter credentials"
+    assert steps[1].test_data is None  # whole section reverted, not just the extra step
+
+
 def test_improve_passes_language_to_llm(monkeypatch):
     captured = {}
     def fake_llm(testcase, selected_issues, language="ru"):

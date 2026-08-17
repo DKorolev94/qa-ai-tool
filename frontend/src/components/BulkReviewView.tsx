@@ -22,7 +22,7 @@ function ItemRow({
   item: BulkReviewItemResult
   index: number
   canRetry: boolean
-  onRetry: (index: number) => void
+  onRetry: (index: number) => Promise<void>
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
@@ -75,7 +75,7 @@ function ItemRow({
             type="button"
             className="bulk-review-row-retry"
             disabled={retrying}
-            onClick={e => { e.stopPropagation(); setRetrying(true); onRetry(index) }}
+            onClick={e => { e.stopPropagation(); setRetrying(true); onRetry(index).catch(() => setRetrying(false)) }}
           >
             {retrying ? <Loader2 size={11} className="spin-icon" /> : <RotateCw size={11} strokeWidth={2} />}
             {t('bulkReview.retry')}
@@ -153,9 +153,14 @@ export function BulkReviewView() {
   const [recentJobs, setRecentJobs] = useState<BulkReviewJobStatus[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollFailuresRef = useRef(0)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -202,6 +207,7 @@ export function BulkReviewView() {
     const poll = async () => {
       try {
         const status = await api.getBulkReviewStatus(id)
+        if (!mountedRef.current) return
         pollFailuresRef.current = 0
         setItems(status.items)
         if (status.done) {
@@ -209,6 +215,7 @@ export function BulkReviewView() {
           if (pollRef.current) clearInterval(pollRef.current)
         }
       } catch {
+        if (!mountedRef.current) return
         pollFailuresRef.current += 1
         if (pollFailuresRef.current >= MAX_CONSECUTIVE_POLL_FAILURES) {
           if (pollRef.current) clearInterval(pollRef.current)
@@ -290,11 +297,11 @@ export function BulkReviewView() {
 
   async function handleRetry(index: number) {
     if (!jobId) return
-    try {
-      await api.retryBulkReviewItem(jobId, index)
-      setJobDone(false)
-      startPolling(jobId)
-    } catch { /* leaves the item as-is; user can press retry again */ }
+    // Let the caller (ItemRow) catch failures so it can reset its own
+    // "retrying" spinner — swallowing the error here left it stuck forever.
+    await api.retryBulkReviewItem(jobId, index)
+    setJobDone(false)
+    startPolling(jobId)
   }
 
   function handleReset() {

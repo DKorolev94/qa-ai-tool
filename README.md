@@ -94,7 +94,8 @@ Copy `.env.example` to `.env` in the project root and fill in the values.
 | `RUNNER_LLM_MODEL` | `gpt-4o` | Model for browser agent (strong reasoning recommended) |
 | `TESTIT_BASE_URL` | `https://testit.example.com` | TestIT instance URL |
 | `TESTIT_PRIVATE_TOKEN` | `your_token` | TestIT private token |
-| `TESTIT_PROJECT_UUID` | `uuid` | Default project UUID |
+
+No project ID to configure — each test case's project is read from TestIT itself, and drafts/results are saved back into that same project.
 
 Everything else (timeouts, preflight, temperature, browser runner tuning) has working defaults, see `.env.example`.
 

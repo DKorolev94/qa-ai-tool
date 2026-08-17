@@ -315,6 +315,16 @@
     },
     "run": "Run",
     "forceRegenerate": "Force regenerate",
+    "forceRegenerateHint": "Cache replays the last run's result if the test case is tagged \"cache-ok\" in the TMS and hasn't changed since. Check this to force a fresh run, bypassing the cache.",
+    "cacheOn": "Cache on",
+    "cacheOff": "Cache off",
+    "cacheOkHint": "This test case is tagged \"cache-ok\": an unchanged re-run in the TMS will replay the last result instead of running the agent again.",
+    "cacheMissingHint": "Cache is inactive: this test case has no \"cache-ok\" tag in the TMS. Every run re-executes the agent.",
+    "localeLabel": "Site locale",
+    "deviceLabel": "Device",
+    "deviceDesktop": "Desktop",
+    "deviceMobile": "Mobile",
+    "deviceTablet": "iPad",
     "history": {
       "recentRuns_one": "{{count}} recent run",
       "recentRuns_other": "{{count}} recent runs",
@@ -355,7 +365,6 @@
     "badge": {
       "running": "Running",
       "passed": "Passed",
-      "passedUnstable": "Passed with warnings",
       "failed": "Failed",
       "blocked": "Blocked",
       "stopped": "Stopped"
@@ -379,6 +388,7 @@
     "runningEllipsis": "Running…",
     "noSteps": "No steps",
     "waitingForSteps": "Waiting for steps…",
+    "cacheReplayHint": "If a cached recording is found, steps will only appear after it finishes",
     "tabs": {
       "screen": "Screen",
       "logs": "Logs"
@@ -404,7 +414,6 @@
     "requiredRetry_other": "{{count}} steps required retry",
     "connectingToBrowser": "Connecting to browser…",
     "live": "LIVE",
-    "liveCaption": "Step {{num}} — {{summary}}",
     "stop": "Stop",
     "wsErrors": {
       "connectionLost": "Connection to runner lost",

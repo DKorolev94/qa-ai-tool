@@ -5,7 +5,6 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import i18n from '../i18n'
 import type {
   ActionDetail, HistoricalStep, RunnerSession, RunnerSessionStatus,
   WsDoneEvent, WsEvent, WsFrameEvent, WsLogEvent, WsStepEvent, WsStepPendingEvent, WsStepUpdateEvent,
@@ -47,7 +46,6 @@ function cleanSummary(raw: string): string {
 const BADGE_CFG: Record<string, { key: string; cls: string }> = {
   running:          { key: 'running',         cls: 'sess-badge--running'          },
   passed:           { key: 'passed',           cls: 'sess-badge--passed'           },
-  passed_unstable:  { key: 'passedUnstable',   cls: 'sess-badge--passed-unstable'  },
   failed:           { key: 'failed',           cls: 'sess-badge--failed'           },
   blocked:          { key: 'blocked',          cls: 'sess-badge--blocked'          },
   stopped:          { key: 'stopped',          cls: 'sess-badge--stopped'          },
@@ -60,7 +58,6 @@ export function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`sess-badge ${cfg?.cls ?? 'sess-badge--blocked'}`}>
       {label}
-      {status === 'passed_unstable' && <span className="sess-badge-warn-dot" />}
     </span>
   )
 }
@@ -410,7 +407,7 @@ function ResultBanner({ summary, status }: { summary: string; status: string }) 
   const { t } = useTranslation()
   const cleaned = fmtDoneSummary(summary)
   if (!cleaned) return null
-  const isOk = status === 'passed' || status === 'passed_unstable'
+  const isOk = status === 'passed'
   const isErr = status === 'failed'
   const cls = isOk ? 'rb--ok' : isErr ? 'rb--err' : 'rb--warn'
   const Icon = isOk ? Check : isErr ? X : AlertTriangle
@@ -425,7 +422,7 @@ function ResultBanner({ summary, status }: { summary: string; status: string }) 
 
 function StepsFeed({
   running, steps, pendingStepNum, highlightedStep, stepRefs,
-  doneSummary, doneResultStatus,
+  doneSummary, doneResultStatus, cacheAttempt,
 }: {
   running: boolean
   steps: UiStep[]
@@ -434,6 +431,7 @@ function StepsFeed({
   stepRefs: React.MutableRefObject<Map<number, HTMLDivElement>>
   doneSummary?: string | null
   doneResultStatus?: string | null
+  cacheAttempt?: boolean
 }) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -484,13 +482,16 @@ function StepsFeed({
           <div className="steps-waiting">
             <div className="steps-dots"><span /><span /><span /></div>
             <span className="steps-waiting-lbl">{t('runnerSession.waitingForSteps')}</span>
+            {cacheAttempt && (
+              <span className="steps-waiting-hint">{t('runnerSession.cacheReplayHint')}</span>
+            )}
           </div>
         )}
         {steps.map((s, idx) => (
           <TimelineStep
-            key={`${s.num}-${s.status}`}
+            key={s.num}
             step={s}
-            isLast={!pendingStepNum && idx === steps.length - 1 && running}
+            isLast={!pendingStepNum && idx === steps.length - 1}
             highlighted={highlightedStep === s.num}
             expanded={expandedStep === s.num}
             onToggle={() => handleToggle(s.num)}
@@ -696,7 +697,7 @@ function SessionFooter({
   const reasonText = doneEvent.status === 'blocked'
     ? humanizeBlockedSummary(doneEvent.summary, t)
     : doneEvent.summary
-  const unstableReason = effectiveStatus === 'passed_unstable' && retryStepCount
+  const unstableReason = effectiveStatus === 'passed' && retryStepCount
     ? t('runnerSession.requiredRetry', { count: retryStepCount })
     : null
   return (
@@ -757,10 +758,9 @@ export interface RunnerSessionViewProps {
   onUpdate: (update: Partial<RunnerSession>) => void
   wsPathPrefix?: string
   stepsApiPath?: string
-  externalRunId?: string
 }
 
-export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, stepsApiPath, externalRunId }: RunnerSessionViewProps) {
+export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, stepsApiPath }: RunnerSessionViewProps) {
   const { t } = useTranslation()
   const tRef = useRef(t)
   useEffect(() => { tRef.current = t })
@@ -799,6 +799,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
   const onUpdateRef = useRef(onUpdate)
   const mountedRef = useRef(true)
   const activeRunIdRef = useRef<string | null>(null)
+  const receivedDoneRef = useRef(false)
   const stepRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -820,7 +821,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
           if (r.ok) {
             setVideoUrl(`/api/runner/sessions/${runId}/video`)
           } else if (attempt < MAX_ATTEMPTS) {
-            setTimeout(() => check(attempt + 1), 2000)
+            setTimeout(() => { if (!cancelled) check(attempt + 1) }, 2000)
           } else {
             setVideoUnavailable(true)
           }
@@ -828,7 +829,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
         .catch(() => {
           if (cancelled) return
           if (attempt < MAX_ATTEMPTS) {
-            setTimeout(() => check(attempt + 1), 2000)
+            setTimeout(() => { if (!cancelled) check(attempt + 1) }, 2000)
           } else {
             setVideoUnavailable(true)
           }
@@ -838,12 +839,23 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
     return () => { cancelled = true }
   }, [doneEvent?.run_id])
 
+  const [stopping, setStopping] = useState(false)
+
+  const stopRun = (runId: string) => {
+    fetch(`/api/runner/sessions/${runId}/stop`, { method: 'POST' }).catch(() => { /* ignore */ })
+  }
+
   const handleStop = async () => {
     const runId = activeRunIdRef.current
-    if (!runId) return
+    if (!runId || stopping) return
+    setStopping(true)
     try {
-      await fetch(`/api/runner/sessions/${runId}/stop`, { method: 'POST' })
-    } catch { /* ignore */ }
+      const res = await fetch(`/api/runner/sessions/${runId}/stop`, { method: 'POST' })
+      if (!res.ok) setStopping(false)
+    } catch {
+      // Network failure — let the user try again instead of a stuck spinner forever.
+      setStopping(false)
+    }
   }
 
   useEffect(() => {
@@ -878,168 +890,156 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
     }
   }, [session.status, session.result?.run_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A cleanup-scheduled stop, deferred so a same-tick remount can cancel it
+  // (see the effect below) — lives outside the effect closure so the NEXT
+  // invocation can see and clear what the PREVIOUS cleanup scheduled.
+  const pendingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     if (!isRunning) return
-    mountedRef.current = true
-    const abort = new AbortController()
-
-    const startAndConnect = async () => {
-      try {
-        let runId: string
-        if (externalRunId) {
-          runId = externalRunId
-        } else {
-          const path = session.source === 'manual' ? '/api/runner/start-manual' : '/api/runner/start-testit'
-          const language = i18n.language === 'en' ? 'en' : 'ru'
-          const body = session.source === 'manual'
-            ? {
-                task: session.task!,
-                start_url: session.startUrl,
-                language,
-                ...(session.sensitiveData ? { sensitive_data: session.sensitiveData } : {}),
-                ...(session.browserProfile ? { browser_profile: session.browserProfile } : {}),
-              }
-            : {
-                work_item_id: session.workItemId!,
-                iteration_index: session.iterationIndex ?? 0,
-                language,
-                ...(session.forceRegenerate ? { force_regenerate: true } : {}),
-              }
-
-          const res = await fetch(path, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-            signal: abort.signal,
-          })
-          if (!res.ok) {
-            let detail = tRef.current('runnerSession.wsErrors.httpError', { status: res.status })
-            try { const err = await res.json(); detail = err.detail || detail } catch { /* use status */ }
-            throw new Error(detail)
-          }
-          const data = await res.json() as { run_id: string }
-          runId = data.run_id
-        }
-
-        if (abort.signal.aborted || !mountedRef.current) return
-        activeRunIdRef.current = runId
-
-        let receivedDone = false
-        let reconnectAttempts = 0
-        const MAX_RECONNECT_ATTEMPTS = 3
-
-        const connectWebSocket = () => {
-        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-        const wsPrefix = wsPathPrefix ?? '/runner/ws'
-        const ws = new WebSocket(`${proto}://${window.location.host}/api${wsPrefix}/${runId}`)
-        wsRef.current = ws
-
-        ws.onmessage = (ev) => {
-          if (!mountedRef.current) return
-          reconnectAttempts = 0 // we're receiving data again — reset backoff
-          let event: WsEvent
-          try { event = JSON.parse(ev.data) } catch { return }
-
-          if (event.type === 'step') {
-            const se = event as WsStepEvent
-            setLiveSteps(prev => {
-              const filtered = prev.filter(s => s.step !== se.step)
-              return [...filtered, se].sort((a, b) => a.step - b.step)
-            })
-            setPendingStepNum(prev => (prev === se.step ? null : prev))
-          } else if (event.type === 'step_update') {
-            const upd = event as WsStepUpdateEvent
-            setLiveSteps(prev => prev.map(s =>
-              s.step === upd.step
-                ? { ...s, summary: upd.summary, ...(upd.status ? { status: upd.status } : {}) }
-                : s
-            ))
-          } else if (event.type === 'step_pending') {
-            const pend = event as WsStepPendingEvent
-            setPendingStepNum(pend.step)
-          } else if (event.type === 'log') {
-            setLogEvents(prev => [...prev, event as WsLogEvent])
-          } else if (event.type === 'done') {
-            receivedDone = true
-            setPendingStepNum(null)
-            const de = event as WsDoneEvent
-            setDoneEvent(de)
-            onUpdateRef.current({
-              status: de.status,
-              endedAt: Date.now(),
-              result: {
-                status: de.status,
-                summary: de.summary,
-                duration_sec: de.duration_sec,
-                steps_count: de.steps_count,
-                errors: de.errors,
-                screenshots: [],
-                run_id: de.run_id,
-                replayed: de.replayed,
-              },
-            })
-          } else if (event.type === 'frame') {
-            const frameData = (event as WsFrameEvent).data
-            if (liveFrameRef.current) {
-              // Auto-detect format: JPEG starts with /9j/, PNG with iVBORw0KGgo
-              const mime = frameData.startsWith('/9j/') ? 'image/jpeg' : 'image/png'
-              liveFrameRef.current.src = `data:${mime};base64,${frameData}`
-            }
-            setHasLiveFrame(true)
-          } else if (event.type === 'error') {
-            receivedDone = true
-            setWsError((event as { type: string; message: string }).message)
-            onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
-          }
-        }
-
-        ws.onclose = () => {
-          if (!mountedRef.current || receivedDone || abort.signal.aborted) return
-          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            reconnectAttempts += 1
-            setTimeout(() => {
-              if (!mountedRef.current || receivedDone || abort.signal.aborted) return
-              connectWebSocket()
-            }, 1000 * reconnectAttempts)
-            return
-          }
-          setWsError(tRef.current('runnerSession.wsErrors.connectionLost'))
-          onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
-        }
-
-        // onerror carries no useful detail and is always followed by onclose
-        // for a WebSocket — let onclose's reconnect/give-up logic handle it,
-        // rather than declaring the run dead on the first blip.
-        ws.onerror = () => {}
-        }
-
-        connectWebSocket()
-
-      } catch (err) {
-        if (abort.signal.aborted) return
-        if (!mountedRef.current) return
-        setWsError((err as Error).message)
-        onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
-      }
+    // React 18 StrictMode (dev only) invokes this effect mount→cleanup→mount
+    // synchronously in the same tick. The run itself is started exactly once,
+    // in the button click handler, before this component ever mounts —
+    // session.id IS that run_id — so this mount is either the StrictMode
+    // phantom re-run or a genuine remount of the SAME already-running job,
+    // never a fresh one. Cancel whatever stop the previous cleanup just
+    // scheduled below before it fires; a real unmount (route change, tab
+    // close) never gets a matching re-mount, so that stop goes through.
+    if (pendingStopTimerRef.current) {
+      clearTimeout(pendingStopTimerRef.current)
+      pendingStopTimerRef.current = null
     }
 
-    startAndConnect()
+    mountedRef.current = true
+    receivedDoneRef.current = false
+    const runId = session.id
+    activeRunIdRef.current = runId
+
+    let receivedDone = false
+    let reconnectAttempts = 0
+    const MAX_RECONNECT_ATTEMPTS = 3
+
+    const connectWebSocket = () => {
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      const wsPrefix = wsPathPrefix ?? '/runner/ws'
+      const ws = new WebSocket(`${proto}://${window.location.host}/api${wsPrefix}/${runId}`)
+      wsRef.current = ws
+
+      ws.onmessage = (ev) => {
+        if (!mountedRef.current) return
+        reconnectAttempts = 0 // we're receiving data again — reset backoff
+        let event: WsEvent
+        try { event = JSON.parse(ev.data) } catch { return }
+
+        if (event.type === 'step') {
+          const se = event as WsStepEvent
+          setLiveSteps(prev => {
+            const filtered = prev.filter(s => s.step !== se.step)
+            return [...filtered, se].sort((a, b) => a.step - b.step)
+          })
+          setPendingStepNum(prev => (prev === se.step ? null : prev))
+        } else if (event.type === 'step_update') {
+          const upd = event as WsStepUpdateEvent
+          setLiveSteps(prev => prev.map(s =>
+            s.step === upd.step
+              ? { ...s, summary: upd.summary, ...(upd.status ? { status: upd.status } : {}) }
+              : s
+          ))
+        } else if (event.type === 'step_pending') {
+          const pend = event as WsStepPendingEvent
+          setPendingStepNum(pend.step)
+        } else if (event.type === 'log') {
+          setLogEvents(prev => [...prev, event as WsLogEvent])
+        } else if (event.type === 'done') {
+          receivedDone = true
+          receivedDoneRef.current = true
+          setPendingStepNum(null)
+          const de = event as WsDoneEvent
+          setDoneEvent(de)
+          onUpdateRef.current({
+            status: de.status,
+            endedAt: Date.now(),
+            result: {
+              status: de.status,
+              summary: de.summary,
+              duration_sec: de.duration_sec,
+              steps_count: de.steps_count,
+              errors: de.errors,
+              screenshots: [],
+              run_id: de.run_id,
+              replayed: de.replayed,
+            },
+          })
+        } else if (event.type === 'frame') {
+          const frameData = (event as WsFrameEvent).data
+          if (liveFrameRef.current) {
+            // Auto-detect format: JPEG starts with /9j/, PNG with iVBORw0KGgo
+            const mime = frameData.startsWith('/9j/') ? 'image/jpeg' : 'image/png'
+            liveFrameRef.current.src = `data:${mime};base64,${frameData}`
+          }
+          setHasLiveFrame(true)
+        } else if (event.type === 'error') {
+          receivedDone = true
+          receivedDoneRef.current = true
+          setWsError((event as { type: string; message: string }).message)
+          onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
+        }
+      }
+
+      ws.onclose = () => {
+        if (!mountedRef.current || receivedDone) return
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts += 1
+          setTimeout(() => {
+            if (!mountedRef.current || receivedDone) return
+            connectWebSocket()
+          }, 1000 * reconnectAttempts)
+          return
+        }
+        setWsError(tRef.current('runnerSession.wsErrors.connectionLost'))
+        onUpdateRef.current({ status: 'blocked', endedAt: Date.now() })
+      }
+
+      // onerror carries no useful detail and is always followed by onclose
+      // for a WebSocket — let onclose's reconnect/give-up logic handle it,
+      // rather than declaring the run dead on the first blip.
+      ws.onerror = () => {}
+    }
+
+    connectWebSocket()
 
     return () => {
       mountedRef.current = false
-      abort.abort()
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      // Component is unmounting (e.g. user navigated back) while the run was
+      // still active on the server — stop it there too, otherwise the
+      // browser-use session keeps burning LLM calls/browser resources with no
+      // way left to reach it. Deferred (see comment above) so a same-tick
+      // StrictMode remount can cancel it instead of stopping a run that's
+      // actually still being watched.
+      if (activeRunIdRef.current && !receivedDoneRef.current) {
+        const idToStop = activeRunIdRef.current
+        pendingStopTimerRef.current = setTimeout(() => {
+          pendingStopTimerRef.current = null
+          stopRun(idToStop)
+          // Reflect the stop in the session list immediately — otherwise this
+          // session still reads status:'running' there, and reopening it from
+          // history re-triggers this effect and reconnects to a run that the
+          // server has already stopped.
+          onUpdateRef.current({ status: 'stopped', endedAt: Date.now() })
+        }, 0)
+      }
       activeRunIdRef.current = null
       setHasLiveFrame(false)
       if (highlightTimerRef.current) {
         clearTimeout(highlightTimerRef.current)
         highlightTimerRef.current = null
       }
-      if (wsRef.current) {
-        wsRef.current.close()
-        wsRef.current = null
-      }
     }
-  }, [isRunning, externalRunId, session.source, session.task, session.workItemId, session.iterationIndex, session.startUrl])
+  }, [isRunning, session.id, wsPathPrefix])
 
   // Build display steps — filter done marker, add duplicate-goal flags + retry markers
   const uiSteps: UiStep[] = (() => {
@@ -1084,15 +1084,14 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
       ? Math.round(doneEvent.duration_sec)
       : Math.round(session.result?.duration_sec ?? 0)
 
-  const hasErrorSteps = uiSteps.some(s => s.status === 'error')
-  const hasWarningSteps = uiSteps.some(s => s.status === 'warning')
-  const hasRetrySteps = uiSteps.some(s => s.isRetry)
-  const baseStatus = doneEvent?.status ?? session.result?.status ?? session.status
-  const displayStatus: string = (
-    !isRunning &&
-    baseStatus === 'passed' &&
-    (hasWarningSteps || hasErrorSteps || hasRetrySteps)
-  ) ? 'passed_unstable' : baseStatus
+  // Status shown here must always be one of the runner's own four values
+  // (passed/failed/blocked/stopped) — matching what the history list shows
+  // for the same run. A "passed with warnings" pseudo-status used to be
+  // synthesized here from step-level retry/warning flags, which meant this
+  // page and the history list could disagree about the same run's status.
+  // Retry/warning info is still surfaced (see unstableReason below) — just
+  // as separate metadata next to the real status, not a fifth status value.
+  const displayStatus = doneEvent?.status ?? session.result?.status ?? session.status
 
   // Strip domain from title for cleaner display
   const headerTitle = session.title.replace(/\s*·\s*\S+\.\S+.*$/, '')
@@ -1114,8 +1113,9 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
           <span className="session-hdr-div" />
           <StatusBadge status={isRunning ? 'running' : (displayStatus)} />
           {isRunning && (
-            <button type="button" className="session-stop-btn" onClick={handleStop}>
-              <Square size={11} strokeWidth={2} /> {t('runnerSession.stop')}
+            <button type="button" className="session-stop-btn" onClick={handleStop} disabled={stopping}>
+              {stopping ? <Loader2 size={11} className="spin-icon" /> : <Square size={11} strokeWidth={2} />}
+              {t('runnerSession.stop')}
             </button>
           )}
         </div>
@@ -1161,14 +1161,6 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
                     {hasLiveFrame && (
                       <div className="session-live-hud">
                         <span className="session-live-badge">● {t('runnerSession.live')}</span>
-                        {uiSteps.length > 0 && (
-                          <div className="session-live-caption">
-                            {t('runnerSession.liveCaption', {
-                              num: uiSteps[uiSteps.length - 1].num,
-                              summary: cleanSummary(uiSteps[uiSteps.length - 1].summary),
-                            })}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -1206,6 +1198,7 @@ export function RunnerSessionView({ session, onBack, onUpdate, wsPathPrefix, ste
             stepRefs={stepRefs}
             doneSummary={!isRunning ? (doneEvent?.summary || session.result?.summary || null) : null}
             doneResultStatus={!isRunning ? (doneEvent?.status || session.result?.status || null) : null}
+            cacheAttempt={session.cacheAttempt}
           />
         </div>
 

@@ -19,8 +19,6 @@ class Settings(BaseSettings):
     TESTIT_AUTH_SCHEME: str = "PrivateToken"
     TESTIT_TIMEOUT_SECONDS: int = 30
     TESTIT_VERIFY_SSL: bool = True
-    TESTIT_PROJECT_UUID: str = ""
-    TESTIT_DRAFT_SECTION_UUID: str = ""
 
     RUNNER_URL: str = "http://localhost:8008"
     RUNNER_TIMEOUT_SEC: int = 180

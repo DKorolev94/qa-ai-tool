@@ -720,6 +720,27 @@ body { padding: 20px; }
   border: 1px solid var(--border); padding: 2px 7px; border-radius: 999px; line-height: 1;
 }
 .wb-source-id { font-size: 11px; font-family: monospace; color: var(--tx-muted); }
+.wb-cache-badge {
+  font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid;
+  line-height: 1; cursor: help;
+}
+.wb-cache-badge-on { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-border); }
+.wb-cache-badge-off { color: var(--tx-muted); background: var(--bg-surface); border-color: var(--border); }
+
+/* Hover tooltip via data-tooltip attribute — native `title` is too slow/unreliable */
+.hint { position: relative; }
+.hint::after {
+  content: attr(data-tooltip);
+  position: absolute; top: 100%; left: 0; margin-top: 8px;
+  width: max-content; max-width: 260px; text-align: left; white-space: normal;
+  background: #1F2430; color: #fff; font-family: var(--font); font-size: 11px; font-weight: 400;
+  line-height: 1.4; padding: 7px 10px; border-radius: var(--r-sm);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .12s ease .2s;
+  z-index: 20;
+}
+.hint:hover::after, .hint:focus-visible::after { opacity: 1; visibility: visible; }
 .wb-status-ok { font-size: 12px; font-weight: 500; color: var(--ok); display: flex; align-items: center; gap: 4px; line-height: 1; }
 .wb-status-analyzed { font-size: 12px; font-weight: 500; color: var(--accent); display: flex; align-items: center; gap: 4px; line-height: 1; }
 .wb-status-partial { font-size: 12px; font-weight: 500; color: #92400E; display: flex; align-items: center; gap: 4px; line-height: 1; }
@@ -733,6 +754,27 @@ body { padding: 20px; }
 
 /* Action buttons */
 .wb-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.wb-force-regen-label {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--tx-secondary);
+  white-space: nowrap; cursor: pointer; user-select: none;
+}
+.wb-force-regen-label input[type="checkbox"] {
+  width: 14px; height: 14px; margin: 0; accent-color: var(--accent); cursor: pointer;
+}
+.wb-setting-group { display: flex; align-items: center; gap: 6px; }
+.wb-setting-label {
+  font-family: var(--font); font-size: 11px; font-weight: 500; color: var(--tx-muted);
+  white-space: nowrap;
+}
+.wb-locale-select {
+  height: 32px; padding: 0 8px; border-radius: var(--r-sm);
+  background: var(--bg-surface); border: 1px solid var(--border);
+  font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--tx-secondary);
+  cursor: pointer; outline: none; transition: border-color .14s;
+}
+.wb-locale-select:hover { border-color: var(--border-hover); }
+.wb-locale-select:focus { border-color: rgba(109,40,217,0.5); box-shadow: 0 0 0 3px rgba(109,40,217,0.1); }
 .wb-btn {
   height: 32px; padding: 0 12px; border-radius: var(--r-sm);
   font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer;
@@ -1666,14 +1708,9 @@ body { padding: 20px; }
   animation: badge-pulse 1.6s ease-in-out infinite;
 }
 .sess-badge--passed          { color: var(--ok);  background: var(--ok-bg);  border-color: var(--ok-border); }
-.sess-badge--passed-unstable { color: var(--ok);  background: var(--ok-bg);  border-color: var(--ok-border); }
 .sess-badge--failed          { color: var(--bad); background: var(--bad-bg); border-color: var(--bad-border); }
 .sess-badge--blocked         { color: #92400E; background: #FEF3C7; border-color: rgba(245,158,11,0.3); }
 .sess-badge--stopped         { color: #4B5563; background: #F3F4F6; border-color: rgba(107,114,128,0.3); }
-.sess-badge-warn-dot {
-  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  background: #F59E0B; margin-left: 5px; flex-shrink: 0; vertical-align: middle;
-}
 
 /* Body: viewport + steps */
 .session-body {
@@ -1740,14 +1777,6 @@ body { padding: 20px; }
   padding: 3px 7px; border-radius: 4px; width: fit-content;
   text-transform: uppercase;
 }
-.session-live-caption {
-  background: rgba(0, 0, 0, 0.6); color: rgba(255, 255, 255, 0.8);
-  font-size: 11px; padding: 6px 10px; border-radius: 5px;
-  backdrop-filter: blur(4px); line-height: 1.45;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; word-break: break-word;
-}
-
 /* ── Right: steps panel ──────────────────────────────────────────────────── */
 .session-steps-panel {
   width: 320px; flex-shrink: 0;
@@ -2065,6 +2094,7 @@ body { padding: 20px; }
   40%           { transform: scale(1.1);  opacity: 1;   }
 }
 .steps-waiting-lbl { font-size: 11.5px; color: var(--tx-dim); letter-spacing: 0.01em; }
+.steps-waiting-hint { font-size: 10.5px; color: var(--tx-dim); opacity: 0.65; max-width: 220px; }
 
 
 /* ── Compact row (new) ────────────────────────────────────────────────────── */
@@ -2311,7 +2341,7 @@ body { padding: 20px; }
 }
 .hist-list { display: flex; flex-direction: column; gap: 4px; }
 .hist-item {
-  display: grid; grid-template-columns: 120px 1fr auto 16px; align-items: center; gap: 6px;
+  display: grid; grid-template-columns: 120px 1fr auto auto 16px; align-items: center; gap: 6px;
   padding: 8px 12px; border-radius: var(--r-sm);
   border: 1px solid var(--border); background: var(--bg-panel);
   cursor: pointer; transition: background .16s, border-color .16s;
@@ -2320,6 +2350,11 @@ body { padding: 20px; }
   background: var(--bg-surface); border-color: var(--border-hover);
 }
 .hist-title { flex: 1; min-width: 0; font-size: 12px; color: var(--tx-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hist-config {
+  font-size: 10px; color: var(--tx-muted); background: var(--bg-surface);
+  border: 1px solid var(--border); padding: 2px 6px; border-radius: 999px;
+  white-space: nowrap; flex-shrink: 0; line-height: 1.4;
+}
 .hist-meta  { font-size: 11px; font-family: monospace; color: var(--tx-muted); flex-shrink: 0; }
 .hist-chevron { color: var(--tx-dim); flex-shrink: 0; transition: color .16s, transform .16s; }
 .hist-item:hover .hist-chevron { color: var(--tx-muted); transform: translateX(2px); }

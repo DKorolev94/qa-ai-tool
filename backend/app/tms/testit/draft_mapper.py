@@ -12,8 +12,12 @@ _PRIORITY_MAP = {
 def _safe_duration(value: object, fallback: int = 60000) -> int:
     if isinstance(value, int) and value > 0:
         return value
-    if isinstance(value, str) and value.isdigit():
-        ms = int(value)
+    if isinstance(value, str):
+        # isdigit() alone would still crash on unicode digits int() rejects
+        try:
+            ms = int(value)
+        except ValueError:
+            return fallback
         return ms if ms > 0 else fallback
     return fallback
 

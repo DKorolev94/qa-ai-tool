@@ -47,7 +47,11 @@ def _display_duration(value: object) -> str | None:
         stripped = value.strip()
         if not stripped:
             return None
-        return _format_duration_ms(int(stripped)) if stripped.isdigit() else stripped
+        # isdigit() alone would still crash on unicode digits int() rejects
+        try:
+            return _format_duration_ms(int(stripped))
+        except ValueError:
+            return stripped
     return None
 
 

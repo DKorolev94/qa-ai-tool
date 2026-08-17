@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
         app_logger.warning("TestIT is not configured (TESTIT_BASE_URL/TESTIT_PRIVATE_TOKEN) — TestIT-backed endpoints will fail")
     yield
     app_logger.removeHandler(_file_handler)
+    _file_handler.close()
 
 
 app = FastAPI(title="QA AI Tool", version="0.1.0", lifespan=lifespan)

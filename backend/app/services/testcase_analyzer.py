@@ -66,8 +66,15 @@ def _complete_resolutions(
     issues: list[dict],
     language: str = "ru",
 ) -> list[IssueResolution]:
-    valid_resolutions = [r for r in resolutions if 0 <= r.issue_index < len(issues)]
-    seen = {r.issue_index for r in valid_resolutions}
+    # Dedupe by issue_index (first wins) — the LLM occasionally returns two
+    # resolutions for the same issue, which would otherwise both survive and
+    # show up as a duplicated resolution for one issue in the UI.
+    valid_resolutions: list[IssueResolution] = []
+    seen: set[int] = set()
+    for r in resolutions:
+        if 0 <= r.issue_index < len(issues) and r.issue_index not in seen:
+            valid_resolutions.append(r)
+            seen.add(r.issue_index)
     result = list(valid_resolutions)
     for idx in range(len(issues)):
         if idx not in seen:

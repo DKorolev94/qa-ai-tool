@@ -274,6 +274,8 @@ export interface SessionListItem {
   instability_step_count?: number
   retry_step_count?: number
   created_at: string
+  replayed?: boolean
+  browser_profile?: BrowserProfileSettings
 }
 
 // Step from /api/runner/sessions/{run_id}/steps
@@ -316,6 +318,9 @@ export interface RunnerSession {
   workItemId?: string
   iterationIndex?: number
   forceRegenerate?: boolean
+  // Cache might be hit once the run reaches the runner (cache-ok tag present,
+  // not forced) — not a guarantee it will be, just that a replay is possible.
+  cacheAttempt?: boolean
   status: RunnerSessionStatus
   result?: RunnerRunResponse
   startedAt: number

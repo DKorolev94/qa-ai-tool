@@ -308,3 +308,36 @@ def test_list_jobs_returns_newest_first():
     ids = [job.job_id for job in bulk_review_service.list_jobs()]
 
     assert ids.index("newer") < ids.index("older")
+
+
+def test_start_bulk_review_rejects_once_too_many_non_done_jobs_queued():
+    # start_bulk_review() itself has no "one batch at a time" gate — only
+    # _RUN_LOCK serializes actual processing — so without this cap, repeated
+    # calls (double submit, retried request) would queue an unbounded number
+    # of non-done jobs that _prune_old_jobs() never evicts (it only reaps
+    # done=True ones).
+    for i in range(bulk_review_service._MAX_NON_DONE_JOBS):
+        _seed_job(f"queued-{i}", ["1"])
+
+    try:
+        bulk_review_service.start_bulk_review(["999"], None, "ru")
+        assert False, "expected RuntimeError once the non-done cap is reached"
+    except RuntimeError:
+        pass
+
+    # None of the already-queued jobs, nor a new one, got created past the cap.
+    assert len(bulk_review_service._JOBS) == bulk_review_service._MAX_NON_DONE_JOBS
+
+
+def test_start_bulk_review_allows_new_batch_once_a_slot_frees_up():
+    for i in range(bulk_review_service._MAX_NON_DONE_JOBS - 1):
+        _seed_job(f"queued-{i}", ["1"])
+
+    async def scenario():
+        with patch.object(bulk_review_service, "fetch_and_normalize_work_item", AsyncMock(return_value=_fetch_response("1"))), \
+             patch.object(bulk_review_service, "analyze_raw_testcase", return_value=_analyze_response(False)):
+            job_id = bulk_review_service.start_bulk_review(["1"], None, "ru")
+            assert bulk_review_service.get_job(job_id) is not None
+            await asyncio.sleep(0.05)  # let the scheduled task finish before patches go out of scope
+
+    run(scenario())

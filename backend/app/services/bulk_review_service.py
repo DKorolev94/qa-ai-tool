@@ -22,6 +22,14 @@ logger = logging.getLogger(__name__)
 _JOBS: dict[str, BulkReviewJobStatus] = {}
 _MAX_STORED_JOBS = 50
 
+# start_bulk_review() has no "one batch at a time" gate of its own — _RUN_LOCK
+# only serializes actual processing, so repeated/duplicate start calls (double
+# submit, retried request) would otherwise queue an unbounded number of
+# non-done jobs, each held forever since _prune_old_jobs() only evicts
+# done=True ones. This caps how many can be queued/running at once, with
+# headroom above the intended "next batch queues behind the current one" flow.
+_MAX_NON_DONE_JOBS = 5
+
 # Live task handles, so a forgotten/abandoned batch (browser tab closed
 # without stopping it) can still be found and cancelled via list_jobs() +
 # stop_bulk_review() — not just the one job_id the current page happens to
@@ -58,9 +66,8 @@ def stop_bulk_review(job_id: str) -> bool:
 def _prune_old_jobs() -> None:
     # Only evicts done=True jobs — evicting one still in flight would delete
     # _JOBS[job_id] out from under its own running task, which indexes into
-    # it on every _update_item call. This is a hard cap in practice, not just
-    # a soft one: _RUN_LOCK allows at most one non-done job at a time
-    # backend-wide, so the store can never exceed _MAX_STORED_JOBS + 1.
+    # it on every _update_item call. Non-done jobs are bounded separately by
+    # _MAX_NON_DONE_JOBS in start_bulk_review(), not by this function.
     if len(_JOBS) <= _MAX_STORED_JOBS:
         return
     for old_id in list(_JOBS.keys()):
@@ -77,6 +84,8 @@ def start_bulk_review(
     language: str,
 ) -> str:
     _prune_old_jobs()
+    if sum(1 for job in _JOBS.values() if not job.done) >= _MAX_NON_DONE_JOBS:
+        raise RuntimeError("Too many bulk review batches already queued or running")
     job_id = uuid.uuid4().hex
     items = [BulkReviewItemResult(work_item_id=wid) for wid in work_item_ids]
     _JOBS[job_id] = BulkReviewJobStatus(job_id=job_id, items=items, enabled_rules=enabled_rules, language=language)

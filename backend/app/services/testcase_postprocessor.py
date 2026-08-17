@@ -263,16 +263,27 @@ def _filter_stale_notes(notes: list[str], improved: dict) -> list[str]:
 
 
 
+def _duration_as_ms(value: object) -> int | None:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        # str.isdigit() alone isn't enough — it's true for unicode digits
+        # (e.g. superscript "²") that int() then rejects with ValueError.
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
+
+
 def _process_duration(improved: dict) -> tuple[str | None, int | None]:
     duration = improved.get("duration")
     if duration is None:
         return None, None
-    if isinstance(duration, int):
-        return _format_duration_ms(duration), duration
+    ms = _duration_as_ms(duration)
+    if ms is not None:
+        return _format_duration_ms(ms), ms
     if isinstance(duration, str):
-        if duration.isdigit():
-            ms = int(duration)
-            return _format_duration_ms(ms), ms
         return duration, None
     return None, None
 
@@ -336,13 +347,9 @@ def postprocess_improved_testcase(
     # Duration — discard LLM value if suspiciously small (LLM confused ms with seconds/minutes).
     # Floor is 60 000 ms (1 min) — any test shorter than that is likely a unit confusion.
     orig_duration = original.get("duration")
-    improved_duration = result.get("duration")
-    if (
-        isinstance(improved_duration, int)
-        and improved_duration < _MIN_DURATION_MS
-        and isinstance(orig_duration, int)
-        and orig_duration >= _MIN_DURATION_MS
-    ):
+    improved_ms = _duration_as_ms(result.get("duration"))
+    orig_ms = _duration_as_ms(orig_duration)
+    if improved_ms is not None and improved_ms < _MIN_DURATION_MS and orig_ms is not None and orig_ms >= _MIN_DURATION_MS:
         result["duration"] = orig_duration
 
     display_duration, raw_duration = _process_duration(result)

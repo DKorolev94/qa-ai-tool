@@ -9,7 +9,15 @@ import { api, humanizeFetchError } from '../api'
 import i18n from '../i18n'
 import { RunnerSessionView, StatusBadge } from './RunnerSessionView'
 import { SectionHeader } from './SectionHeader'
-import type { FetchResult, RunnerRunResponse, RunnerSession, SessionListItem, Step } from '../types'
+import type { BrowserProfileSettings, FetchResult, RunnerRunResponse, RunnerSession, SessionListItem, Step } from '../types'
+
+// iPad Air, iPadOS 17 — mirrors the iPhone 14 preset already hardcoded in browser-use-runner/main.py
+const _IPAD_UA = 'Mozilla/5.0 (iPad; CPU OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1'
+
+const DEVICE_PRESETS: Record<string, BrowserProfileSettings> = {
+  mobile: { is_mobile: true },
+  tablet: { is_mobile: true, viewport_width: 820, viewport_height: 1180, device_scale_factor: 2, user_agent: _IPAD_UA },
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -24,7 +32,7 @@ function fmtElapsed(s: number, t: TFunction) {
 
 function mkSession(
   base: Pick<RunnerSession, 'title' | 'source'> &
-    Partial<Pick<RunnerSession, 'task' | 'startUrl' | 'workItemId' | 'iterationIndex' | 'forceRegenerate' | 'sensitiveData' | 'browserProfile'>>
+    Partial<Pick<RunnerSession, 'id' | 'task' | 'startUrl' | 'workItemId' | 'iterationIndex' | 'forceRegenerate' | 'cacheAttempt' | 'sensitiveData' | 'browserProfile'>>
 ): RunnerSession {
   return {
     id: crypto.randomUUID(),
@@ -69,7 +77,7 @@ function StepBlock({ label, steps }: { label: string; steps?: Step[] | null }) {
 interface WorkbenchProps {
   fetchResult: FetchResult
   onBack: () => void
-  onRun: (iterationIndex: number, forceRegenerate: boolean) => void
+  onRun: (iterationIndex: number, forceRegenerate: boolean, browserProfile: BrowserProfileSettings) => Promise<void>
 }
 
 function IterationPicker({
@@ -106,6 +114,15 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
   const hasIterations = pt && pt.rows.length > 1
   const [selectedIteration, setSelectedIteration] = useState(0)
   const [forceRegenerate, setForceRegenerate] = useState(false)
+  const [locale, setLocale] = useState('ru-RU')
+  const [device, setDevice] = useState('')
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+  const runBrowserProfile = (): BrowserProfileSettings => ({
+    ...(locale ? { locale } : {}),
+    ...(DEVICE_PRESETS[device] ?? {}),
+  })
+  const cacheOk = (tc.tags ?? []).includes('cache-ok')
   return (
     <div className="workspace-inner-wb">
       <SectionHeader title={t('sidebar.testRunner')} onBack={onBack} />
@@ -116,10 +133,32 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
           <div className="wb-meta-row">
             <span className="wb-source-badge">TestIT</span>
             <span className="wb-source-id">#{fetchResult.work_item_id}</span>
+            <span
+              className={cacheOk ? 'wb-cache-badge wb-cache-badge-on hint' : 'wb-cache-badge wb-cache-badge-off hint'}
+              tabIndex={0}
+              data-tooltip={cacheOk ? t('runnerView.cacheOkHint') : t('runnerView.cacheMissingHint')}
+            >
+              {cacheOk ? t('runnerView.cacheOn') : t('runnerView.cacheOff')}
+            </span>
           </div>
         </div>
         <div className="wb-actions">
-          <label className="wb-force-regen-label">
+          <div className="wb-setting-group">
+            <span className="wb-setting-label">{t('runnerView.localeLabel')}</span>
+            <select className="wb-locale-select" value={locale} onChange={e => setLocale(e.target.value)}>
+              <option value="ru-RU">ru-RU</option>
+              <option value="en-US">en-US</option>
+            </select>
+          </div>
+          <div className="wb-setting-group">
+            <span className="wb-setting-label">{t('runnerView.deviceLabel')}</span>
+            <select className="wb-locale-select" value={device} onChange={e => setDevice(e.target.value)}>
+              <option value="">{t('runnerView.deviceDesktop')}</option>
+              <option value="mobile">{t('runnerView.deviceMobile')}</option>
+              <option value="tablet">{t('runnerView.deviceTablet')}</option>
+            </select>
+          </div>
+          <label className="wb-force-regen-label hint" tabIndex={0} data-tooltip={t('runnerView.forceRegenerateHint')}>
             <input
               type="checkbox"
               checked={forceRegenerate}
@@ -127,11 +166,34 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
             />
             {t('runnerView.forceRegenerate')}
           </label>
-          <button type="button" className="source-fetch-btn" onClick={() => onRun(selectedIteration, forceRegenerate)}>
-            <Play size={13} /> {t('runnerView.run')}
+          <button
+            type="button"
+            className={`source-fetch-btn${starting ? ' source-fetch-btn-muted' : ''}`}
+            disabled={starting}
+            onClick={async () => {
+              setStarting(true)
+              setStartError(null)
+              try {
+                await onRun(selectedIteration, forceRegenerate, runBrowserProfile())
+              } catch (err) {
+                setStartError(humanizeFetchError((err as Error).message))
+                setStarting(false)
+              }
+            }}
+          >
+            {starting
+              ? <><Loader2 size={13} className="spin-icon" />{t('runnerView.loading')}</>
+              : <><Play size={13} />{t('runnerView.run')}</>}
           </button>
         </div>
       </div>
+
+      {startError && (
+        <div className="alert alert-error">
+          <span className="alert-icon-err"><XCircle size={16} strokeWidth={1.75} /></span>
+          <span className="alert-text"><strong>{t('runnerView.errorPrefix')}</strong>{startError}</span>
+        </div>
+      )}
 
       <div className="wb-grid" style={{ flex: 1, minHeight: 0 }}>
         <div className="wb-main">
@@ -188,6 +250,20 @@ function TestItWorkbench({ fetchResult, onBack, onRun }: WorkbenchProps) {
   )
 }
 
+// ── Run-history device/locale badge ──────────────────────────────────────
+
+function historyConfigLabel(bp: BrowserProfileSettings | undefined, replayed: boolean | undefined, t: TFunction): string | null {
+  const device = !bp
+    ? null
+    : !bp.is_mobile
+      ? t('runnerView.deviceDesktop')
+      : bp.viewport_width === 820 && bp.viewport_height === 1180
+        ? t('runnerView.deviceTablet')
+        : t('runnerView.deviceMobile')
+  const parts = [device, bp?.locale, replayed ? t('runnerSession.replayedBadge') : null].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
+
 // ── Date formatting ───────────────────────────────────────────────────────
 
 function fmtDate(iso: string, t: TFunction): string {
@@ -238,6 +314,7 @@ function SessionHistoryList({
             <div key={item.local!.id} className="hist-item" onClick={() => onOpenLocal(item.local!.id)}>
               <StatusBadge status={item.local!.status} />
               <span className="hist-title" title={item.local!.title}>{item.local!.title}</span>
+              <span className="hist-config">{historyConfigLabel(item.local!.browserProfile, item.local!.result?.replayed, t) ?? '—'}</span>
               <span className="hist-meta">{fmtElapsed(Math.round((Date.now() - item.local!.startedAt) / 1000), t)}</span>
               <ChevronRight size={14} strokeWidth={1.75} className="hist-chevron" />
             </div>
@@ -254,6 +331,7 @@ function SessionHistoryList({
                   ? t('runnerView.history.testCaseHash', { id: item.api!.test_case_id })
                   : t('runnerView.history.manualRun')}
               </span>
+              <span className="hist-config">{historyConfigLabel(item.api!.browser_profile, item.api!.replayed, t) ?? '—'}</span>
               <span className="hist-meta">
                 {t('runnerView.time.elapsedSec', { s: Math.round(item.api!.duration_sec) })} · {fmtDate(item.api!.created_at, t)}
               </span>
@@ -292,7 +370,7 @@ interface InputScreenProps {
   fetchResult: FetchResult | null
   fetchError: string | null
   onFetch: () => void
-  onRunManual: (task: string) => void
+  onRunManual: (task: string) => Promise<void>
   apiSessions: SessionListItem[]
   localSessions: RunnerSession[]
   onOpenApiSession: (item: SessionListItem) => void
@@ -308,9 +386,11 @@ function InputScreen({
   const [manualTask, setManualTask] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [showAllHistory, setShowAllHistory] = useState(false)
+  const [startingManual, setStartingManual] = useState(false)
+  const [manualStartError, setManualStartError] = useState<string | null>(null)
 
   const canFetch = testItId.trim().length > 0 && !fetchLoading
-  const canRun = manualTask.trim().length > 0
+  const canRun = manualTask.trim().length > 0 && !startingManual
   // Dedup: local sessions already in apiSessions (by run_id)
   const apiRunIds = new Set(apiSessions.map(s => s.run_id))
   const uniqueLocalCount = localSessions.filter(s => !apiRunIds.has(s.id)).length
@@ -428,11 +508,29 @@ function InputScreen({
                 <button
                   type="button"
                   className="runner-cta-btn"
-                  onClick={() => onRunManual(manualTask)}
+                  onClick={async () => {
+                    setStartingManual(true)
+                    setManualStartError(null)
+                    try {
+                      await onRunManual(manualTask)
+                    } catch (err) {
+                      setManualStartError(humanizeFetchError((err as Error).message))
+                      setStartingManual(false)
+                    }
+                  }}
                   disabled={!canRun}
                 >
-                  <Play size={16} /> {t('runnerView.run')}
+                  {startingManual
+                    ? <><Loader2 size={16} className="spin-icon" />{t('runnerView.loading')}</>
+                    : <><Play size={16} />{t('runnerView.run')}</>}
                 </button>
+
+                {manualStartError && (
+                  <div className="alert alert-error">
+                    <span className="alert-icon-err"><XCircle size={16} strokeWidth={1.75} /></span>
+                    <span className="alert-text"><strong>{t('runnerView.errorPrefix')}</strong>{manualStartError}</span>
+                  </div>
+                )}
 
                 {/* Limitations — callout */}
                 <div className="limits-callout">
@@ -567,17 +665,54 @@ export function RunnerView() {
     return `${prefix} · ${words.length > 45 ? words.slice(0, 45) + '…' : words}`
   }
 
-  function handleRunManual(task: string) {
-    startSession(mkSession({ title: manualTitle(task), source: 'manual', task }))
+  // Posts /start-* here (button click), not inside RunnerSessionView's effect —
+  // that effect used to generate its own run_id and fire this same request,
+  // which meant React 18 StrictMode's dev-only double-invoke minted TWO
+  // distinct run_ids and started the agent TWICE per click. The run_id is
+  // generated once, right here, and reused as the session's own id, so
+  // RunnerSessionView only ever connects to an already-started run.
+  async function postStart(path: string, body: Record<string, unknown>): Promise<void> {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      let detail = t('runnerSession.wsErrors.httpError', { status: res.status })
+      try { const err = await res.json(); detail = err.detail || detail } catch { /* use status */ }
+      throw new Error(detail)
+    }
   }
 
-  function handleRunTestIt(iterationIndex = 0, forceRegenerate = false) {
+  async function handleRunManual(task: string) {
+    const runId = crypto.randomUUID().replace(/-/g, '')
+    const language = i18n.language === 'en' ? 'en' : 'ru'
+    await postStart('/api/runner/start-manual', { task, language, run_id: runId })
+    startSession(mkSession({ id: runId, title: manualTitle(task), source: 'manual', task }))
+  }
+
+  async function handleRunTestIt(iterationIndex = 0, forceRegenerate = false, browserProfile: BrowserProfileSettings = {}) {
     if (!fetchResult) return
     const tc = fetchResult.normalized_testcase
     const title = tc.title
       ? `${tc.title} #${fetchResult.work_item_id}`
       : t('runnerView.history.testCaseHash', { id: fetchResult.work_item_id })
-    startSession(mkSession({ title, source: 'testit', workItemId: fetchResult.work_item_id, iterationIndex, forceRegenerate }))
+    const runId = crypto.randomUUID().replace(/-/g, '')
+    const language = i18n.language === 'en' ? 'en' : 'ru'
+    await postStart('/api/runner/start-testit', {
+      work_item_id: fetchResult.work_item_id,
+      iteration_index: iterationIndex,
+      language,
+      run_id: runId,
+      ...(forceRegenerate ? { force_regenerate: true } : {}),
+      ...(Object.keys(browserProfile).length ? { browser_profile: browserProfile } : {}),
+    })
+    const cacheAttempt = (tc.tags ?? []).includes('cache-ok') && !forceRegenerate
+    startSession(mkSession({
+      id: runId, title, source: 'testit', workItemId: fetchResult.work_item_id, iterationIndex, forceRegenerate,
+      cacheAttempt,
+      ...(Object.keys(browserProfile).length ? { browserProfile } : {}),
+    }))
   }
 
   function updateSession(id: string, update: Partial<RunnerSession>) {
@@ -602,6 +737,7 @@ export function RunnerView() {
       screenshots: [],
       duration_sec: item.duration_sec,
       run_id: item.run_id,
+      replayed: item.replayed,
     }
     const session: RunnerSession = {
       id: item.run_id,

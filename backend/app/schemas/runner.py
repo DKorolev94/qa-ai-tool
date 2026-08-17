@@ -9,6 +9,8 @@ class RunnerStartRequest(BaseModel):
     iteration_index: int = Field(default=0, ge=0)
     language: Literal['ru', 'en'] = 'ru'
     force_regenerate: bool = False
+    browser_profile: BrowserProfileRequest | None = None
+    run_id: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]+$')
 
 
 class BrowserProfileRequest(BaseModel):
@@ -28,6 +30,7 @@ class RunnerManualStartRequest(BaseModel):
     sensitive_data: dict[str, str] | None = None
     browser_profile: BrowserProfileRequest | None = None
     language: Literal['ru', 'en'] = 'ru'
+    run_id: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]+$')
 
 
 class RunnerScreenshot(BaseModel):

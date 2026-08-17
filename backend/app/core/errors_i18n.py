@@ -28,8 +28,8 @@ ERROR_MESSAGES: dict[str, dict[str, str]] = {
         "ru": "TESTIT_PRIVATE_TOKEN не задан в .env",
     },
     "testit_project_uuid_missing": {
-        "en": "TESTIT_PROJECT_UUID is not configured in .env",
-        "ru": "TESTIT_PROJECT_UUID не задан в .env",
+        "en": "Source test case has no projectId — cannot determine which TestIT project to save to",
+        "ru": "У исходного тест-кейса нет projectId — не удалось определить проект TestIT для сохранения",
     },
     "testit_auth_failed": {
         "en": "TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.",

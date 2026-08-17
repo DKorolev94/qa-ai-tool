@@ -36,6 +36,15 @@ class RunRequest(BaseModel):
 	model_config = ConfigDict(extra='forbid')
 
 	test_case_id: str | None = None
+	run_id: str | None = Field(
+		default=None,
+		description=(
+			'Client-supplied id for the /start + /ws/{run_id} streaming flow. Lets the '
+			'caller know its run_id before this request resolves, so it can still be '
+			"stopped even if the caller unmounts/aborts before reading this call's "
+			'response. Ignored by the synchronous /run endpoint.'
+		),
+	)
 	cache_key: str | None = Field(default=None, description='Cache-replay key (TestIT modifiedDate); set only when the test case is tagged cache-ok')
 	force_regenerate: bool = Field(default=False, description='Skip cache lookup and force a fresh AI run, overwriting any cached entry')
 	language: Literal['ru', 'en'] = 'ru'

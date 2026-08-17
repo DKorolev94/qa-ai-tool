@@ -182,15 +182,10 @@ async def bulk_review_list() -> list[BulkReviewJobStatus]:
 
 @router.post("/bulk-review/start")
 async def bulk_review_start(body: BulkReviewRequest) -> dict:
-    # Draft creation needs this for every item that has issues — fail the whole
-    # batch upfront rather than burning an LLM analyze+improve call per item
-    # only to hit the same config error at the last step for each of them.
-    if not settings.TESTIT_PROJECT_UUID:
-        raise HTTPException(
-            status_code=503,
-            detail=localize("testit_project_uuid_missing", body.language),
-        )
-    job_id = bulk_review_service.start_bulk_review(body.work_item_ids, body.enabled_rules, body.language)
+    try:
+        job_id = bulk_review_service.start_bulk_review(body.work_item_ids, body.enabled_rules, body.language)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=429, detail=str(exc))
     return {"job_id": job_id}
 
 
@@ -215,11 +210,6 @@ async def bulk_review_retry(job_id: str, index: int) -> dict:
     job = bulk_review_service.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Bulk review job not found")
-    if not settings.TESTIT_PROJECT_UUID:
-        raise HTTPException(
-            status_code=503,
-            detail=localize("testit_project_uuid_missing", job.language),
-        )
     retried = bulk_review_service.retry_item(job_id, index)
     if not retried:
         raise HTTPException(status_code=409, detail="Item is not in a retryable state")
@@ -240,6 +230,16 @@ async def runner_run(body: RunnerStartRequest) -> RunnerRunResponse:
         raise HTTPException(status_code=404, detail=str(exc))
     except TestItConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
+    except TestItAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except TestItConnectionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except TestItResponseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except TestItApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"Runner error: {exc}")
 
 
 @router.post("/runner/run-manual", response_model=RunnerRunResponse)
@@ -252,6 +252,8 @@ async def runner_run_manual(body: RunnerManualStartRequest) -> RunnerRunResponse
         raise HTTPException(status_code=502, detail=f"Runner error: {exc.response.text[:300]}")
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Runner unavailable: {exc}")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"Runner error: {exc}")
 
 
 @router.post("/runner/start-manual")
@@ -270,7 +272,8 @@ async def runner_start_manual(body: RunnerManualStartRequest) -> dict:
 async def runner_start_testit(body: RunnerStartRequest) -> dict:
     try:
         return await runner_service.start_testit_streaming(
-            body.work_item_id, body.iteration_index, body.language, body.force_regenerate,
+            body.work_item_id, body.iteration_index, body.language, body.force_regenerate, body.run_id,
+            body.browser_profile,
         )
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Runner timeout — could not start test")
@@ -282,7 +285,14 @@ async def runner_start_testit(body: RunnerStartRequest) -> dict:
         raise HTTPException(status_code=404, detail=str(exc))
     except TestItConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-
+    except TestItAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except TestItConnectionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except TestItResponseError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except TestItApiError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.get("/runner/sessions")
@@ -335,9 +345,33 @@ async def runner_stop_session(run_id: str) -> dict:
 
 
 
+_pending_orphan_stops: dict[str, asyncio.Task] = {}
+# Frontend retries its own WS connection up to 3x with backoff 1s/2s/3s (~6s of
+# pure backoff, more with connect time) before giving up — this must stay well
+# above that or a reconnecting tab still loses its run.
+_ORPHAN_STOP_GRACE_SEC = 12.0
+
+
+async def _stop_if_still_orphaned(run_id: str) -> None:
+    try:
+        await asyncio.sleep(_ORPHAN_STOP_GRACE_SEC)
+        await runner_service.stop_session(run_id)
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        pass
+    finally:
+        _pending_orphan_stops.pop(run_id, None)
+
+
 @router.websocket("/runner/ws/{run_id}")
 async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
     await websocket.accept()
+    # A previous connection for this run may have just disconnected and scheduled
+    # an orphan-stop — this new connection is that client reconnecting, so cancel it.
+    pending = _pending_orphan_stops.pop(run_id, None)
+    if pending:
+        pending.cancel()
     _parsed = urlparse(settings.RUNNER_URL)
     _ws_scheme = 'wss' if _parsed.scheme == 'https' else 'ws'
     runner_ws_url = urlunparse(_parsed._replace(scheme=_ws_scheme)) + f'/ws/{run_id}'
@@ -349,14 +383,12 @@ async def runner_ws_proxy(websocket: WebSocket, run_id: str) -> None:
                     msg = message if isinstance(message, str) else message.decode()
                     await websocket.send_text(msg)
             except WebSocketDisconnect:
-                # The frontend went away mid-run, not the runner finishing
-                # normally (that path ends the `async for` without raising) —
-                # stop the run instead of letting it keep burning LLM/browser
-                # time with nobody watching.
-                try:
-                    await runner_service.stop_session(run_id)
-                except Exception:
-                    pass
+                # The frontend went away — could be a permanent close (tab shut,
+                # navigated away) or just a network blip/backgrounded tab that its
+                # own reconnect logic will recover from. Give it a grace window
+                # before assuming nobody's watching and stopping the run; a
+                # reconnecting client cancels this via the check above.
+                _pending_orphan_stops[run_id] = asyncio.create_task(_stop_if_still_orphaned(run_id))
     except WebSocketDisconnect:
         pass
     except Exception as exc:
@@ -404,7 +436,11 @@ async def runner_screenshot(path: str) -> FileResponse:
         raise HTTPException(status_code=503, detail="Screenshot serving not configured (RUNNER_RUNS_DIR not set)")
 
     runs_root = pathlib.Path(runs_dir).resolve()
-    target = pathlib.Path(path).resolve()
+    # Runner now sends paths relative to its RUNS_DIR (older persisted
+    # steps.json files may still hold an absolute path from before that
+    # change — both are supported here).
+    raw_target = pathlib.Path(path)
+    target = raw_target.resolve() if raw_target.is_absolute() else (runs_root / raw_target).resolve()
 
     if not target.is_relative_to(runs_root):
         raise HTTPException(status_code=403, detail="Access denied")

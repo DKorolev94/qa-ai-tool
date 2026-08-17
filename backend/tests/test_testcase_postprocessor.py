@@ -84,6 +84,33 @@ def test_duration_none_stays_none():
     assert result["raw_duration"] is None
 
 
+def test_suspiciously_small_int_duration_restored_from_original():
+    original = {"duration": 600000}
+    improved = _base_improved(duration=5)  # LLM confused ms with seconds
+    result = postprocess_improved_testcase(original, improved)
+    assert result["duration"] == 600000
+    assert result["raw_duration"] == 600000
+
+
+def test_suspiciously_small_string_duration_restored_from_original():
+    # The guard used to only fire for isinstance(duration, int) — a numeric
+    # *string* duration from the LLM (AnalyzedTestCase.duration: str | int | None)
+    # slipped straight through unguarded.
+    original = {"duration": 600000}
+    improved = _base_improved(duration="5")
+    result = postprocess_improved_testcase(original, improved)
+    assert result["duration"] == 600000
+
+
+def test_unicode_digit_duration_does_not_crash():
+    # str.isdigit() is True for unicode digits (e.g. superscript "²") that
+    # int() then rejects with ValueError — this used to be an unhandled crash.
+    improved = _base_improved(duration="²")  # superscript two
+    result = postprocess_improved_testcase({}, improved)
+    assert result["display_duration"] == "²"
+    assert result["raw_duration"] is None
+
+
 def test_uuid_attributes_preserved():
     uuid_key = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
     uuid_val = "b2c3d4e5-f6a7-8901-bcde-f12345678901"

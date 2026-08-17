@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
+import ipaddress
 import json
 import logging
 import os
 import re
 import shutil
+import socket
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -20,6 +23,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from browser_use import Agent, Browser
+from browser_use.agent.views import AgentHistoryList
 from browser_use.browser.events import AgentFocusChangedEvent, NavigateToUrlEvent as BrowserNavigateToUrlEvent
 from browser_use.browser.profile import BrowserProfile
 import browser_use.tools.service as browser_tools_service
@@ -46,14 +50,14 @@ _RUNNER_LOG_STRINGS = {
         'max_steps': 'Шагов макс', 'locale': 'Локаль', 'step': 'Шаг',
         'total': 'итого', 'cache': 'кэш', 'summary_total': 'Итого',
         'steps_word': 'шагов', 'all_tokens': 'всего', 'tokens_word': 'токенов',
-        'sec_suffix': 'с',
+        'sec_suffix': 'с', 'estimated': 'оценочно, провайдер не вернул usage',
     },
     'en': {
         'model': 'Model', 'browser': 'Browser', 'device': 'Device',
         'max_steps': 'Max steps', 'locale': 'Locale', 'step': 'Step',
         'total': 'total', 'cache': 'cache', 'summary_total': 'Total',
         'steps_word': 'steps', 'all_tokens': 'total', 'tokens_word': 'tokens',
-        'sec_suffix': 's',
+        'sec_suffix': 's', 'estimated': "estimated, provider didn't return usage",
     },
 }
 
@@ -63,6 +67,9 @@ _live_runs: dict[str, asyncio.Queue] = {}
 _active_tasks: dict[str, asyncio.Task] = {}
 # Active agents: run_id → Agent (for graceful stop via agent.stop())
 _active_agents: dict[str, Any] = {}
+# Strong refs for fire-and-forget hard-stop timers — asyncio only holds a weak
+# ref to a bare create_task() result, so it can be GC'd mid-flight otherwise.
+_hard_stop_tasks: set[asyncio.Task] = set()
 
 load_dotenv(RUNNER_DIR.parent / '.env')           # project root (base)
 load_dotenv(RUNNER_DIR / '.env', override=True)   # local override
@@ -206,7 +213,7 @@ def settings() -> dict[str, Any]:
         },
         'llm': {
             'model': os.getenv('RUNNER_LLM_MODEL'),
-            'has_api_key': bool(os.getenv('DEEPSEEK_API_KEY')),
+            'has_api_key': bool(os.getenv('LLM_API_KEY')),
         },
     }
 
@@ -259,23 +266,57 @@ def mark_latest_run(run_dir: Path) -> None:
         logger.warning('Could not update latest run symlink: %s', exc)
 
 
-def attach_run_log(run_dir: Path) -> logging.Handler:
+# Which run_id is executing in the *current* asyncio task — set at the top of
+# run_test_case/_stream_run. browser_use's loggers (root + 'browser_use', both
+# shared across the whole process) would otherwise deliver every concurrent
+# run's log records to every other run's file/WS handler at once.
+_current_run_id: contextvars.ContextVar[str | None] = contextvars.ContextVar('current_run_id', default=None)
+
+# Root logger level is forced to DEBUG while any run is active (browser_use's
+# own logger has propagate=False, but plenty of libs log through root) and
+# restored once the last concurrent run finishes, instead of staying at DEBUG
+# forever after the first run.
+_active_run_log_count = 0
+_root_log_level_before_runs: int | None = None
+
+
+class _RunIdFilter(logging.Filter):
+    def __init__(self, run_id: str) -> None:
+        super().__init__()
+        self.run_id = run_id
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return _current_run_id.get() == self.run_id
+
+
+def attach_run_log(run_dir: Path, run_id: str) -> logging.Handler:
+    global _active_run_log_count, _root_log_level_before_runs
+
     handler = logging.FileHandler(run_dir / 'logs' / 'runner.log', encoding='utf-8')
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s'))
+    handler.addFilter(_RunIdFilter(run_id))
 
     root_logger = logging.getLogger()
+    if _active_run_log_count == 0:
+        _root_log_level_before_runs = root_logger.level
+    _active_run_log_count += 1
     root_logger.addHandler(handler)
-    root_logger.setLevel(min(root_logger.level or logging.INFO, logging.DEBUG))
+    root_logger.setLevel(logging.DEBUG)
     # browser_use has propagate=False — must attach directly
     logging.getLogger('browser_use').addHandler(handler)
     return handler
 
 
 def detach_run_log(handler: logging.Handler) -> None:
+    global _active_run_log_count
+
     logging.getLogger().removeHandler(handler)
     logging.getLogger('browser_use').removeHandler(handler)
     handler.close()
+    _active_run_log_count = max(0, _active_run_log_count - 1)
+    if _active_run_log_count == 0 and _root_log_level_before_runs is not None:
+        logging.getLogger().setLevel(_root_log_level_before_runs)
 
 
 class WsLogHandler(logging.Handler):
@@ -350,13 +391,34 @@ def get_start_url(request: RunRequest) -> str | None:
     return match.group(0).rstrip('.,;') if match else None
 
 
+def _is_blocked_address(hostname: str) -> bool:
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            return True
+    return False
+
+
 async def preflight_url(
     url: str,
     timeout_sec: float,
     retries: int,
     verify_ssl: bool,
+    block_ip_addresses: bool = False,
 ) -> tuple[bool, str, list[dict[str, Any]]]:
     attempts: list[dict[str, Any]] = []
+
+    if block_ip_addresses:
+        hostname = urlparse(url).hostname
+        if hostname:
+            loop = asyncio.get_running_loop()
+            blocked = await loop.run_in_executor(None, _is_blocked_address, hostname)
+            if blocked:
+                return False, f'Preflight blocked for {url}: resolves to an internal/private address', []
 
     for attempt in range(1, retries + 2):
         started_at = time.monotonic()
@@ -385,18 +447,34 @@ async def preflight_url(
     return False, f'Preflight failed for {url}: {reason}', attempts
 
 
+# Per-run navigation wait_until/timeout — request.navigation_wait_until and
+# request.navigation_timeout_sec used to be accepted but silently ignored
+# (only the env-var default from process startup was ever applied, shared by
+# every concurrent run). Contextvars make each run's task see its own value
+# without a lock, same pattern as _current_run_id.
+_nav_wait_until_var: contextvars.ContextVar[str] = contextvars.ContextVar('nav_wait_until')
+_nav_timeout_var: contextvars.ContextVar[float] = contextvars.ContextVar('nav_timeout_sec')
+
+
+def _apply_nav_sub_event_timeouts(timeout_sec: float) -> None:
+    # NavigationStartedEvent/NavigationCompleteEvent are constructed deep inside
+    # browser_use's own BrowserSession (browser/session.py), with no import-time
+    # factory reference to monkeypatch the way NavigateToUrlEvent is below — their
+    # only knob is these env vars, read via default_factory at construction time.
+    # That makes them process-global (last run to start wins for any concurrent
+    # run mid-navigation) rather than truly per-run like _nav_timeout_var — a
+    # known, pre-existing imprecision this restores rather than introduces.
+    os.environ['TIMEOUT_NavigationStartedEvent'] = str(timeout_sec)
+    os.environ['TIMEOUT_NavigationCompleteEvent'] = str(timeout_sec)
+
+
 def _configure_browser_globals() -> None:
-    nav_timeout = env_float('RUNNER_NAVIGATION_TIMEOUT_SEC', 90)
     action_timeout = env_float('RUNNER_ACTION_TIMEOUT_SEC', 180)
-    wait_until = os.getenv('RUNNER_NAVIGATION_WAIT_UNTIL', 'domcontentloaded')
-    os.environ['TIMEOUT_NavigateToUrlEvent'] = str(nav_timeout)
-    os.environ['TIMEOUT_NavigationStartedEvent'] = str(nav_timeout)
-    os.environ['TIMEOUT_NavigationCompleteEvent'] = str(nav_timeout)
     os.environ['BROWSER_USE_ACTION_TIMEOUT_S'] = str(action_timeout)
-    _wt = wait_until
 
     def _navigate_event(*args: Any, **kwargs: Any) -> BrowserNavigateToUrlEvent:
-        kwargs.setdefault('wait_until', _wt)
+        kwargs.setdefault('wait_until', _nav_wait_until_var.get(os.getenv('RUNNER_NAVIGATION_WAIT_UNTIL', 'domcontentloaded')))
+        kwargs.setdefault('event_timeout', _nav_timeout_var.get(env_float('RUNNER_NAVIGATION_TIMEOUT_SEC', 90)))
         return BrowserNavigateToUrlEvent(*args, **kwargs)
 
     browser_tools_service.NavigateToUrlEvent = _navigate_event
@@ -463,7 +541,11 @@ def create_browser(request: RunRequest, start_url: str | None = None) -> Browser
 
     extra_args: list[str] = []
     if cfg.locale:
-        # --lang sets UI language; --accept-languages sets navigator.language + Accept-Language header
+        # These launch args don't actually change navigator.language in this
+        # container's headless Chromium build (confirmed by direct test — it
+        # stays en-US regardless). Kept as a harmless best-effort in case a
+        # future browser build honors them; the mechanism that actually works
+        # is the CDP Emulation.setLocaleOverride call in _launch_browser_with_tz.
         extra_args.append(f'--lang={cfg.locale}')
         extra_args.append(f'--accept-languages={cfg.locale}')
     if cfg.is_mobile:
@@ -473,9 +555,75 @@ def create_browser(request: RunRequest, start_url: str | None = None) -> Browser
         profile_kwargs['args'] = extra_args
 
     # NOTE: BrowserProfile.env is never passed to subprocess by browser-use (bug in library).
-    # TZ is applied at os.environ level in _stream_run before browser creation.
+    # TZ is applied at os.environ level by _launch_browser_with_tz() right before the
+    # Chromium subprocess actually spawns.
 
     return Browser(browser_profile=BrowserProfile(**profile_kwargs))
+
+
+# Serializes the "set TZ env var → spawn Chromium subprocess" window. os.environ
+# is process-wide and BrowserProfile.env is never passed through by browser-use
+# (see note above), so without this lock two concurrent runs with different
+# timezone_id would race on which TZ the other's subprocess actually inherits.
+_tz_env_lock = asyncio.Lock()
+
+
+async def _launch_browser_with_tz(browser: Browser, timezone_id: str | None, locale: str | None = None) -> None:
+    """Start the browser session, applying timezone_id (if any) only for the
+    instant it takes the subprocess to spawn and inherit the environment.
+
+    Locale is applied separately after start — this container's headless
+    Chromium build ignores --lang/--accept-languages launch args entirely
+    (navigator.language stays en-US regardless; confirmed by direct test), and
+    CDP's Emulation.setLocaleOverride only affects Intl/date formatting, not
+    navigator.language/navigator.languages. The one mechanism that actually
+    works (same trick Playwright's own `locale=` context option uses under the
+    hood) is overriding the navigator getters via an init script injected
+    before every document load."""
+    if not timezone_id:
+        await browser.start()
+    else:
+        async with _tz_env_lock:
+            orig_tz = os.environ.get('TZ')
+            os.environ['TZ'] = timezone_id
+            try:
+                await browser.start()
+            finally:
+                if orig_tz is None:
+                    os.environ.pop('TZ', None)
+                else:
+                    os.environ['TZ'] = orig_tz
+
+    if locale:
+        try:
+            base_lang = locale.split('-')[0].split('_')[0]
+            languages = [locale, base_lang] if base_lang != locale else [locale]
+            script = (
+                "Object.defineProperty(Object.getPrototypeOf(navigator), 'language', "
+                f"{{get: () => {json.dumps(locale)}}});"
+                "Object.defineProperty(Object.getPrototypeOf(navigator), 'languages', "
+                f"{{get: () => {json.dumps(languages)}}});"
+            )
+            session = await browser.get_or_create_cdp_session()
+            await session.cdp_client.send.Page.addScriptToEvaluateOnNewDocument(
+                params={'source': script}, session_id=session.session_id,
+            )
+        except Exception as exc:
+            logger.warning(f'Locale override failed for locale={locale}: {exc}')
+
+
+async def _stop_browser(browser: Any) -> None:
+    """Best-effort shutdown: try a graceful stop, hard-kill if it hangs or fails
+    (a wedged CDP session otherwise leaves an orphaned Chromium process)."""
+    try:
+        await asyncio.wait_for(browser.stop(), timeout=5.0)
+        return
+    except BaseException as exc:
+        logger.debug(f'browser.stop() error, falling back to kill(): {exc}')
+    try:
+        await asyncio.wait_for(browser.kill(), timeout=5.0)
+    except BaseException as exc:
+        logger.warning(f'browser.kill() fallback also failed: {exc}')
 
 
 # ---------------------------------------------------------------------------
@@ -871,7 +1019,10 @@ def build_analysis(
     }
 
 
-def build_manifest(response: RunResponse, screenshots: list[dict[str, Any]], analysis: dict[str, Any]) -> dict[str, Any]:
+def build_manifest(
+    response: RunResponse, screenshots: list[dict[str, Any]], analysis: dict[str, Any],
+    browser_profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         'schema_version': RUN_SCHEMA_VERSION,
         'run_id': response.run_id,
@@ -879,6 +1030,11 @@ def build_manifest(response: RunResponse, screenshots: list[dict[str, Any]], ana
         'status': response.status.value,
         'summary': response.summary,
         'errors': response.errors,
+        'replayed': response.replayed,
+        # Surfaced in the run-history list so two runs of the same test case
+        # under different device/locale don't look identical — absent (None)
+        # on runs recorded before this field existed.
+        'browser_profile': browser_profile or None,
         'created_at': datetime.now().isoformat(timespec='seconds'),
         'duration_sec': response.duration_sec,
         'steps_count': response.steps_count,
@@ -1002,10 +1158,26 @@ def save_artifacts(
     write_json(run_dir / 'ui' / 'analysis.json', analysis)
     write_json(run_dir / 'ui' / 'steps.json', steps)
     write_jsonl(run_dir / 'ui' / 'timeline.jsonl', steps)
-    write_json(run_dir / 'manifest.json', build_manifest(response, screenshots, analysis))
+    profile_summary = (
+        request.browser_profile.model_dump(exclude_none=True, exclude_defaults=True)
+        if request and request.browser_profile else None
+    )
+    write_json(run_dir / 'manifest.json', build_manifest(response, screenshots, analysis, profile_summary))
     write_report(run_dir, response, analysis)
     mark_latest_run(run_dir)
     return response
+
+
+async def finish_run_async(*args: Any, **kwargs: Any) -> RunResponse:
+    # finish_run() copies every screenshot (shutil.copy2, up to max_steps of
+    # them) and writes several JSON files synchronously — on the event loop
+    # that would stall WS delivery for every other concurrent run for the
+    # duration of the copy. Runs in a worker thread instead.
+    return await asyncio.to_thread(finish_run, *args, **kwargs)
+
+
+async def fail_run_async(*args: Any, **kwargs: Any) -> RunResponse:
+    return await asyncio.to_thread(fail_run, *args, **kwargs)
 
 
 def finish_run(
@@ -1114,7 +1286,10 @@ async def _try_replay(
     llm: Any,
     browser: Browser,
     cached_path: Path,
-) -> RunResponse | None:
+    queue: asyncio.Queue | None = None,
+    frames_dir: Path | None = None,
+    run_id: str | None = None,
+) -> tuple[RunResponse, AgentHistoryList | None] | tuple[None, None]:
     agent = Agent(
         task=task,
         llm=llm,
@@ -1126,13 +1301,45 @@ async def _try_replay(
         sensitive_data=request.sensitive_data or None,
         calculate_cost=True,
     )
+    # Replay drives a real browser same as a live run, so record it the same way —
+    # otherwise a replayed run has no screenshots/video to review afterward. Only
+    # the streaming /start path wires a queue+frames_dir through; the legacy /run
+    # endpoint has no screencast on its live path either, so skip it there too.
+    screencast_task = (
+        asyncio.create_task(_run_screencast(agent, queue, frames_dir))
+        if queue is not None and frames_dir is not None else None
+    )
+    # Register so /stop can call agent.stop() (cooperative) on a replay in progress —
+    # without this, stopping mid-replay only reaches the hard-cancel path, which
+    # discards the run instead of returning whatever was replayed so far.
+    if run_id is not None:
+        _active_agents[run_id] = agent
     try:
         results = await agent.load_and_rerun(cached_path, skip_failures=False)
     except Exception as exc:
         logger.warning(f'Cache replay failed for test_case_id={request.test_case_id}: {exc}')
-        return None
+        return None, None
+    finally:
+        if screencast_task is not None:
+            screencast_task.cancel()
+            try:
+                await screencast_task
+            except BaseException:
+                pass
 
     write_json(run_dir / 'raw' / 'rerun_results.json', [r.model_dump(mode='json') for r in results])
+
+    # load_and_rerun() doesn't populate agent.history — its result list is a flat
+    # list[ActionResult], not the AgentHistoryList shape build_steps() needs — so
+    # without this, every replayed run showed zero steps in the UI even on success.
+    # The cache file IS a valid AgentHistoryList (that's what got replayed), so load
+    # it back for the UI instead of passing history=None.
+    replay_history: AgentHistoryList | None = None
+    try:
+        replay_history = AgentHistoryList.load_from_file(cached_path, agent.AgentOutput)
+    except Exception as exc:
+        logger.warning(f'Failed to load replayed history for UI steps: {exc}')
+
     final = results[-1] if results else None
     summary_text = ((final.extracted_content if final else None) or (final.long_term_memory if final else None) or '').strip()
     success = final.success if final else None
@@ -1155,20 +1362,25 @@ async def _try_replay(
         run_id=run_dir.name,
         run_dir=str(run_dir),
         replayed=True,
-    )
+    ), replay_history
 
 
 @app.post('/run', response_model=RunResponse)
 async def run_test_case(request: RunRequest) -> RunResponse:
     started_at = time.monotonic()
     run_dir = create_run_dir(request.test_case_id)
-    log_handler = attach_run_log(run_dir)
+    run_id = run_dir.name
+    _current_run_id.set(run_id)
+    log_handler = attach_run_log(run_dir, run_id)
     browser: Browser | None = None
 
     await _SESSION_SEMAPHORE.acquire()
     try:
         original_request = request
         request = apply_runner_settings(request)
+        _nav_wait_until_var.set(request.navigation_wait_until)
+        _nav_timeout_var.set(request.navigation_timeout_sec)
+        _apply_nav_sub_event_timeouts(request.navigation_timeout_sec)
 
         write_json(run_dir / 'raw' / 'api_request.json', redact_request(original_request))
         write_json(run_dir / 'raw' / 'request.json', redact_request(request))
@@ -1194,16 +1406,19 @@ async def run_test_case(request: RunRequest) -> RunResponse:
                 request.preflight_timeout_sec,
                 request.preflight_retries,
                 request.preflight_verify_ssl,
+                env_bool('RUNNER_BLOCK_IP_ADDRESSES', False),
             )
             write_json(run_dir / 'raw' / 'preflight.json', {'ok': ok, 'message': message, 'attempts': attempts})
             append_event(run_dir, 'preflight', {'ok': ok, 'message': message})
             if not ok:
-                return fail_run(run_dir, request.test_case_id, started_at, 'PreflightError', message)
+                return await fail_run_async(run_dir, request.test_case_id, started_at, 'PreflightError', message)
 
         browser = create_browser(request, start_url)
+        await _launch_browser_with_tz(browser, request.browser_profile.timezone_id, request.browser_profile.locale)
         task = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
 
         replay_response: RunResponse | None = None
+        replay_history: AgentHistoryList | None = None
         if request.cache_key and not request.force_regenerate and request.test_case_id:
             try:
                 cached_path = load_cached(request.test_case_id, request.cache_key)
@@ -1211,12 +1426,14 @@ async def run_test_case(request: RunRequest) -> RunResponse:
                 logger.warning(f'Cache lookup failed for test_case_id={request.test_case_id}: {exc}')
                 cached_path = None
             if cached_path is not None:
-                replay_response = await _try_replay(request, run_dir, started_at, task, llm, browser, cached_path)
+                replay_response, replay_history = await _try_replay(request, run_dir, started_at, task, llm, browser, cached_path)
                 if replay_response is None:
+                    await _stop_browser(browser)
                     browser = create_browser(request, start_url)
+                    await _launch_browser_with_tz(browser, request.browser_profile.timezone_id, request.browser_profile.locale)
 
         if replay_response is not None:
-            return finish_run(run_dir, replay_response, history=None, request=request)
+            return await finish_run_async(run_dir, replay_response, history=replay_history, request=request)
 
         agent = Agent(
             task=task,
@@ -1234,10 +1451,10 @@ async def run_test_case(request: RunRequest) -> RunResponse:
         history = await agent.run(max_steps=request.max_steps)
         append_event(run_dir, 'agent_finished', {'history_steps': len(history.history)})
 
-        history.save_to_file(run_dir / 'raw' / 'history.json')
+        await asyncio.to_thread(history.save_to_file, run_dir / 'raw' / 'history.json')
         if request.cache_key and request.test_case_id:
             try:
-                save_cached(request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
+                await asyncio.to_thread(save_cached, request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
             except Exception as exc:
                 logger.warning(f'Cache save failed for test_case_id={request.test_case_id}: {exc}')
         usage, llm_usage = collect_usage(agent, history)
@@ -1277,11 +1494,11 @@ async def run_test_case(request: RunRequest) -> RunResponse:
             usage=usage,
             llm_usage=llm_usage,
         )
-        return finish_run(run_dir, response, history, request)
+        return await finish_run_async(run_dir, response, history, request)
 
     except HTTPException as exc:
         append_event(run_dir, 'rejected', {'status_code': exc.status_code, 'reason': exc.detail})
-        return fail_run(
+        return await fail_run_async(
             run_dir,
             request.test_case_id,
             started_at,
@@ -1292,13 +1509,13 @@ async def run_test_case(request: RunRequest) -> RunResponse:
     except Exception as exc:
         logger.exception('Run failed')
         append_event(run_dir, 'error', {'type': type(exc).__name__, 'message': str(exc)})
-        return fail_run(run_dir, request.test_case_id, started_at, type(exc).__name__, str(exc))
+        return await fail_run_async(run_dir, request.test_case_id, started_at, type(exc).__name__, str(exc))
     finally:
         if browser is not None:
             try:
-                await asyncio.wait_for(browser.stop(), timeout=5.0)
-            except Exception as _e:
-                logger.debug(f'browser.stop() error (non-fatal): {_e}')
+                await _stop_browser(browser)
+            except BaseException as _e:
+                logger.debug(f'browser cleanup error (non-fatal): {_e}')
         detach_run_log(log_handler)
         _SESSION_SEMAPHORE.release()
 
@@ -1309,8 +1526,15 @@ async def run_test_case(request: RunRequest) -> RunResponse:
 
 @app.post('/start')
 async def start_run_stream(request: RunRequest) -> dict[str, str]:
-    """Start a run in the background and return a run_id for WebSocket streaming."""
-    run_id = uuid.uuid4().hex
+    """Start a run in the background and return a run_id for WebSocket streaming.
+
+    Accepts a client-supplied run_id so the caller can know it *before* this
+    request even resolves (see RunRequest.run_id docstring) — otherwise a
+    client that unmounts/aborts the instant it fires this request never
+    learns the run_id and has no way left to stop the run it just started."""
+    run_id = request.run_id if request.run_id and re.fullmatch(r'[A-Za-z0-9_-]+', request.run_id) else uuid.uuid4().hex
+    if run_id in _live_runs:
+        raise HTTPException(status_code=409, detail='run_id already in use')
     queue: asyncio.Queue = asyncio.Queue()
     _live_runs[run_id] = queue
     task = asyncio.create_task(_stream_run(run_id, request, queue))
@@ -1343,7 +1567,9 @@ async def stop_run(run_id: str) -> dict[str, str]:
         agent.stop()  # graceful: sets state.stopped=True, breaks after current step
     task = _active_tasks.get(run_id)
     if task and not task.done():
-        asyncio.create_task(_hard_stop_after_grace(task))
+        hard_stop_task = asyncio.create_task(_hard_stop_after_grace(task))
+        _hard_stop_tasks.add(hard_stop_task)
+        hard_stop_task.add_done_callback(_hard_stop_tasks.discard)
         return {'status': 'stopping'}
     if agent is not None:
         return {'status': 'stopping'}
@@ -1370,7 +1596,7 @@ async def ws_run_stream(websocket: WebSocket, run_id: str) -> None:
         pass
 
 
-async def _run_screencast(agent: Any, queue: asyncio.Queue, frames_dir: Path) -> None:
+async def _run_screencast(agent: Any, queue: asyncio.Queue, frames_dir: Path, max_duration_sec: float = 3600) -> None:
     """Stream CDP screencast frames live and save every 3rd frame for post-run video assembly."""
     browser_session = agent.browser_session
 
@@ -1458,7 +1684,7 @@ async def _run_screencast(agent: Any, queue: asyncio.Queue, frames_dir: Path) ->
     try:
         initial_session = await browser_session.get_or_create_cdp_session()
         await switch_to_session(initial_session)
-        await asyncio.sleep(3600)
+        await asyncio.sleep(max_duration_sec)
     except asyncio.CancelledError:
         pass
     except Exception as e:
@@ -1476,13 +1702,14 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
     started_at = time.monotonic()
     run_dir = create_run_dir(original_request.test_case_id)
     frames_dir = run_dir / 'media' / 'frames'
-    log_handler = attach_run_log(run_dir)
+    _current_run_id.set(run_id)
+    log_handler = attach_run_log(run_dir, run_id)
     ws_log_handler = WsLogHandler(queue, started_at, asyncio.get_running_loop())
+    ws_log_handler.addFilter(_RunIdFilter(run_id))
     logging.getLogger().addHandler(ws_log_handler)
     logging.getLogger('browser_use').addHandler(ws_log_handler)
     browser: Any = None
     screencast_task: asyncio.Task[None] | None = None
-    _orig_tz: str | None = os.environ.get('TZ')
 
     await _SESSION_SEMAPHORE.acquire()
 
@@ -1491,6 +1718,9 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
 
     try:
         request = apply_runner_settings(original_request)
+        _nav_wait_until_var.set(request.navigation_wait_until)
+        _nav_timeout_var.set(request.navigation_timeout_sec)
+        _apply_nav_sub_event_timeouts(request.navigation_timeout_sec)
         L = _RUNNER_LOG_STRINGS.get(request.language, _RUNNER_LOG_STRINGS['ru'])
         write_json(run_dir / 'raw' / 'api_request.json', redact_request(original_request))
         write_json(run_dir / 'raw' / 'request.json', redact_request(request))
@@ -1526,6 +1756,7 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
             ok, message, attempts = await preflight_url(
                 start_url, request.preflight_timeout_sec,
                 request.preflight_retries, request.preflight_verify_ssl,
+                env_bool('RUNNER_BLOCK_IP_ADDRESSES', False),
             )
             write_json(run_dir / 'raw' / 'preflight.json', {'ok': ok, 'message': message, 'attempts': attempts})
             append_event(run_dir, 'preflight', {'ok': ok, 'message': message})
@@ -1535,21 +1766,18 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
                 'elapsed_sec': round(time.monotonic() - started_at, 1),
             })
             if not ok:
-                resp = fail_run(run_dir, request.test_case_id, started_at, 'PreflightError', message)
+                resp = await fail_run_async(run_dir, request.test_case_id, started_at, 'PreflightError', message)
                 await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
                             'duration_sec': resp.duration_sec, 'steps_count': 0,
                             'errors': resp.errors, 'run_id': resp.run_id})
                 return
 
-        # Apply TZ env var before subprocess launch (browser-use spawns Chromium as subprocess
-        # which inherits parent process env — BrowserProfile.env field is never passed through)
-        if request.browser_profile.timezone_id:
-            os.environ['TZ'] = request.browser_profile.timezone_id
-
         browser = create_browser(request, start_url)
+        await _launch_browser_with_tz(browser, request.browser_profile.timezone_id, request.browser_profile.locale)
         task_text = f'{request.task}\n\nStart from URL: {start_url}' if start_url else request.task
 
         replay_response: RunResponse | None = None
+        replay_history: AgentHistoryList | None = None
         if request.cache_key and not request.force_regenerate and request.test_case_id:
             try:
                 cached_path = load_cached(request.test_case_id, request.cache_key)
@@ -1562,12 +1790,16 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
                     'message': 'Replaying from cached run…',
                     'elapsed_sec': round(time.monotonic() - started_at, 1),
                 })
-                replay_response = await _try_replay(request, run_dir, started_at, task_text, llm, browser, cached_path)
+                replay_response, replay_history = await _try_replay(
+                    request, run_dir, started_at, task_text, llm, browser, cached_path, queue, frames_dir, run_id,
+                )
                 if replay_response is None:
+                    await _stop_browser(browser)
                     browser = create_browser(request, start_url)
+                    await _launch_browser_with_tz(browser, request.browser_profile.timezone_id, request.browser_profile.locale)
 
         if replay_response is not None:
-            finish_run(run_dir, replay_response, history=None, request=request)
+            await finish_run_async(run_dir, replay_response, history=replay_history, request=request)
             await push({
                 'type': 'done',
                 'status': replay_response.status.value,
@@ -1645,7 +1877,14 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
                 'step': step_num + 1,
                 'elapsed_sec': round(time.monotonic() - started_at, 1),
             })
-            # Token stats for this step
+            # Token stats for this step — some OpenAI-compatible providers
+            # (local/self-hosted models in particular) never return a "usage"
+            # field, so token_cost_service.usage_history stays empty for the
+            # whole run and this step would otherwise get no token feedback
+            # at all (previously the only fallback was a single estimated
+            # total in the final summary line, after the run was already
+            # over). Estimate from this step's own output size instead, same
+            # ~4 chars/token heuristic as estimate_usage_from_history().
             try:
                 entries = list(getattr(getattr(agent, 'token_cost_service', None), 'usage_history', []) or [])
                 if entries:
@@ -1655,6 +1894,14 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
                     await push({
                         'type': 'log', 'level': 'info', 'category': 'tokens', 'source': 'session',
                         'message': f'{L["step"]} {step_num} — prompt: {p:,} · completion: {c:,} · {L["total"]}: {p+c:,}',
+                        'elapsed_sec': round(time.monotonic() - started_at, 1),
+                    })
+                else:
+                    est_text = json.dumps(output.model_dump(mode='json'), ensure_ascii=False, default=str)
+                    est_tokens = max(1, round(len(est_text) / 4))
+                    await push({
+                        'type': 'log', 'level': 'info', 'category': 'tokens', 'source': 'session',
+                        'message': f'{L["step"]} {step_num} — ~{L["total"]}: {est_tokens:,} ({L["estimated"]})',
                         'elapsed_sec': round(time.monotonic() - started_at, 1),
                     })
             except Exception:
@@ -1673,16 +1920,26 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
             calculate_cost=True,
         )
         _active_agents[run_id] = agent
-        screencast_task = asyncio.create_task(_run_screencast(agent, queue, frames_dir))
+        # This sleep is only a safety net against an orphaned screencast task (the
+        # normal path always cancels it in the finally block below) — but a flat
+        # 1h cap silently killed live streaming/video for long runs (max_steps up
+        # to 500 at up to 600s/step can legitimately exceed that). Scale it to the
+        # run's own configured ceiling instead of a fixed number.
+        screencast_max_sec = max(3600.0, request.max_steps * request.action_timeout_sec * 1.2)
+        screencast_task = asyncio.create_task(_run_screencast(agent, queue, frames_dir, screencast_max_sec))
 
         append_event(run_dir, 'agent_started', {'start_url': start_url})
         history = await agent.run(max_steps=request.max_steps)
         append_event(run_dir, 'agent_finished', {'history_steps': len(history.history)})
 
-        history.save_to_file(run_dir / 'raw' / 'history.json')
-        if request.cache_key and request.test_case_id:
+        await asyncio.to_thread(history.save_to_file, run_dir / 'raw' / 'history.json')
+        agent_stopped = getattr(getattr(agent, 'state', None), 'stopped', False)
+        # A user-stopped run has only a partial history — caching it would silently
+        # replace a good recording with a truncated one, degrading every future
+        # replay of this test case until someone reruns it to completion.
+        if request.cache_key and request.test_case_id and not agent_stopped:
             try:
-                save_cached(request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
+                await asyncio.to_thread(save_cached, request.test_case_id, request.cache_key, run_dir / 'raw' / 'history.json')
             except Exception as exc:
                 logger.warning(f'Cache save failed for test_case_id={request.test_case_id}: {exc}')
         usage, llm_usage = collect_usage(agent, history)
@@ -1691,7 +1948,6 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
             'llm_calls': [item.model_dump(mode='json') for item in llm_usage],
         })
 
-        agent_stopped = getattr(getattr(agent, 'state', None), 'stopped', False)
         final_summary = _extract_summary(history.final_result()) or ''
         if history.is_done() and history.is_successful() is True:
             status = RunStatus.passed
@@ -1722,17 +1978,18 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
             usage=usage,
             llm_usage=llm_usage,
         )
-        response = finish_run(run_dir, response, history, request)
+        response = await finish_run_async(run_dir, response, history, request)
 
         cached = usage.prompt_cached_tokens or 0
         cache_str = f' · {L["cache"]}: {cached:,}' if cached else ''
+        estimated_str = f' ({L["estimated"]})' if usage.estimated else ''
         await push({
             'type': 'log', 'level': 'info', 'category': 'summary', 'source': 'session',
             'message': (
                 f'{L["summary_total"]}: {response.steps_count} {L["steps_word"]} · '
                 f'prompt: {usage.prompt_tokens:,}{cache_str} · '
                 f'completion: {usage.completion_tokens:,} · '
-                f'{L["all_tokens"]}: {usage.total_tokens:,} {L["tokens_word"]} · '
+                f'{L["all_tokens"]}: {usage.total_tokens:,} {L["tokens_word"]}{estimated_str} · '
                 f'{round(time.monotonic() - started_at, 1)}{L["sec_suffix"]}'
             ),
             'elapsed_sec': round(time.monotonic() - started_at, 1),
@@ -1768,54 +2025,61 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
             run_dir=str(run_dir),
             usage=empty_usage,
         )
-        finish_run(run_dir, resp)
+        await finish_run_async(run_dir, resp)
         await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
                     'duration_sec': resp.duration_sec, 'steps_count': 0,
                     'errors': [], 'run_id': resp.run_id})
     except HTTPException as exc:
         append_event(run_dir, 'rejected', {'status_code': exc.status_code, 'reason': exc.detail})
-        resp = fail_run(run_dir, original_request.test_case_id, started_at, 'HTTPException', str(exc.detail), exc.status_code)
+        resp = await fail_run_async(run_dir, original_request.test_case_id, started_at, 'HTTPException', str(exc.detail), exc.status_code)
         await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
                     'duration_sec': resp.duration_sec, 'steps_count': 0,
                     'errors': resp.errors, 'run_id': resp.run_id})
     except Exception as exc:
         logger.exception('Stream run failed')
         append_event(run_dir, 'error', {'type': type(exc).__name__, 'message': str(exc)})
-        resp = fail_run(run_dir, original_request.test_case_id, started_at, type(exc).__name__, str(exc))
+        resp = await fail_run_async(run_dir, original_request.test_case_id, started_at, type(exc).__name__, str(exc))
         await push({'type': 'done', 'status': resp.status.value, 'summary': resp.summary,
                     'duration_sec': resp.duration_sec, 'steps_count': 0,
                     'errors': resp.errors, 'run_id': resp.run_id})
     finally:
-        # Restore TZ env var to avoid leaking across runs
-        if original_request.browser_profile.timezone_id:
-            if _orig_tz is None:
-                os.environ.pop('TZ', None)
-            else:
-                os.environ['TZ'] = _orig_tz
+        # Each step below is best-effort cleanup for a run that is already over —
+        # caught as BaseException (not just Exception) because a stray second
+        # asyncio.CancelledError from _hard_stop_after_grace's timer landing here
+        # (e.g. mid video-assembly) must not skip the handler/semaphore cleanup
+        # further down, which would otherwise wedge _SESSION_SEMAPHORE forever.
         if screencast_task is not None:
             screencast_task.cancel()
             try:
                 await screencast_task
-            except Exception:
+            except BaseException:
                 pass
         if browser is not None:
             try:
-                await asyncio.wait_for(browser.stop(), timeout=5.0)
-            except (asyncio.TimeoutError, Exception) as _e:
-                logger.debug(f'browser.stop() error (non-fatal): {_e}')
+                await _stop_browser(browser)
+            except BaseException as _e:
+                logger.debug(f'browser cleanup error (non-fatal): {_e}')
         # Assemble video from collected screencast frames
         try:
             frame_files = sorted(frames_dir.glob('frame_*.jpg')) if frames_dir.exists() else []
             if frame_files:
                 logger.info(f'Assembling video from {len(frame_files)} frames…')
                 output_path = run_dir / 'media' / 'recording.mp4'
+                # Encode to a temp path and rename into place atomically — the
+                # frontend starts polling for this file as soon as 'done' is
+                # pushed (before this finally block even runs), and a HEAD hit on
+                # a still-being-written file served a truncated/corrupt video
+                # that only fixed itself on page reload once encoding finished.
+                # imageio picks its backend/muxer from the file extension, so the
+                # temp name must still end in .mp4 — not a generic .tmp suffix.
+                tmp_output_path = output_path.with_name(f'recording.tmp-{uuid.uuid4().hex[:8]}.mp4')
 
                 def _assemble_video() -> None:
                     import imageio.v2 as iio
                     import numpy as np
                     from PIL import Image
                     with iio.get_writer(
-                        str(output_path), fps=10, codec='libx264',
+                        str(tmp_output_path), fps=10, codec='libx264',
                         pixelformat='yuv420p', quality=8, macro_block_size=None,
                     ) as writer:
                         for f in frame_files:
@@ -1824,13 +2088,14 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
                                     writer.append_data(np.array(img.convert('RGB')))
                             except Exception:
                                 pass
+                    os.replace(tmp_output_path, output_path)
                     shutil.rmtree(str(frames_dir), ignore_errors=True)
 
                 await asyncio.get_event_loop().run_in_executor(None, _assemble_video)
                 logger.info(f'Video assembled → {output_path} ({output_path.stat().st_size} bytes)')
             else:
                 logger.warning('No screencast frames collected — video will not be available')
-        except Exception as _ve:
+        except BaseException as _ve:
             logger.warning(f'Video assembly error: {_ve}')
         logging.getLogger().removeHandler(ws_log_handler)
         logging.getLogger('browser_use').removeHandler(ws_log_handler)
@@ -1839,7 +2104,10 @@ async def _stream_run(run_id: str, original_request: RunRequest, queue: asyncio.
         _live_runs.pop(run_id, None)
         _active_tasks.pop(run_id, None)
         _active_agents.pop(run_id, None)
-        await queue.put(None)  # sentinel → WS close
+        try:
+            await queue.put(None)  # sentinel → WS close
+        except BaseException:
+            pass
         _SESSION_SEMAPHORE.release()
 
 
@@ -1893,8 +2161,12 @@ def get_run_steps(run_id: str) -> dict[str, Any]:
     for step in steps:
         screenshot = step.get('screenshot')
         if screenshot and screenshot.get('path'):
-            abs_path = str(run_dir / screenshot['path'])
-            screenshot['url'] = f'/api/runner/screenshot?path={abs_path}'
+            # Relative to RUNS_DIR, not absolute — avoids leaking the host's
+            # filesystem layout through an API response. The backend proxy
+            # (runner_screenshot in routes.py) resolves it against its own
+            # configured runs dir before serving.
+            rel_path = f'{run_dir.name}/{screenshot["path"]}'
+            screenshot['url'] = f'/api/runner/screenshot?path={rel_path}'
 
     return {'steps': steps}
 

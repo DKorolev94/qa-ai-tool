@@ -63,18 +63,32 @@ class TestItClient:
             "Authorization": f"{self._auth_scheme} {self._token}",
         }
 
-    async def _with_retry(self, send: Callable[[], Awaitable[httpx.Response]]) -> httpx.Response:
-        """One retry with a short backoff on transient network failures — a
-        flaky TestIT instance shouldn't turn a single blip into a hard failure."""
+    async def _with_retry(self, send: Callable[[], Awaitable[httpx.Response]], retry_on_failure: bool = True) -> httpx.Response:
+        """One retry with a short backoff on transient network failures or a
+        5xx TestIT response — a flaky TestIT instance shouldn't turn a single
+        blip into a hard failure.
+
+        retry_on_failure must be False for non-idempotent writes (POST): a 5xx
+        — or a read timeout, which looks identical from the caller's side —
+        can arrive after TestIT already persisted the write, so blindly
+        resending (whether it's the same request object or a fresh one) would
+        create a duplicate work item/section/comment. Safe only for idempotent
+        reads (GET) and true replacements (PUT)."""
         for attempt in (0, 1):
             try:
-                return await send()
+                response = await send()
             except httpx.TimeoutException:
-                if attempt == 1:
+                if attempt == 1 or not retry_on_failure:
                     raise TestItConnectionError("Connection to TestIT timed out", code="testit_timeout")
+                await asyncio.sleep(0.5)
+                continue
             except httpx.RequestError as exc:
-                if attempt == 1:
+                if attempt == 1 or not retry_on_failure:
                     raise TestItConnectionError(f"Could not connect to TestIT: {type(exc).__name__}", code="testit_connect_failed", exc_type=type(exc).__name__)
+                await asyncio.sleep(0.5)
+                continue
+            if not retry_on_failure or response.status_code < 500 or attempt == 1:
+                return response
             await asyncio.sleep(0.5)
         raise AssertionError("unreachable")  # loop always returns or raises above
 
@@ -192,6 +206,86 @@ class TestItClient:
 
         return data if isinstance(data, list) else data.get("items", [])
 
+    async def list_configurations(self, project_id: str) -> list[dict]:
+        self._check_config()
+        url = f"{self._base_url}/api/v2/projects/{project_id}/configurations"
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.get(url, headers=self._headers())
+        resp = await self._with_retry(_do)
+
+        if resp.status_code in (401, 403):
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
+
+        try:
+            data = resp.json()
+        except Exception:
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+
+        if not resp.is_success:
+            err = data if isinstance(data, dict) else {}
+            msg = err.get("message") or err.get("detail") or "TestIT API error"
+            raise TestItApiError(str(msg), status_code=resp.status_code)
+
+        return data if isinstance(data, list) else data.get("items", [])
+
+    async def search_autotests(self, project_id: str, external_id: str) -> list[dict]:
+        self._check_config()
+        url = f"{self._base_url}/api/v2/autoTests/search"
+        payload = {"filter": {"projectIds": [project_id], "externalIds": [external_id]}}
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.post(url, headers={**self._headers(), "Content-Type": "application/json"}, json=payload)
+        resp = await self._with_retry(_do)
+
+        if resp.status_code in (401, 403):
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
+
+        try:
+            data = resp.json()
+        except Exception:
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+
+        if not resp.is_success:
+            err = data if isinstance(data, dict) else {}
+            msg = err.get("message") or err.get("detail") or "TestIT API error"
+            raise TestItApiError(str(msg), status_code=resp.status_code)
+
+        return data if isinstance(data, list) else data.get("items", [])
+
+    async def create_autotest(self, project_id: str, external_id: str, name: str, work_item_id: str) -> dict:
+        """Registers an autotest so a manual work item can receive automated
+        results — TestIT's testResults endpoint only accepts results tied to
+        an autotest's externalId, there is no plain-work-item result API."""
+        self._check_config()
+        url = f"{self._base_url}/api/v2/autoTests"
+        payload = {
+            "projectId": project_id,
+            "externalId": external_id,
+            "name": name,
+            "workItemIds": [work_item_id],
+        }
+        async def _do() -> httpx.Response:
+            async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
+                return await client.post(url, headers={**self._headers(), "Content-Type": "application/json"}, json=payload)
+        resp = await self._with_retry(_do, retry_on_failure=False)
+
+        if resp.status_code in (401, 403):
+            raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
+
+        try:
+            data = resp.json()
+        except Exception:
+            raise TestItResponseError(f"TestIT returned non-JSON response (HTTP {resp.status_code})", code="testit_response_error", status_code=resp.status_code)
+        if not isinstance(data, dict):
+            data = {}
+
+        if not resp.is_success:
+            msg = data.get("message") or data.get("detail") or data.get("title") or f"HTTP {resp.status_code}"
+            raise TestItApiError(str(msg), status_code=resp.status_code)
+
+        return data
+
     async def get_section(self, section_id: str) -> dict:
         self._check_config()
         url = f"{self._base_url}/api/v2/sections/{section_id}"
@@ -223,7 +317,7 @@ class TestItClient:
                     headers={**self._headers(), "Content-Type": "application/json"},
                     json=payload,
                 )
-        resp = await self._with_retry(_do)
+        resp = await self._with_retry(_do, retry_on_failure=False)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -256,7 +350,7 @@ class TestItClient:
         async def _do() -> httpx.Response:
             async with httpx.AsyncClient(verify=self._verify_ssl, timeout=float(self._timeout)) as client:
                 return await client.post(url, headers={**self._headers(), "Content-Type": "application/json"}, json=payload)
-        resp = await self._with_retry(_do)
+        resp = await self._with_retry(_do, retry_on_failure=False)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")
@@ -300,7 +394,7 @@ class TestItClient:
                     headers={**self._headers(), "Content-Type": "application/json"},
                     json={"workItemId": work_item_id, "text": text[:1024]},
                 )
-        resp = await self._with_retry(_do)
+        resp = await self._with_retry(_do, retry_on_failure=False)
 
         if resp.status_code in (401, 403):
             raise TestItAuthError("TestIT authorization failed. Check TESTIT_PRIVATE_TOKEN.", code="testit_auth_failed")

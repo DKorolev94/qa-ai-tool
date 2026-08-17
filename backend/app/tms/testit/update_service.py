@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from app.core.config import settings
-from app.tms.testit.client import TestItClient, TestItConfigError
+from app.tms.testit.client import TestItClient
 from app.tms.testit.link_parser import extract_work_item_id
 from app.tms.testit.update_mapper import build_update_payload
 from app.tms.testit.schemas import UpdateOriginalResponse
@@ -16,9 +16,6 @@ async def apply_to_original_in_testit(
     source_work_item_id: str,
     source_attributes: dict | None = None,
 ) -> UpdateOriginalResponse:
-    if not settings.TESTIT_PROJECT_UUID:
-        raise TestItConfigError("TESTIT_PROJECT_UUID is not configured in .env", code="testit_project_uuid_missing")
-
     # Normalize/validate like the fetch flow does — without this, an
     # unvalidated id reaches the URL path built in client.get_work_item.
     source_work_item_id = extract_work_item_id(source_work_item_id)
@@ -46,15 +43,16 @@ async def apply_to_original_in_testit(
 
     testit_url: str | None = None
     if global_id and settings.TESTIT_BASE_URL:
-        try:
-            from app.tms.testit.draft_service import _resolve_project_global_id
-            project_global_id = await _resolve_project_global_id(client, settings.TESTIT_PROJECT_UUID)
-            if project_global_id:
-                testit_url = f"{settings.TESTIT_BASE_URL}/projects/{project_global_id}/tests/{global_id}"
-            else:
-                testit_url = f"{settings.TESTIT_BASE_URL}/workItems/{work_item_id}"
-        except Exception:
-            testit_url = f"{settings.TESTIT_BASE_URL}/workItems/{work_item_id}"
+        testit_url = f"{settings.TESTIT_BASE_URL}/workItems/{work_item_id}"
+        project_id = original_raw.get("projectId")
+        if project_id:
+            try:
+                from app.tms.testit.draft_service import _resolve_project_global_id
+                project_global_id = await _resolve_project_global_id(client, project_id)
+                if project_global_id:
+                    testit_url = f"{settings.TESTIT_BASE_URL}/projects/{project_global_id}/tests/{global_id}"
+            except Exception:
+                pass
 
     return UpdateOriginalResponse(
         work_item_id=work_item_id,

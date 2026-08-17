@@ -24,6 +24,31 @@ _VERIFIABLE_RULE_FIELDS: dict[str, list[str]] = {
     "test_data": ["steps"],
 }
 
+# steps/expected_results/test_data all live inside the same step-list fields, so
+# comparing whole-list equality would mark any one of them "changed" whenever
+# ANY of the others touched the list — e.g. fixing a step's action would also
+# validate an untouched test_data resolution as legit. Compare the specific
+# sub-field these rules actually care about instead.
+_STEP_SECTIONS = ("preconditions", "steps", "postconditions")
+_STEP_SUBFIELD_RULES: dict[str, str] = {
+    "steps": "action",
+    "expected_results": "expected",
+    "test_data": "test_data",
+}
+
+
+def _any_step_subfield_changed(field: str, original: dict, improved: dict) -> bool:
+    for section in _STEP_SECTIONS:
+        orig_list = original.get(section) or []
+        impr_list = improved.get(section) or []
+        for i in range(max(len(orig_list), len(impr_list))):
+            o = orig_list[i] if i < len(orig_list) and isinstance(orig_list[i], dict) else {}
+            n = impr_list[i] if i < len(impr_list) and isinstance(impr_list[i], dict) else {}
+            if o.get(field) != n.get(field):
+                return True
+    return False
+
+
 _ALL_TRACKED_FIELDS = {
     "title", "description", "tags", "priority", "preconditions", "postconditions", "steps",
 }
@@ -71,7 +96,11 @@ def _uses_linked_docs_without_links(improved: dict, original: dict) -> bool:
 
 
 def _rule_field_changed(rule: str | None, original: dict, improved: dict) -> bool:
-    if not rule or rule not in _VERIFIABLE_RULE_FIELDS:
+    if not rule:
+        return True
+    if rule in _STEP_SUBFIELD_RULES:
+        return _any_step_subfield_changed(_STEP_SUBFIELD_RULES[rule], original, improved)
+    if rule not in _VERIFIABLE_RULE_FIELDS:
         return True
     return any(original.get(f) != improved.get(f) for f in _VERIFIABLE_RULE_FIELDS[rule])
 
@@ -99,6 +128,38 @@ def _fields_touched_by_rules(selected_issues: list[dict]) -> set[str]:
     return fields
 
 
+def _restrict_step_subfields(restored: dict, original: dict, allowed_subfields: set[str]) -> dict:
+    """Within preconditions/steps/postconditions, keep only the specific
+    subfields a subfield-scoped rule (test_data/expected_results) authorized —
+    revert every other subfield (action/comments/the other of the two) back to
+    original per step, instead of trusting the whole list wholesale."""
+    result = dict(restored)
+    for section in _STEP_SECTIONS:
+        orig_list = original.get(section) or []
+        rest_list = restored.get(section) or []
+        if len(orig_list) != len(rest_list):
+            # A subfield-scoped rule (test_data/expected_results) has no license to
+            # add/remove steps — the LLM ignoring that means index-based pairing
+            # below can't be trusted (misattributes data to the wrong step, and a
+            # step with no original counterpart gets action=None, which the
+            # schema doesn't allow). Discard the whole section rather than risk
+            # either — the rule's own subfield fix is lost too, but that's the
+            # safe trade-off against silently corrupting a step.
+            result[section] = original.get(section)
+            continue
+        merged = []
+        for i in range(len(orig_list)):
+            o = orig_list[i] if isinstance(orig_list[i], dict) else {}
+            r = rest_list[i] if isinstance(rest_list[i], dict) else dict(o)
+            step = dict(r)
+            for field in ("action", "expected", "test_data", "comments"):
+                if field not in allowed_subfields:
+                    step[field] = o.get(field)
+            merged.append(step)
+        result[section] = merged
+    return result
+
+
 def _restore_untouched_fields(improved: dict, original: dict, selected_issues: list[dict]) -> dict:
     """Revert fields the LLM had no selected issue for back to the original text.
 
@@ -110,6 +171,24 @@ def _restore_untouched_fields(improved: dict, original: dict, selected_issues: l
     restored = dict(improved)
     for field in _ALL_TRACKED_FIELDS - touched:
         restored[field] = original.get(field)
+
+    if "steps" in touched:
+        rules = {_issue_rule(i) for i in selected_issues}
+        subfield_rules = {r for r in rules if r in _STEP_SUBFIELD_RULES}
+        # Any OTHER selected rule that also lands on "steps" — the general "steps"
+        # rule (may restructure the list), an unrecognized rule (already trust-
+        # everything, per _fields_touched_by_rules), or one of atomicity/
+        # independence/reproducibility (not in _VERIFIABLE_RULE_FIELDS at all,
+        # same trust-everything fallback) — means the LLM may have had a real
+        # reason to touch more than test_data/expected_results, so don't narrow.
+        other_rules_touching_steps = {
+            r for r in rules
+            if r not in _STEP_SUBFIELD_RULES
+            and (r is None or r not in _VERIFIABLE_RULE_FIELDS or _VERIFIABLE_RULE_FIELDS[r] == ["steps"])
+        }
+        if subfield_rules and not other_rules_touching_steps:
+            allowed_subfields = {_STEP_SUBFIELD_RULES[r] for r in subfield_rules}
+            restored = _restrict_step_subfields(restored, original, allowed_subfields)
     return restored
 
 

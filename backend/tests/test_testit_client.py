@@ -130,6 +130,49 @@ def test_500_raises_api_error():
             run(client.get_work_item("6109"))
 
 
+def test_5xx_retried_once_then_succeeds():
+    # _with_retry's docstring promises resilience to "a flaky TestIT instance" —
+    # but it used to only retry on network-level exceptions, so a single 5xx
+    # HTTP response (not an exception) went straight to the caller as a hard
+    # failure. One retry should now recover from a transient 502.
+    client = TestItClient(_cfg())
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=[_mock_resp(502, {"message": "bad gateway"}), _mock_resp(200, {"id": "6109"})])
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    with patch("httpx.AsyncClient", return_value=mock_client), patch("asyncio.sleep", AsyncMock()):
+        result = run(client.get_work_item("6109"))
+    assert result == {"id": "6109"}
+    assert mock_client.get.call_count == 2
+
+
+def test_5xx_persists_past_retry_raises_api_error():
+    client = TestItClient(_cfg())
+    mock_client = AsyncMock()
+    mock_client.get = AsyncMock(side_effect=[_mock_resp(503, {"message": "down"}), _mock_resp(503, {"message": "still down"})])
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    with patch("httpx.AsyncClient", return_value=mock_client), patch("asyncio.sleep", AsyncMock()):
+        with pytest.raises(TestItApiError):
+            run(client.get_work_item("6109"))
+    assert mock_client.get.call_count == 2
+
+
+def test_write_timeout_not_retried():
+    # A read timeout on a POST looks identical to the server-side view as "request
+    # received, response lost" — the write may have already been persisted, so
+    # retrying (unlike for GET) would risk creating a duplicate work item.
+    client = TestItClient(_cfg())
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+    with patch("httpx.AsyncClient", return_value=mock_client), patch("asyncio.sleep", AsyncMock()):
+        with pytest.raises(TestItConnectionError):
+            run(client.create_work_item({"name": "x"}))
+    assert mock_client.post.call_count == 1
+
+
 def test_non_json_raises_response_error():
     client = TestItClient(_cfg())
     mock_client = _make_async_client(_mock_resp(200, raises_json=True))

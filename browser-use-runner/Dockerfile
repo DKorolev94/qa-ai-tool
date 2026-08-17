@@ -1,9 +1,8 @@
-FROM python:3.11-slim
+# Chromium + OS-level deps for Playwright are baked into this image already;
+# git/curl are preinstalled too. Version pin must match the `playwright` pip
+# package pinned below.
+FROM mcr.microsoft.com/playwright/python:v1.62.0-noble
 WORKDIR /app
-
-# git required for browser-use git dependency; curl for healthchecks
-RUN apt-get update && apt-get install -y --no-install-recommends git curl \
-    && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv
 
@@ -11,8 +10,8 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --extra all --frozen
 
-# Install Chromium + OS-level dependencies for Playwright
-RUN uv pip install playwright && uv run python -m playwright install chromium --with-deps
+# Pinned to match the base image's bundled browser build
+RUN uv pip install "playwright==1.62.0"
 
 COPY . .
 ENV PYTHONPATH=/app
