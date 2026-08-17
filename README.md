@@ -18,7 +18,7 @@ AI-powered test case review and improvement tool. Integrates with TestIT, uses a
 
 ---
 
-## Quick Start (Docker)
+## Quick Start
 
 **Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Linux / macOS / Windows)
 
@@ -38,45 +38,11 @@ open http://localhost:3000
 ```
 
 ```bash
-# Prod mode (built frontend, named volumes)
-docker compose -f docker-compose.prod.yml up --build
-
 # Stop
 docker compose down
 ```
 
-> **Apple Silicon note:** `platform: linux/amd64` is already set for `browser-use-runner` in both compose files. Rosetta handles the emulation automatically.
-
----
-
-## Quick Start (local, no Docker)
-
-**Requirements:** Python 3.10+, Node.js 18+, uv (`pip install uv`)
-
-```bash
-# All services at once (uses Makefile)
-make dev
-
-# Or individually:
-
-# Backend
-cd backend && python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# browser-use-runner
-cd browser-use-runner && uv sync
-uv run uvicorn main:app --host 0.0.0.0 --port 8008 --reload
-
-# Frontend
-cd frontend && npm install && npm run dev
-```
-
-```bash
-make stop      # kill all local services
-make restart   # stop + start
-make status    # check ports
-```
+> **Apple Silicon note:** `platform: linux/amd64` is already set for `browser-use-runner` in `docker-compose.yml`. Rosetta handles the emulation automatically.
 
 ---
 
